@@ -21,7 +21,7 @@ There is no lint-fix or format-check script beyond `flutter analyze`; the projec
 
 ## Architecture
 
-This is a Flutter **game platform** (no backend yet — Supabase integration is intentionally deferred; see below): a `Navigator`-based shell that hosts multiple independent games — currently "Bombalı Sayılar", "Kart Eşleştirme", "Renk mi Kelime mi?", "Dizi Hafızası", and "Desen Tamamlama". State management is `provider` (`ChangeNotifier` + `MultiProvider`), scoped **per game**, not globally.
+This is a Flutter **game platform** (no backend yet — Supabase integration is intentionally deferred; see below): a `Navigator`-based shell that hosts multiple independent games — currently "Bombalı Sayılar", "Kart Eşleştirme", "Renk mi Kelime mi?", "Dizi Hafızası", "Desen Tamamlama", and "Tepki Süresi". State management is `provider` (`ChangeNotifier` + `MultiProvider`), scoped **per game**, not globally.
 
 ### Platform shell and adding a new game
 
@@ -82,6 +82,18 @@ The platform-level `MaterialApp.theme` is a neutral fixed seed (`Colors.indigo`)
 - Winner = most `correctCount` (`PatternController.rankedByCorrect`).
 - `PatternGameScreen` builds two small private widgets inline (not extracted to `lib/widgets/`, matching Stroop's own inline `_ColorNameButton` precedent rather than the shared-widget-file precedent used by more complex/reused visuals like `grid_cell.dart`): `_NumberChip` (non-interactive, displays one sequence term or "?") and `_OptionButton` (`key: ValueKey(option)` for testability, mirroring Stroop's `_ColorNameButton(key: ValueKey(option))`).
 - No `AppThemeController`/`SoundService`/`SpeechService`/`GameResultRepository` integration — same reasoning as Stroop/Kart Eşleştirme/Dizi Hafızası. Add only if asked.
+
+### Screen flow / rules (Tepki Süresi — reaction-time test)
+
+`games/reflex_game.dart`'s `ReflexGame` wraps a single `ChangeNotifierProvider<ReflexController>` around `_ReflexRoot`, which switches on `ReflexController.phase` (`ReflexGamePhase`: `setup → playing → turnTransition → finished`, the same round-counted four-phase shape as Stroop/Desen Tamamlama) to show `ReflexSetupScreen` / `ReflexGameScreen` / `ReflexTurnTransitionScreen` / `ReflexResultsScreen`.
+
+- This is the first game whose controller measures **elapsed wall-clock time** rather than just sequencing discrete choices. Each of `reflexRoundsPerPlayer` (5) rounds: a big tappable area (`ReflexGameScreen`'s `Key('reflexTapArea')` `GestureDetector`) shows "Bekle..." (`ReflexRoundState.waiting`, red) for a random delay between `_minSignalDelay` (1200ms) and `_maxSignalDelay` (3500ms), then flips to "ŞİMDİ! Dokun!" (`ready`, green) and starts a `Stopwatch`. Tapping during `waiting` is a false start — it records the fixed `falseStartPenaltyMs` (1000ms) instead of a real time. Tapping during `ready` stops the stopwatch and records `elapsedMilliseconds`.
+- **`Stopwatch`, not `DateTime.now().difference(...)`**: `Stopwatch` is monotonic (immune to clock adjustments/NTP sync mid-measurement); `DateTime.now()` elsewhere in this codebase (e.g. `GameController`) is only ever used to store a timestamp, never to measure a duration — this is a deliberately different tool for a deliberately different job. Follow this precedent if you add more timing-sensitive games.
+- **`_beginRound`'s pending signal-reveal delay is guarded by two conditions, not just `_generation`**: `if (generation != _generation || roundState != ReflexRoundState.waiting) return;`. The extra `roundState` check is genuinely load-bearing here (unlike in other games where `_generation` alone suffices) — a false start happens *within the same generation* (the game hasn't restarted), so the already-scheduled "reveal" timer must recognize the round already resolved to `tooEarly` and not silently flip it back to `ready`. `tap()`'s own reentrancy guard stays simple (`if (_resolving) return;` only) since `roundState ∈ {tooEarly, result}` is only ever true while `_resolving` is also true — checking both would be redundant.
+- **Round-count constant is `reflexRoundsPerPlayer`**, not `roundsPerPlayer`/`patternRoundsPerPlayer` — same "ambiguous import" reasoning as Desen Tamamlama's naming note above; every trial/round-based game needs its own distinctly-named top-level round-count constant since `test/widget_test.dart` imports every controller into one file.
+- **Testability caveat**: `Stopwatch`/`DateTime` are **not** virtualized by `tester.pump()` — pumping virtual time does not change what `Stopwatch.elapsedMilliseconds` reports, since only `Future.delayed`/`Timer` are faked by the test framework. Tests must only assert `roundState` transitions and counters (`roundsPlayed`, `reactionTimes.length`), never a specific millisecond value. Two determinism tricks make this testable anyway: tapping immediately after `startGame` (no pump at all) is *always* a false start, since `_minSignalDelay` is a hard 1200ms floor; pumping the full `_maxSignalDelay` (3500ms) *always* reaches `ready` regardless of the RNG draw, since `_rng.nextInt(range)` never returns the range's upper bound.
+- Winner = lowest average reaction time (`ReflexController.rankedByAverage`, `ReflexPlayerState.averageMs`).
+- No `AppThemeController`/`SoundService`/`SpeechService`/`GameResultRepository` integration — same reasoning as the other games without it. Add only if asked.
 
 ### Player count (1 or 2 players — platform-wide convention)
 

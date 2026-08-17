@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../games/bombali_sayilar_game.dart';
 import '../games/memory_match_game.dart';
 import '../games/pattern_game.dart';
+import '../games/reflex_game.dart';
 import '../games/sequence_memory_game.dart';
 import '../games/stroop_game.dart';
 import '../models/game_catalog_entry.dart';
@@ -60,6 +61,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.blueGrey,
     routeName: PatternGame.routeName,
     skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 5, hafiza: 1),
+  ),
+  GameCatalogEntry(
+    title: 'Tepki Süresi',
+    description:
+        'Ekran yeşile dönünce olabildiğince hızlı dokun! Erken dokunma, '
+        'cezası var. En düşük ortalama süre kazanır.',
+    icon: Icons.bolt,
+    color: Colors.red,
+    routeName: ReflexGame.routeName,
+    skills: GameSkillRatings(zeka: 1, ingilizce: 0, iq: 2, hafiza: 0),
   ),
 ];
 

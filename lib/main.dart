@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'games/bombali_sayilar_game.dart';
 import 'games/memory_match_game.dart';
 import 'games/pattern_game.dart';
+import 'games/reflex_game.dart';
 import 'games/sequence_memory_game.dart';
 import 'games/stroop_game.dart';
 import 'screens/game_catalog_screen.dart';
@@ -34,6 +35,7 @@ class GamePlatformApp extends StatelessWidget {
           SequenceMemoryGame.routeName => (BuildContext _) =>
               const SequenceMemoryGame(),
           PatternGame.routeName => (BuildContext _) => const PatternGame(),
+          ReflexGame.routeName => (BuildContext _) => const ReflexGame(),
           _ => (BuildContext _) => const GameCatalogScreen(),
         };
         return MaterialPageRoute(builder: builder, settings: settings);

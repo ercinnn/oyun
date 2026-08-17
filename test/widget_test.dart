@@ -5,17 +5,20 @@ import 'package:provider/provider.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
+import 'package:bombali_sayilar/controllers/reflex_controller.dart';
 import 'package:bombali_sayilar/controllers/sequence_memory_controller.dart';
 import 'package:bombali_sayilar/controllers/stroop_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
 import 'package:bombali_sayilar/main.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
+import 'package:bombali_sayilar/models/reflex_round_state.dart';
 import 'package:bombali_sayilar/models/sequence_tile_color.dart';
 import 'package:bombali_sayilar/screens/game_screen.dart';
 import 'package:bombali_sayilar/screens/memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_catalog_screen.dart';
 import 'package:bombali_sayilar/screens/pattern_game_screen.dart';
+import 'package:bombali_sayilar/screens/reflex_game_screen.dart';
 import 'package:bombali_sayilar/screens/sequence_memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/setup_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
@@ -124,6 +127,34 @@ Future<void> _answerPatternCorrectly(
   await tester.pump(const Duration(milliseconds: 400));
 }
 
+/// Platform ana menüsünden Tepki Süresi oyununa girer.
+Future<void> _openReflex(WidgetTester tester) async {
+  // Bkz. _openSequenceMemory/_openPattern — 6. (son) kart, beceri tablosu
+  // yüzünden lazy build cache dışında kalabiliyor.
+  tester.view.physicalSize = const Size(800, 3600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Tepki Süresi'));
+  await tester.pumpAndSettle();
+}
+
+// ReflexController'daki gecikme sabitleri kütüphane içi (private)
+// olduğundan, diğer oyun testlerinin de yaptığı gibi burada kendi
+// kopyaları tutulur.
+const _reflexMaxSignalDelay = Duration(milliseconds: 3500);
+const _reflexFeedbackDelay = Duration(milliseconds: 900);
+
+/// `startGame`'den hemen sonra (hiç pump etmeden) dokunur; `_minSignalDelay`
+/// (1200ms) bir taban olduğu için bu deterministik olarak erken başlamadır.
+/// Bir turu hızlıca bitirmenin en basit yolu.
+Future<void> _falseStartTap(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('reflexTapArea')));
+  await tester.pump(_reflexFeedbackDelay);
+}
+
 /// [controller.cards] içinde aynı sembole sahip kartları sembole göre
 /// gruplar; her grup tam olarak o çiftin iki index'ini içerir.
 Map<String, List<int>> _groupCardIndicesBySymbol(
@@ -140,10 +171,10 @@ void main() {
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
-    // Katalog listesi 5 karta çıktığı için varsayılan test görünümünde
+    // Katalog listesi 6 karta çıktığı için varsayılan test görünümünde
     // ListView'in lazy build cache'i son kartı henüz kurmayabilir; tam
     // liste görünür olsun diye görünümü uzatıyoruz.
-    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.physicalSize = const Size(800, 3600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -156,6 +187,7 @@ void main() {
     expect(find.text('Renk mi Kelime mi?'), findsOneWidget);
     expect(find.text('Dizi Hafızası'), findsOneWidget);
     expect(find.text('Desen Tamamlama'), findsOneWidget);
+    expect(find.text('Tepki Süresi'), findsOneWidget);
   });
 
   testWidgets(
@@ -164,7 +196,7 @@ void main() {
       // Her kart artık 4 satırlık bir yıldız tablosu da içeriyor; ListView'in
       // lazy build cache'i tüm kartları kurabilsin diye görünümü daha da
       // uzatıyoruz.
-      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.physicalSize = const Size(800, 3600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -875,6 +907,151 @@ void main() {
 
       expect(controller.currentPlayerIndex, 1);
       expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Reflex: starting a game shows the waiting state', (
+    WidgetTester tester,
+  ) async {
+    await _openReflex(tester);
+    await tester.tap(find.text('Oyunu Başlat'));
+    await tester.pump();
+
+    expect(find.textContaining('oynuyor'), findsOneWidget);
+    expect(find.text('Bekle...'), findsOneWidget);
+
+    // Testin sonunda bekleyen bir zamanlayıcı kalmaması için sinyal
+    // gecikmesinin bitmesini bekle.
+    await tester.pump(_reflexMaxSignalDelay);
+  });
+
+  testWidgets(
+    'Reflex: tapping before the signal is a false start',
+    (WidgetTester tester) async {
+      await _openReflex(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ReflexController>(
+        tester.element(find.byType(ReflexGameScreen)),
+        listen: false,
+      );
+
+      // _minSignalDelay bir taban olduğu için hiç pump etmeden dokunmak
+      // deterministik olarak erken başlamadır.
+      await tester.tap(find.byKey(const Key('reflexTapArea')));
+      await tester.pump();
+
+      expect(controller.roundState, ReflexRoundState.tooEarly);
+      expect(find.text('Çok erken!'), findsOneWidget);
+      expect(controller.players[0].reactionTimes, [falseStartPenaltyMs]);
+      expect(controller.players[0].roundsPlayed, 1);
+
+      // Testin sonunda bekleyen zamanlayıcı kalmaması için geri bildirim
+      // gecikmesini ve ardından başlayan sıradaki turun sinyal gecikmesini
+      // bitir.
+      await tester.pump(_reflexFeedbackDelay);
+      await tester.pump(_reflexMaxSignalDelay);
+    },
+  );
+
+  testWidgets(
+    'Reflex: tapping after the signal records a reaction time',
+    (WidgetTester tester) async {
+      await _openReflex(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ReflexController>(
+        tester.element(find.byType(ReflexGameScreen)),
+        listen: false,
+      );
+
+      // _maxSignalDelay kadar pump etmek, RNG ne çekerse çeksin
+      // deterministik olarak "ready" durumuna ulaştırır.
+      await tester.pump(_reflexMaxSignalDelay);
+      expect(controller.roundState, ReflexRoundState.ready);
+
+      await tester.tap(find.byKey(const Key('reflexTapArea')));
+      await tester.pump();
+
+      expect(controller.roundState, ReflexRoundState.result);
+      expect(controller.players[0].roundsPlayed, 1);
+      expect(controller.players[0].reactionTimes, hasLength(1));
+
+      // Testin sonunda bekleyen zamanlayıcı kalmaması için geri bildirim
+      // gecikmesini ve ardından başlayan sıradaki turun sinyal gecikmesini
+      // bitir.
+      await tester.pump(_reflexFeedbackDelay);
+      await tester.pump(_reflexMaxSignalDelay);
+    },
+  );
+
+  testWidgets(
+    'Reflex: 1 Kişi tamamlanınca sonuç ekranında ortalama süre görünür',
+    (WidgetTester tester) async {
+      await _openReflex(tester);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      expect(find.text('2. Oyuncu adı'), findsNothing);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ReflexController>(
+        tester.element(find.byType(ReflexGameScreen)),
+        listen: false,
+      );
+      expect(controller.players, hasLength(1));
+
+      for (var round = 0; round < reflexRoundsPerPlayer; round++) {
+        await _falseStartTap(tester);
+      }
+      // Her erken başlama, bir sonraki tur için yeni bir sinyal gecikmesi
+      // zamanlayıcısı da başlatır (o tur da erken bitirildiği için hiç
+      // ateşlenmez); testin sonunda bekleyen zamanlayıcı kalmaması için
+      // hepsini tek seferde temizle.
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sonuçlar'), findsOneWidget);
+      expect(find.textContaining('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Reflex: 2 Kişi — ilk oyuncu bitirince sıra ikinciye geçer',
+    (WidgetTester tester) async {
+      await _openReflex(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ReflexController>(
+        tester.element(find.byType(ReflexGameScreen)),
+        listen: false,
+      );
+
+      for (var round = 0; round < reflexRoundsPerPlayer; round++) {
+        await _falseStartTap(tester);
+      }
+      // Bkz. "1 Kişi" testindeki not: her erken başlama bir sonraki turun
+      // sinyal zamanlayıcısını da başlatıyor, hiçbiri ateşlenmiyor.
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+
+      expect(controller.players[0].roundsPlayed, reflexRoundsPerPlayer);
+      expect(find.textContaining('Sıra'), findsOneWidget);
+
+      await tester.tap(find.text('Hazırım'));
+      await tester.pump();
+
+      expect(controller.currentPlayerIndex, 1);
+      expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+
+      // Testin sonunda bekleyen bir zamanlayıcı kalmaması için 2. oyuncunun
+      // ilk turunun sinyal gecikmesinin bitmesini bekle.
+      await tester.pump(_reflexMaxSignalDelay);
     },
   );
 }
