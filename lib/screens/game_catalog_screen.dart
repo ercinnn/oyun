@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../games/bombali_sayilar_game.dart';
 import '../games/memory_match_game.dart';
 import '../games/pattern_game.dart';
+import '../games/puzzle_game.dart';
 import '../games/reflex_game.dart';
 import '../games/sequence_memory_game.dart';
+import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
 import '../models/game_catalog_entry.dart';
 import '../widgets/skill_ratings_table.dart';
@@ -71,6 +73,26 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.red,
     routeName: ReflexGame.routeName,
     skills: GameSkillRatings(zeka: 1, ingilizce: 0, iq: 2, hafiza: 0),
+  ),
+  GameCatalogEntry(
+    title: 'Simon Diyor ki',
+    description:
+        'Sadece "Simon dedi ki" ile başlayan talimatı uygula, değilse Pas '
+        'Geç\'e bas! En çok doğru cevabı veren kazanır.',
+    icon: Icons.record_voice_over,
+    color: Colors.pink,
+    routeName: SimonGame.routeName,
+    skills: GameSkillRatings(zeka: 3, ingilizce: 0, iq: 2, hafiza: 1),
+  ),
+  GameCatalogEntry(
+    title: 'Kayan Yapboz',
+    description:
+        'Sayıları sırayla dizmeye çalış! Boş kareye komşu bir sayıya '
+        'dokunarak kaydır. En az hamlede tamamlayan kazanır.',
+    icon: Icons.extension,
+    color: Colors.cyan,
+    routeName: PuzzleGame.routeName,
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 4, hafiza: 2),
   ),
 ];
 

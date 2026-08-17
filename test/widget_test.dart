@@ -5,22 +5,30 @@ import 'package:provider/provider.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
+import 'package:bombali_sayilar/controllers/puzzle_controller.dart';
 import 'package:bombali_sayilar/controllers/reflex_controller.dart';
 import 'package:bombali_sayilar/controllers/sequence_memory_controller.dart';
+import 'package:bombali_sayilar/controllers/simon_controller.dart';
 import 'package:bombali_sayilar/controllers/stroop_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
 import 'package:bombali_sayilar/main.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
+import 'package:bombali_sayilar/models/puzzle_player_state.dart';
 import 'package:bombali_sayilar/models/reflex_round_state.dart';
 import 'package:bombali_sayilar/models/sequence_tile_color.dart';
+import 'package:bombali_sayilar/models/simon_attribute_type.dart';
+import 'package:bombali_sayilar/models/simon_tile_id.dart';
+import 'package:bombali_sayilar/models/simon_trial.dart';
 import 'package:bombali_sayilar/screens/game_screen.dart';
 import 'package:bombali_sayilar/screens/memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_catalog_screen.dart';
 import 'package:bombali_sayilar/screens/pattern_game_screen.dart';
+import 'package:bombali_sayilar/screens/puzzle_game_screen.dart';
 import 'package:bombali_sayilar/screens/reflex_game_screen.dart';
 import 'package:bombali_sayilar/screens/sequence_memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/setup_screen.dart';
+import 'package:bombali_sayilar/screens/simon_game_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
 import 'package:bombali_sayilar/widgets/star_rating.dart';
@@ -155,6 +163,51 @@ Future<void> _falseStartTap(WidgetTester tester) async {
   await tester.pump(_reflexFeedbackDelay);
 }
 
+/// Platform ana menüsünden Simon Diyor ki oyununa girer. Katalog listesi
+/// 7 karta çıktığı için (bkz. "Game catalog shows the available games")
+/// son kartın ListView'in lazy build cache'i dışında kalmaması için
+/// görünümü uzatıyoruz.
+Future<void> _openSimon(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 4200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Simon Diyor ki'));
+  await tester.pumpAndSettle();
+}
+
+/// Mevcut turun doğru tepkisini verir: `obey` ise hedef kutuya, değilse
+/// "Pas Geç" butonuna basar; ardından geri bildirim gecikmesinin
+/// geçmesini bekler.
+Future<void> _respondCorrectly(
+  WidgetTester tester,
+  SimonController controller,
+) async {
+  final trial = controller.currentTrial;
+  final finder = trial.obey
+      ? find.byKey(ValueKey(trial.target))
+      : find.byKey(const Key('simonPassButton'));
+  await tester.tap(finder);
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+/// Platform ana menüsünden Kayan Yapboz oyununa girer. Katalog listesi
+/// 8 karta çıktığı için (bkz. "Game catalog shows the available games")
+/// son kartın ListView'in lazy build cache'i dışında kalmaması için
+/// görünümü uzatıyoruz.
+Future<void> _openPuzzle(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 4800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Kayan Yapboz'));
+  await tester.pumpAndSettle();
+}
+
 /// [controller.cards] içinde aynı sembole sahip kartları sembole göre
 /// gruplar; her grup tam olarak o çiftin iki index'ini içerir.
 Map<String, List<int>> _groupCardIndicesBySymbol(
@@ -171,10 +224,10 @@ void main() {
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
-    // Katalog listesi 6 karta çıktığı için varsayılan test görünümünde
+    // Katalog listesi 8 karta çıktığı için varsayılan test görünümünde
     // ListView'in lazy build cache'i son kartı henüz kurmayabilir; tam
     // liste görünür olsun diye görünümü uzatıyoruz.
-    tester.view.physicalSize = const Size(800, 3600);
+    tester.view.physicalSize = const Size(800, 4800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -188,6 +241,8 @@ void main() {
     expect(find.text('Dizi Hafızası'), findsOneWidget);
     expect(find.text('Desen Tamamlama'), findsOneWidget);
     expect(find.text('Tepki Süresi'), findsOneWidget);
+    expect(find.text('Simon Diyor ki'), findsOneWidget);
+    expect(find.text('Kayan Yapboz'), findsOneWidget);
   });
 
   testWidgets(
@@ -196,7 +251,7 @@ void main() {
       // Her kart artık 4 satırlık bir yıldız tablosu da içeriyor; ListView'in
       // lazy build cache'i tüm kartları kurabilsin diye görünümü daha da
       // uzatıyoruz.
-      tester.view.physicalSize = const Size(800, 3600);
+      tester.view.physicalSize = const Size(800, 4800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -1052,6 +1107,285 @@ void main() {
       // Testin sonunda bekleyen bir zamanlayıcı kalmaması için 2. oyuncunun
       // ilk turunun sinyal gecikmesinin bitmesini bekle.
       await tester.pump(_reflexMaxSignalDelay);
+    },
+  );
+
+  testWidgets(
+    'Simon: starting a game shows the instruction, 4 tiles and pass button',
+    (WidgetTester tester) async {
+      await _openSimon(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('oynuyor'), findsOneWidget);
+      expect(
+        find.textContaining('Tur 1 / $simonRoundsPerPlayer'),
+        findsOneWidget,
+      );
+      for (final tile in SimonTileId.values) {
+        expect(find.byKey(ValueKey(tile)), findsOneWidget);
+      }
+      expect(find.byKey(const Key('simonPassButton')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Simon: correct response (obey) increments the score',
+    (WidgetTester tester) async {
+      await _openSimon(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SimonController>(
+        tester.element(find.byType(SimonGameScreen)),
+        listen: false,
+      );
+      // Deterministik bir "Simon dedi ki" turu için doğrudan controller
+      // state'ini set ediyoruz (Pattern/SequenceMemory testlerindeki gibi,
+      // controller alanları public).
+      controller.currentTrial = SimonTrial(
+        obey: true,
+        attributeType: SimonAttributeType.color,
+        target: SimonTileId.redCircle,
+        boardOrder: SimonTileId.values,
+      );
+
+      await _respondCorrectly(tester, controller);
+
+      expect(controller.currentPlayer.correctCount, 1);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+    },
+  );
+
+  testWidgets(
+    'Simon: correct response (Pas Geç) increments the score',
+    (WidgetTester tester) async {
+      await _openSimon(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SimonController>(
+        tester.element(find.byType(SimonGameScreen)),
+        listen: false,
+      );
+      // Deterministik bir "Simon dedi ki" OLMAYAN tur için doğrudan
+      // controller state'ini set ediyoruz.
+      controller.currentTrial = SimonTrial(
+        obey: false,
+        attributeType: SimonAttributeType.shape,
+        target: SimonTileId.greenTriangle,
+        boardOrder: SimonTileId.values,
+      );
+
+      await _respondCorrectly(tester, controller);
+
+      expect(controller.currentPlayer.correctCount, 1);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+    },
+  );
+
+  testWidgets(
+    'Simon: 1 Kişi tamamlanınca sonuç ekranında doğru sayısı görünür',
+    (WidgetTester tester) async {
+      await _openSimon(tester);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      expect(find.text('2. Oyuncu adı'), findsNothing);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SimonController>(
+        tester.element(find.byType(SimonGameScreen)),
+        listen: false,
+      );
+      expect(controller.players, hasLength(1));
+
+      for (var round = 0; round < simonRoundsPerPlayer; round++) {
+        await _respondCorrectly(tester, controller);
+      }
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sonuçlar'), findsOneWidget);
+      expect(find.textContaining('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+      expect(
+        find.text('$simonRoundsPerPlayer / $simonRoundsPerPlayer doğru'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Simon: 2 Kişi — ilk oyuncu bitirince sıra ikinciye geçer',
+    (WidgetTester tester) async {
+      await _openSimon(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SimonController>(
+        tester.element(find.byType(SimonGameScreen)),
+        listen: false,
+      );
+
+      for (var round = 0; round < simonRoundsPerPlayer; round++) {
+        await _respondCorrectly(tester, controller);
+      }
+      await tester.pumpAndSettle();
+
+      expect(controller.players[0].correctCount, simonRoundsPerPlayer);
+      expect(find.textContaining('Sıra'), findsOneWidget);
+
+      await tester.tap(find.text('Hazırım'));
+      await tester.pumpAndSettle();
+
+      expect(controller.currentPlayerIndex, 1);
+      expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Puzzle: starting a game shows 15 numbered tiles',
+    (WidgetTester tester) async {
+      await _openPuzzle(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('oynuyor'), findsOneWidget);
+      for (var value = 1; value <= 15; value++) {
+        expect(find.text('$value'), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets(
+    'Puzzle: tapping a tile adjacent to the empty cell slides it',
+    (WidgetTester tester) async {
+      await _openPuzzle(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<PuzzleController>(
+        tester.element(find.byType(PuzzleGameScreen)),
+        listen: false,
+      );
+      final emptyIndex = controller.currentPlayer.tiles.indexOf(0);
+      final adjacentIndex = adjacentIndices(emptyIndex).first;
+      final movedValue = controller.currentPlayer.tiles[adjacentIndex];
+
+      await tester.tap(find.byKey(ValueKey(movedValue)));
+      await tester.pump();
+
+      expect(controller.currentPlayer.moveCount, 1);
+      expect(controller.currentPlayer.tiles[emptyIndex], movedValue);
+      expect(controller.currentPlayer.tiles[adjacentIndex], 0);
+    },
+  );
+
+  testWidgets(
+    'Puzzle: tapping a non-adjacent tile does nothing',
+    (WidgetTester tester) async {
+      await _openPuzzle(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<PuzzleController>(
+        tester.element(find.byType(PuzzleGameScreen)),
+        listen: false,
+      );
+      final emptyIndex = controller.currentPlayer.tiles.indexOf(0);
+      final neighbors = adjacentIndices(emptyIndex);
+      final nonAdjacentIndex = List.generate(
+        16,
+        (i) => i,
+      ).firstWhere((i) => i != emptyIndex && !neighbors.contains(i));
+      final tappedValue = controller.currentPlayer.tiles[nonAdjacentIndex];
+
+      await tester.tap(find.byKey(ValueKey(tappedValue)));
+      await tester.pump();
+
+      expect(controller.currentPlayer.moveCount, 0);
+    },
+  );
+
+  testWidgets(
+    'Puzzle: 1 Kişi tamamlanınca sonuç ekranında hamle sayısı görünür',
+    (WidgetTester tester) async {
+      await _openPuzzle(tester);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      expect(find.text('2. Oyuncu adı'), findsNothing);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<PuzzleController>(
+        tester.element(find.byType(PuzzleGameScreen)),
+        listen: false,
+      );
+      expect(controller.players, hasLength(1));
+
+      // Çözülmeye tam bir hamle uzak bir durum set ediyoruz — gerçek bir
+      // karışık 15'lik bulmacayı testte çözmek bir solver gerektirir.
+      final oneMoveFromSolved = List<int>.generate(16, (i) {
+        if (i == 14) return 0;
+        if (i == 15) return 15;
+        return i + 1;
+      });
+      for (var i = 0; i < oneMoveFromSolved.length; i++) {
+        controller.currentPlayer.tiles[i] = oneMoveFromSolved[i];
+      }
+
+      // Doğrudan controller.moveTile çağırıyoruz: tiles listesini yerinde
+      // değiştirdiğimiz için widget ağacı henüz yeniden kurulmadı, bu
+      // yüzden find.byKey(ValueKey(15)) hâlâ eski (karışık) düzendeki
+      // index'e bağlı kalırdı.
+      controller.moveTile(15);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sonuçlar'), findsOneWidget);
+      expect(find.textContaining('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+      expect(find.text('1 hamle'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Puzzle: 2 Kişi — ilk oyuncu bitirince sıra ikinciye geçer',
+    (WidgetTester tester) async {
+      await _openPuzzle(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<PuzzleController>(
+        tester.element(find.byType(PuzzleGameScreen)),
+        listen: false,
+      );
+
+      final oneMoveFromSolved = List<int>.generate(16, (i) {
+        if (i == 14) return 0;
+        if (i == 15) return 15;
+        return i + 1;
+      });
+      for (var i = 0; i < oneMoveFromSolved.length; i++) {
+        controller.currentPlayer.tiles[i] = oneMoveFromSolved[i];
+      }
+
+      // Doğrudan controller.moveTile çağırıyoruz: tiles listesini yerinde
+      // değiştirdiğimiz için widget ağacı henüz yeniden kurulmadı, bu
+      // yüzden find.byKey(ValueKey(15)) hâlâ eski (karışık) düzendeki
+      // index'e bağlı kalırdı.
+      controller.moveTile(15);
+      await tester.pumpAndSettle();
+
+      expect(controller.players[0].moveCount, 1);
+      expect(find.textContaining('Sıra'), findsOneWidget);
+
+      await tester.tap(find.text('Hazırım'));
+      await tester.pumpAndSettle();
+
+      expect(controller.currentPlayerIndex, 1);
+      expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
     },
   );
 }
