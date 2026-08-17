@@ -1,0 +1,120 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+flutter pub get                 # install dependencies
+flutter analyze                 # static analysis (must be clean before considering a change done)
+flutter test                    # run all widget tests
+flutter test test/widget_test.dart --plain-name "Hitting a bomb"  # run a single test by name
+flutter run -d chrome           # run in Chrome (auto-launches a managed browser)
+flutter run -d web-server --web-port=<port> --web-hostname=localhost  # run without auto-launching a browser (use this if -d chrome fails to launch; open the printed URL manually)
+flutter run -d windows          # run as a Windows desktop app
+dart run tool/generate_sounds.dart  # regenerate assets/sounds/{bomb,win}.wav if the synthesis parameters change
+```
+
+There is no lint-fix or format-check script beyond `flutter analyze`; the project uses the default `flutter_lints` rule set (see `analysis_options.yaml`).
+
+**Adding a new dependency with a native/web platform implementation** (e.g. `flutter_tts`) requires a full stop-and-restart of any running `flutter run` session — hot reload (`r`) and even hot restart (`R`) only swap Dart code in the already-compiled bundle, they don't regenerate the web plugin registrant that wires the new platform channel up. Skipping the full restart doesn't error at build time; it fails silently at runtime with `MissingPluginException` on every call to the new plugin. If you (or the user) see that exception, the fix is a full stop + `flutter run` again, not a code change.
+
+## Architecture
+
+This is a Flutter **game platform** (no backend yet — Supabase integration is intentionally deferred; see below): a `Navigator`-based shell that hosts multiple independent games — currently "Bombalı Sayılar", "Kart Eşleştirme", "Renk mi Kelime mi?", "Dizi Hafızası", and "Desen Tamamlama". State management is `provider` (`ChangeNotifier` + `MultiProvider`), scoped **per game**, not globally.
+
+### Platform shell and adding a new game
+
+`main.dart`'s `GamePlatformApp` is a `MaterialApp` with `initialRoute: GameCatalogScreen.routeName` ('/') and an `onGenerateRoute` that maps route names to game root widgets. `screens/game_catalog_screen.dart` renders the home menu from the `gameCatalog` list (`GameCatalogEntry`: title/description/icon/color/routeName) — each card pushes its game's route by name via `Navigator.pushNamed`.
+
+To add a new game:
+1. Create `games/<new_game>_game.dart` with a root widget (see `games/bombali_sayilar_game.dart`) that owns a `static const routeName` and sets up that game's own `MultiProvider` scope (its controllers are created fresh on every navigation into the route and disposed on pop — game state never leaks between games or across a "leave and come back").
+2. Add a case for that `routeName` in `main.dart`'s `onGenerateRoute`.
+3. Add a `GameCatalogEntry` for it to `gameCatalog` in `screens/game_catalog_screen.dart`.
+4. Give its setup screen a `widgets/player_count_selector.dart` (`PlayerCountSelector`, 1/2 players) and honor it consistently (see "Player count" below) — this is a platform-wide convention every game follows.
+5. Give its `GameCatalogEntry` a `skills: GameSkillRatings(...)` (`models/game_catalog_entry.dart`) — 0-5 scores for Zeka/İngilizce/IQ/Hafıza, rendered as a 4-row star table on the catalog card by `widgets/skill_ratings_table.dart`'s `SkillRatingsTable`. The field is `required`, so a new entry won't compile without it. Score honestly against what the game actually trains (e.g. only Kart Eşleştirme scores above 0 on İngilizce, since it's the only game with any English content); don't hide a 0 score by omitting that row — every card shows all four rows for a consistent table shape.
+
+The platform-level `MaterialApp.theme` is a neutral fixed seed (`Colors.indigo`) — it does **not** react to any single game's theme picker. A game that wants its own live-selectable color scheme (as Bombalı Sayılar does) wraps its own subtree in a local `Theme(...)` fed by its own `AppThemeController`, scoped inside that game's root widget, not at the platform level.
+
+### Screen flow (Bombalı Sayılar)
+
+`games/bombali_sayilar_game.dart`'s `BombaliSayilarGame` wraps two `ChangeNotifierProvider`s (`GameController`, `AppThemeController`) around `_BombaliSayilarRoot`, which switches on `GameController.phase` (`GamePhase`: `setup → playing → turnTransition → finished`) to show `SetupScreen` / `GameScreen` / `TurnTransitionScreen` / `ResultsScreen`. Within this one game there are still no named sub-routes — adding a new screen to *this* game means adding a `GamePhase` value and a case in `_BombaliSayilarRoot`. Because the game is pushed via `Navigator`, every screen's `AppBar` gets Flutter's default back button for free, returning to the game catalog.
+
+### Screen flow / rules (Kart Eşleştirme)
+
+`games/memory_match_game.dart`'s `MemoryMatchGame` wraps a single `ChangeNotifierProvider<MemoryMatchController>` around `_MemoryMatchRoot`, which switches on `MemoryMatchController.phase` (`MemoryGamePhase`: `setup → playing → finished`, no `turnTransition` — turns pass silently since nothing needs to be hidden between hand-offs) to show `MemorySetupScreen` / `MemoryGameScreen` / `MemoryResultsScreen`.
+
+- Grid is `gridColumns × gridRows` (4×4 = `pairCount` = 8 pairs, see `controllers/memory_match_controller.dart`); cards are two-per-symbol, shuffled fresh in `startGame`. Matching is still by `symbol` equality — each pair's two `MemoryCard`s additionally carry a different `label` (one gets the Turkish name, the other the English name), shown under the emoji on the front face as a lightweight vocabulary hook; this is purely cosmetic and never affects match logic.
+- The setup screen's `widgets/memory_category_selector.dart` (`MemoryCategorySelector`) lets the player pick a `models/memory_category.dart` `MemoryCategory` (`fruits` or `vehicles`) before starting; `startGame(names, {required category})` looks up the matching symbol/name table via `_namesFor(category)` (`_fruitNames` has 12 entries, a random 8 are used per game; `_vehicleNames` has exactly 8 and all are used every game). To add a new category: add an enum value, a `_xxxNames` map with **at least `pairCount` (8)** entries, a case in `_namesFor`, and a segment in `MemoryCategorySelector`.
+- `MemoryMatchController.flipCard` is the only mutator during play: a match keeps the turn on the same player (`currentPlayerIndex` unchanged) after a short reveal delay (400ms); a mismatch flips both cards back and advances `currentPlayerIndex` after a longer delay (850ms) so both players can see what was revealed. Both delays are guarded by a `_generation` counter bumped in `startGame`/`restart`, so a stale delayed callback from a game that was since restarted can't corrupt the new one's state.
+- Winner = most `matchedPairs` (`MemoryMatchController.rankedByMatches`), the inverse ordering from Bombalı Sayılar's "fewest attempts wins".
+- `widgets/memory_card_widget.dart` does the flip visual: a `TweenAnimationBuilder` drives a Y-axis `Matrix4` rotation between a fixed card-back face and the symbol face, matching the platform's general "make it feel 3D" direction (see the `grid_cell.dart` press/explode treatment in Bombalı Sayılar) — but this game intentionally has **no** `AppThemeController` integration; its fixed card-back color is a deliberate scope choice to avoid forcing a mismatched preset UI (the preset swatches literally render a sample digit, a Bombalı Sayılar-specific affordance) onto a differently-shaped game. Add real per-game theming here only if asked.
+- Tapping an already-**matched** card (not during active flip/resolve play) doesn't call `flipCard` — `MemoryGameScreen`'s `onTap` branches on `card.isMatched` and calls `MemoryMatchController.pronounce(index)` instead, which speaks `card.label` in `card.languageCode` ('tr-TR' or 'en-US', set per-card in `startGame`) via `services/speech_service.dart`'s `SpeechService` (wraps the `flutter_tts` plugin, which uses the browser's Web Speech API on web — no audio assets needed). `pronounce` never mutates game state, purely a pronunciation-practice affordance (small `Icons.volume_up` hint shown on matched cards in `memory_card_widget.dart`). Since a real distinct "child voice" TTS voice isn't reliably available across browsers/OSes, `SpeechService` approximates a child-friendly tone with a higher pitch (1.4) and slower rate (0.42) rather than trying to select a named voice — document this reasoning if you touch it, so nobody "fixes" it into picking a voice by name and reintroduces cross-platform flakiness.
+
+### Screen flow / rules (Renk mi Kelime mi? — Stroop test)
+
+`games/stroop_game.dart`'s `StroopGame` wraps a single `ChangeNotifierProvider<StroopController>` around `_StroopRoot`, which switches on `StroopController.phase` (`StroopGamePhase`: `setup → playing → turnTransition → finished`, same four-phase shape as Bombalı Sayılar, unlike Kart Eşleştirme) to show `StroopSetupScreen` / `StroopGameScreen` / `StroopTurnTransitionScreen` / `StroopResultsScreen`.
+
+- Classic Stroop interference test: each trial (`models/stroop_trial.dart`) shows a color *name* (`word`) rendered in an independently-random ink `StroopColor` (`models/stroop_color.dart`, 6 colors) — the correct answer is always the **ink** color, not the word. Response buttons deliberately show the color's *name* in neutral black text (`_ColorNameButton` in `stroop_game_screen.dart`), **not** a colored swatch: a colored circle would let the player match hue-to-hue without ever naming the color, defeating the point of the exercise — reading the ink and picking its *word* is what forces genuine naming. The button label itself stays neutral-colored so it doesn't introduce a second, unwanted Stroop conflict. `StroopTrial.options` (a shuffled `List<StroopColor>`, generated once per trial in `_generateTrial()`) fixes the button order for that trial — this must **not** be reshuffled inside the screen's `build()`, both because a rebuild happens mid-trial (e.g. when the correct/incorrect flash fires) and would visibly reshuffle the buttons out from under the player, and because a fixed per-trial order that's freshly randomized every trial (rather than a static order) is what prevents the player from learning button *position* instead of reading the word.
+- Each player answers `roundsPerPlayer` (10, see `controllers/stroop_controller.dart`) trials before handing off; `StroopController.answer` is the only mutator during play — it records `correctCount`/`roundsPlayed`, shows a 350ms green/red feedback flash (`lastAnswerCorrect`) on the stimulus, then either generates the next trial or — once a player hits `roundsPerPlayer` — hands off via `_findNextUnfinishedPlayerIndex` (same pattern as `GameController` in Bombalı Sayılar) or finishes the game. The 350ms delay is guarded by the same `_generation`-counter pattern as the other two games' delayed callbacks, for the same reason (a restarted game can't be corrupted by a stale callback).
+- Winner = most `correctCount` (`StroopController.rankedByCorrect`).
+- No `AppThemeController`/`SoundService`/`SpeechService` integration here either — same reasoning as Kart Eşleştirme (a mismatched preset UI, or audio that doesn't fit a rapid-fire reaction test). Add only if asked.
+
+### Screen flow / rules (Dizi Hafızası — sequence memory / "Simon")
+
+`games/sequence_memory_game.dart`'s `SequenceMemoryGame` wraps a single `ChangeNotifierProvider<SequenceMemoryController>` around `_SequenceMemoryRoot`, which switches on `SequenceMemoryController.phase` (`SequenceMemoryGamePhase`: `setup → playing → turnTransition → finished`, same four-phase shape as Stroop, since the next player shouldn't see how far the previous one got) to show `SequenceMemorySetupScreen` / `SequenceMemoryGameScreen` / `SequenceMemoryTurnTransitionScreen` / `SequenceMemoryResultsScreen`.
+
+- Each player gets exactly **one run**, not a fixed number of rounds: `SequenceMemoryController` auto-plays a growing `sequence` of `models/sequence_tile_color.dart` `SequenceTileColor`s (4 colors, 2×2 grid in `SequenceMemoryGameScreen`), then the player must tap them back in order via `tapTile`. A fully-correct repeat appends one more random tile and replays the (now longer) sequence; a wrong tap ends the player's turn immediately — their score (`SequenceMemoryPlayerState.bestLength`) is the sequence length they'd already completed, not the failed attempt's length. Reaching `maxSequenceLength` (20) without a mistake also ends the run, at the max score, so a run can't grow forever.
+- Turn hand-off uses a boolean-`finished` `_findNextUnfinishedPlayerIndex`, the same shape as `GameController`'s (Bombalı Sayılar) rather than Stroop's `roundsPlayed`-counter version — appropriate here because each player's "amount of play" is a variable-length single run, not a fixed round count.
+- The auto-playback (`_playSequence`) and the post-correct-repeat pause before replaying are both guarded by the same `_generation`/`_resolving` pattern as Stroop's delayed feedback and Kart Eşleştirme's flip-resolve delays — a stale timer from a restarted game can't corrupt the new one. `SequenceMemoryController.inputLocked` (`showingSequence || _resolving`) is exposed so `SequenceMemoryGameScreen` can disable tile taps during both playback and resolution.
+- Winner = highest `bestLength` (`SequenceMemoryController.rankedByBestLength`).
+- Feedback is intentionally asymmetric: a wrong tap flashes the tapped tile red (`wrongTile`), but there's no separate "correct" flash — the sequence visibly growing and replaying is itself the positive feedback, so a redundant success flash was left out.
+- No `AppThemeController`/`SoundService`/`SpeechService`/`GameResultRepository` integration — same reasoning as Stroop/Kart Eşleştirme (mismatched preset UI / audio that doesn't fit the game / no persistence outside Bombalı Sayılar). Add only if asked.
+
+### Screen flow / rules (Desen Tamamlama — IQ-test style number pattern completion)
+
+`games/pattern_game.dart`'s `PatternGame` wraps a single `ChangeNotifierProvider<PatternController>` around `_PatternRoot`, which switches on `PatternController.phase` (`PatternGamePhase`: `setup → playing → turnTransition → finished`, the same round-counted four-phase shape as Stroop, not the single-run shape of Dizi Hafızası) to show `PatternSetupScreen` / `PatternGameScreen` / `PatternTurnTransitionScreen` / `PatternResultsScreen`.
+
+- Each trial (`models/pattern_trial.dart`'s `PatternTrial`) shows the first 4 terms of a 5-term number sequence plus a "?"; the player picks the hidden 5th term from 4 shuffled options. `PatternController._generateTrial()` picks one of two rule types with equal probability: **arithmetic** (ascending, `start` 1–20 / `step` 1–5, or descending, `start` 25–50 / `step` -1..-5 — the descending range is deliberately shifted high so the minimum possible term, `25 + 4×(-5) = 5`, is always positive) or **geometric** (`start` 1–4, `ratio` 2 or 3, always ascending). All terms are kept strictly positive by construction — no negative numbers are ever shown, and the correct answer can never be negative while the distractor filter only accepts positive candidates.
+- Wrong options are generated by offsetting the correct answer by a random magnitude scaled to that trial's `spacing` (the arithmetic step's absolute value, or the geometric first-gap), rejecting any candidate that's non-positive, equal to the answer, or **equal to one of the 4 already-displayed sequence terms** (otherwise a trial like "1, 2, 3, 4, ?" could offer "4" — a number already visible on screen — as a wrong choice). `spacing` is never 0 in either branch, so the candidate pool is always wide enough that this loop terminates quickly.
+- Each player answers `patternRoundsPerPlayer` (8, see `controllers/pattern_controller.dart`) trials before handing off; `PatternController.answer` is the only mutator during play, structured identically to `StroopController.answer` (350ms green/red feedback flash via `lastAnswerCorrect`, `_generation`-guarded delay, hand-off via `_findNextUnfinishedPlayerIndex`'s round-count variant once `roundsPlayed` hits the cap).
+- **Naming note**: the round-count constant is `patternRoundsPerPlayer`, not `roundsPerPlayer` — Stroop's controller already declares a top-level public `roundsPerPlayer`, and `test/widget_test.dart` imports both controllers into the same file, so reusing that name would be an "ambiguous import" compile error. Any future trial/round-based game must pick its own distinctly-named top-level round-count constant for the same reason.
+- Winner = most `correctCount` (`PatternController.rankedByCorrect`).
+- `PatternGameScreen` builds two small private widgets inline (not extracted to `lib/widgets/`, matching Stroop's own inline `_ColorNameButton` precedent rather than the shared-widget-file precedent used by more complex/reused visuals like `grid_cell.dart`): `_NumberChip` (non-interactive, displays one sequence term or "?") and `_OptionButton` (`key: ValueKey(option)` for testability, mirroring Stroop's `_ColorNameButton(key: ValueKey(option))`).
+- No `AppThemeController`/`SoundService`/`SpeechService`/`GameResultRepository` integration — same reasoning as Stroop/Kart Eşleştirme/Dizi Hafızası. Add only if asked.
+
+### Player count (1 or 2 players — platform-wide convention)
+
+Every game's setup screen offers `widgets/player_count_selector.dart`'s `PlayerCountSelector` (a `SegmentedButton<int>`, "1 Kişi" / "2 Kişi", default 2). Selecting 1 hides the second name field and `startGame` is called with a one-element names list — nothing else needs to special-case solo play:
+
+- Both `GameController` and `MemoryMatchController` were already generic over `List<PlayerState>`/`List<MemoryPlayerState>`, so a 1-player list "just works": `_findNextUnfinishedPlayerIndex` (Bombalı Sayılar) finds no other player and goes straight to `finished` (so `TurnTransitionScreen` is simply never reached), and `MemoryMatchController`'s `currentPlayerIndex = (currentPlayerIndex + 1) % players.length` on a mismatch is a no-op with `players.length == 1`.
+- The only per-game adjustments needed are **wording**, not logic: each results screen computes a `headline` that says `'Tebrikler, ${winner.name}!'` when `ranked.length == 1` instead of the 2-player `'${winner.name} kazandı!'` / `'Berabere!'` phrasing (comparing yourself to a nonexistent opponent reads oddly). `MemoryGameScreen` similarly switches its `AppBar` title from `'Sıra: ${current.name}'` to `'${current.name} oynuyor'` (matching `GameScreen`'s own convention) when solo, since there's no "turn" to announce.
+- When adding a new game, replicate this: build `PlayerCountSelector` + conditional second field into its setup screen, and give its results screen the same `ranked.length == 1` solo-headline branch.
+
+### Game rules (Bombalı Sayılar — must stay consistent when touching game logic)
+
+- Grid is 5 columns × 10 rows, numbers 1–50 (`row * colCount + col + 1`, see `models/player_state.dart`).
+- Each player gets their own random bomb layout at game start (`PlayerState.generateBombLayout`): 2 bomb columns per row, **fixed for that player's entire game** — this is deliberate (the game is a memory exercise: hitting a bomb resets progress but not the layout, so players must remember prior attempts).
+- Turn logic lives in `GameController.selectCell`: a bomb hit resets `currentRow` to 0 and increments `attempts`, but does **not** pass the turn to the other player — the same player keeps retrying. The turn only passes once a player clears all 10 rows in one unbroken run (`_findNextUnfinishedPlayerIndex`). Winner = fewest `attempts` (`GameController.rankedByAttempts`).
+- `PlayerState.streakClearedCols` tracks only the *current* run's cleared cells and is wiped on a bomb hit — the UI must never leak information about a previous run's safe cells, since remembering them is the point of the game.
+
+### Repository abstraction (Supabase is intentionally not wired up yet)
+
+`data/game_result_repository.dart` defines `GameResultRepository` (`saveResult`/`fetchResults`); `data/in_memory_game_result_repository.dart` is the only implementation, session-scoped. The user has explicitly deferred Supabase to a later stage — when adding it, implement `GameResultRepository` with Supabase and swap the instance passed into `GameController` in `games/bombali_sayilar_game.dart`; no other game logic should need to change.
+
+### Theming (`GameColorTheme` / `AppThemeController`)
+
+- `models/color_theme.dart` defines `GameColorTheme` (name, `boxColor`, `backgroundColor`, `numberColor`), 5 fixed presets (`standardThemes`), and an 8-color palette (`customColorPalette`) shared by all three custom pickers.
+- `controllers/theme_controller.dart` (`AppThemeController`) holds either a selected preset index or three independently-chosen custom colors; `current` resolves to the active `GameColorTheme`. It is intentionally a separate `ChangeNotifier` from `GameController` (theme picking happens in `SetupScreen` before/independent of game state) and is provided once per game session (scoped inside `BombaliSayilarGame`, see above) so it's a single shared theme for both players (per explicit product decision — not per-player), not shared with any other game on the platform.
+- Only the **active** cell's colors come from the theme (`widgets/grid_cell.dart` reads `AppThemeController` for the `active` state only). Cleared (green) and locked (grey) cell colors are hardcoded on purpose — they're state feedback, not decoration, and must stay visually distinct regardless of the chosen theme.
+- `theme.backgroundColor` is applied only to the `Container` behind the grid in `GameScreen`, not the app-wide `Scaffold`/`MaterialApp` background — this keeps default (black-on-white) text readable on the setup/results screens even when a saturated custom color is chosen.
+
+### Grid sizing (`widgets/number_grid.dart`)
+
+Cell size is computed in a `LayoutBuilder`, driven primarily by **available height** divided by 10 rows (not width) so all 10 rows are visible without scrolling on typical screens, clamped to `[_minCellSize, _maxCellSize]` and capped by width so 5 columns never overflow. It's built as a manual `Column`/`Row` of fixed-size `SizedBox`es (not `GridView`) wrapped in a `SingleChildScrollView` as a fallback for viewports too short to fit the clamped minimum. If you change row/column counts or spacing, this is the place that needs the math updated.
+
+### Sound (`services/sound_service.dart`) and speech (`services/speech_service.dart`)
+
+Sound effects (`assets/sounds/bomb.wav`, `assets/sounds/win.wav`) are synthesized locally by `tool/generate_sounds.dart` (no external/downloaded audio assets). `SoundService` loads them via `rootBundle` and plays them with `audioplayers`' `BytesSource` — **not** `AssetSource`. This is deliberate: on Flutter web, the built asset actually lives at `/assets/assets/sounds/*.wav` (pubspec assets are declared under a folder literally named `assets/`, and Flutter web additionally prefixes every asset with `/assets/`), which conflicts with `AssetSource`'s own `assets/` prefix and 404s silently. `BytesSource` sidesteps that entirely. `GameController` triggers `playBomb()`/`playWin()` directly (not the UI layer) so sound stays in sync with state transitions; both calls are wrapped in try/catch inside `SoundService` so a playback failure (e.g. browser autoplay policy) never breaks game logic.
+
+`SpeechService` (used only by Kart Eşleştirme, see above) is a separate, unrelated service — text-to-speech via `flutter_tts`, not a bundled audio asset — because it needs to say arbitrary words in two languages rather than play one fixed clip. Follow the same defensive pattern if you add more speech: wrap every `flutter_tts` call in try/catch so an unsupported browser/OS never breaks the game.
