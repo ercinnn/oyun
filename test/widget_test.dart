@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:bombali_sayilar/controllers/auth_controller.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
+import 'package:bombali_sayilar/controllers/profile_controller.dart';
 import 'package:bombali_sayilar/controllers/puzzle_controller.dart';
 import 'package:bombali_sayilar/controllers/reflex_controller.dart';
 import 'package:bombali_sayilar/controllers/sequence_memory_controller.dart';
@@ -221,6 +225,21 @@ Map<String, List<int>> _groupCardIndicesBySymbol(
 }
 
 void main() {
+  // BombaliSayilarGame yalnızca [Supabase.instance] üzerinden bir
+  // SupabaseGameResultRepository kurar; gerçek bir ağ isteği yapılmadan
+  // (initialize network çağrısı yapmaz, yalnızca istemciyi kurar) testlerin
+  // çalışabilmesi için sahte bir proje ile bir kez initialize ediyoruz.
+  // shared_preferences'ın oturum kalıcılığı için kullandığı platform
+  // kanalı test ortamında yok, o yüzden mock başlangıç değerleri veriyoruz.
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+    await Supabase.initialize(
+      url: 'https://test.supabase.co',
+      publishableKey: 'test-anon-key',
+    );
+  });
+
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
@@ -277,6 +296,68 @@ void main() {
     expect(find.text('1. Oyuncu adı'), findsOneWidget);
     expect(find.text('2. Oyuncu adı'), findsOneWidget);
     expect(find.text('Oyunu Başlat'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Profildeki isim, oyunun 1. Oyuncu alanını otomatik doldurur',
+    (WidgetTester tester) async {
+      final profile = ProfileController()..name = 'Ada';
+      await tester.pumpWidget(GamePlatformApp(profileController: profile));
+      await tester.tap(find.text('Bombalı Sayılar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ada'), findsOneWidget);
+      expect(find.text('2. Oyuncu'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Profil: isim girip kaydetmek profili günceller', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const GamePlatformApp());
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profilim'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('profileNameField')), 'Ada');
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oyun Platformu'), findsOneWidget);
+    final profile = Provider.of<ProfileController>(
+      tester.element(find.text('Oyun Platformu')),
+      listen: false,
+    );
+    expect(profile.name, 'Ada');
+  });
+
+  testWidgets('Auth: oturum yokken giriş ekranı gösterilir', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      GamePlatformApp(authController: AuthController()..isSignedIn = false),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Google ile Bağlan'), findsOneWidget);
+    expect(find.text('Oyun Platformu'), findsOneWidget);
+    expect(find.text('Bombalı Sayılar'), findsNothing);
+  });
+
+  testWidgets('Auth: Çıkış Yap, giriş ekranına döner', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      GamePlatformApp(authController: AuthController()..isSignedIn = true),
+    );
+    await tester.tap(find.byIcon(Icons.person));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('signOutButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Google ile Bağlan'), findsOneWidget);
   });
 
   testWidgets('Setup screen shows the 5 standard theme presets', (

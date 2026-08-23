@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/game_controller.dart';
 import '../controllers/theme_controller.dart';
-import '../data/in_memory_game_result_repository.dart';
+import '../data/supabase_game_result_repository.dart';
 import '../models/game_phase.dart';
 import '../services/sound_service.dart';
 import '../screens/game_screen.dart';
@@ -27,7 +27,7 @@ class BombaliSayilarGame extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => GameController(
-            resultRepository: InMemoryGameResultRepository(),
+            resultRepository: SupabaseGameResultRepository(),
             soundService: SoundService(),
           ),
         ),

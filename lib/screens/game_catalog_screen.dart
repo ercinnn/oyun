@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../controllers/profile_controller.dart';
 import '../games/bombali_sayilar_game.dart';
 import '../games/memory_match_game.dart';
 import '../games/pattern_game.dart';
@@ -10,6 +12,7 @@ import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
 import '../models/game_catalog_entry.dart';
 import '../widgets/skill_ratings_table.dart';
+import 'profile_screen.dart';
 
 /// Platformda oynanabilir tüm oyunların listesi. Yeni bir oyun eklerken
 /// buraya bir [GameCatalogEntry] daha eklenir.
@@ -103,8 +106,19 @@ class GameCatalogScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Oyun Platformu')),
+      appBar: AppBar(
+        title: const Text('Oyun Platformu'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: profile.hasName ? profile.name : 'Profil',
+            onPressed: () =>
+                Navigator.of(context).pushNamed(ProfileScreen.routeName),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),

@@ -88,13 +88,15 @@ class GameController extends ChangeNotifier {
     final now = DateTime.now();
     for (final player in players) {
       unawaited(
-        _resultRepository.saveResult(
-          GameResult(
-            playerName: player.name,
-            attempts: player.attempts,
-            finishedAt: now,
-          ),
-        ),
+        _resultRepository
+            .saveResult(
+              GameResult(
+                playerName: player.name,
+                attempts: player.attempts,
+                finishedAt: now,
+              ),
+            )
+            .catchError((_) {}),
       );
     }
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/pattern_controller.dart';
+import '../controllers/profile_controller.dart';
 import '../widgets/player_count_selector.dart';
 
 class PatternSetupScreen extends StatefulWidget {
@@ -13,9 +14,18 @@ class PatternSetupScreen extends StatefulWidget {
 
 class _PatternSetupScreenState extends State<PatternSetupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _player1Controller = TextEditingController(text: '1. Oyuncu');
+  late final TextEditingController _player1Controller;
   final _player2Controller = TextEditingController(text: '2. Oyuncu');
   int _playerCount = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    final profileName = context.read<ProfileController>().name;
+    _player1Controller = TextEditingController(
+      text: profileName.isNotEmpty ? profileName : '1. Oyuncu',
+    );
+  }
 
   @override
   void dispose() {

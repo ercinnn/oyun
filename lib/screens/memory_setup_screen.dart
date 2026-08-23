@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/memory_match_controller.dart';
+import '../controllers/profile_controller.dart';
 import '../models/memory_category.dart';
 import '../widgets/memory_category_selector.dart';
 import '../widgets/player_count_selector.dart';
@@ -15,10 +16,19 @@ class MemorySetupScreen extends StatefulWidget {
 
 class _MemorySetupScreenState extends State<MemorySetupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _player1Controller = TextEditingController(text: '1. Oyuncu');
+  late final TextEditingController _player1Controller;
   final _player2Controller = TextEditingController(text: '2. Oyuncu');
   int _playerCount = 2;
   MemoryCategory _category = MemoryCategory.fruits;
+
+  @override
+  void initState() {
+    super.initState();
+    final profileName = context.read<ProfileController>().name;
+    _player1Controller = TextEditingController(
+      text: profileName.isNotEmpty ? profileName : '1. Oyuncu',
+    );
+  }
 
   @override
   void dispose() {
