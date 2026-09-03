@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bombali_sayilar/controllers/auth_controller.dart';
+import 'package:bombali_sayilar/controllers/chess_controller.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
@@ -16,6 +17,13 @@ import 'package:bombali_sayilar/controllers/simon_controller.dart';
 import 'package:bombali_sayilar/controllers/stroop_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
 import 'package:bombali_sayilar/main.dart';
+import 'package:bombali_sayilar/models/chess_board.dart';
+import 'package:bombali_sayilar/models/chess_game_phase.dart';
+import 'package:bombali_sayilar/models/chess_mode.dart';
+import 'package:bombali_sayilar/models/chess_move.dart';
+import 'package:bombali_sayilar/models/chess_outcome.dart';
+import 'package:bombali_sayilar/models/chess_piece.dart';
+import 'package:bombali_sayilar/models/chess_square.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
 import 'package:bombali_sayilar/models/puzzle_player_state.dart';
@@ -24,6 +32,7 @@ import 'package:bombali_sayilar/models/sequence_tile_color.dart';
 import 'package:bombali_sayilar/models/simon_attribute_type.dart';
 import 'package:bombali_sayilar/models/simon_tile_id.dart';
 import 'package:bombali_sayilar/models/simon_trial.dart';
+import 'package:bombali_sayilar/screens/chess_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_screen.dart';
 import 'package:bombali_sayilar/screens/memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_catalog_screen.dart';
@@ -212,6 +221,21 @@ Future<void> _openPuzzle(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Platform ana menüsünden Satranç oyununa girer. Katalog listesi 9 karta
+/// çıktığı için (bkz. "Game catalog shows the available games") son kartın
+/// ListView'in lazy build cache'i dışında kalmaması için görünümü
+/// uzatıyoruz.
+Future<void> _openChess(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 5400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Satranç'));
+  await tester.pumpAndSettle();
+}
+
 /// [controller.cards] içinde aynı sembole sahip kartları sembole göre
 /// gruplar; her grup tam olarak o çiftin iki index'ini içerir.
 Map<String, List<int>> _groupCardIndicesBySymbol(
@@ -243,10 +267,10 @@ void main() {
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
-    // Katalog listesi 8 karta çıktığı için varsayılan test görünümünde
+    // Katalog listesi 9 karta çıktığı için varsayılan test görünümünde
     // ListView'in lazy build cache'i son kartı henüz kurmayabilir; tam
     // liste görünür olsun diye görünümü uzatıyoruz.
-    tester.view.physicalSize = const Size(800, 4800);
+    tester.view.physicalSize = const Size(800, 5400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -262,6 +286,7 @@ void main() {
     expect(find.text('Tepki Süresi'), findsOneWidget);
     expect(find.text('Simon Diyor ki'), findsOneWidget);
     expect(find.text('Kayan Yapboz'), findsOneWidget);
+    expect(find.text('Satranç'), findsOneWidget);
   });
 
   testWidgets(
@@ -270,7 +295,7 @@ void main() {
       // Her kart artık 4 satırlık bir yıldız tablosu da içeriyor; ListView'in
       // lazy build cache'i tüm kartları kurabilsin diye görünümü daha da
       // uzatıyoruz.
-      tester.view.physicalSize = const Size(800, 4800);
+      tester.view.physicalSize = const Size(800, 5400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -1467,6 +1492,516 @@ void main() {
 
       expect(controller.currentPlayerIndex, 1);
       expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess setup: 1 Kişi renk seçici + tek isim alanı, 2 Kişi iki isim '
+    'alanı gösterir',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+
+      expect(find.text('Beyaz Oyuncu adı'), findsOneWidget);
+      expect(find.text('Siyah Oyuncu adı'), findsOneWidget);
+      expect(find.text('Beyaz'), findsNothing);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+
+      expect(find.text('Oyuncu adı'), findsOneWidget);
+      expect(find.text('Siyah Oyuncu adı'), findsNothing);
+      expect(find.text('Beyaz'), findsOneWidget);
+      expect(find.text('Siyah'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess: 2 kişilik oyun başlangıç diziliminde, beyaz başlar, tahta '
+    'dönmemiş olur',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      expect(controller.currentColor, PieceColor.white);
+      expect(controller.boardFlipped, isFalse);
+      expect(find.text('♙'), findsNWidgets(8));
+      expect(find.text('♟'), findsNWidgets(8));
+      expect(find.text('♔'), findsOneWidget);
+      expect(find.text('♚'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess: bir piyonu seçip geçerli hedefe dokununca hareket eder',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      final from = squareIndex(4, 1); // e2
+      final to = squareIndex(4, 3); // e4
+
+      await tester.tap(find.byKey(ValueKey('sq_$from')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey('sq_$to')));
+      await tester.pump();
+
+      expect(controller.board.squares[to]?.type, PieceType.pawn);
+      expect(controller.board.squares[from], isNull);
+      expect(controller.currentColor, PieceColor.black);
+    },
+  );
+
+  testWidgets(
+    'Chess: geçersiz bir kareye dokunmak no-op olur',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      final from = squareIndex(4, 1); // e2
+      controller.selectSquare(from);
+      final before = List<ChessPiece?>.from(controller.board.squares);
+
+      controller.selectSquare(squareIndex(4, 4)); // e5 — tek hamlede ulaşılamaz
+      await tester.pump();
+
+      expect(controller.board.squares, equals(before));
+      expect(controller.selectedSquare, from);
+    },
+  );
+
+  testWidgets(
+    'Chess: rakip taşı alınca tahtadan kalkar',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(3, 3)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      squares[squareIndex(3, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      );
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(3, 3));
+      controller.selectSquare(squareIndex(3, 6));
+
+      expect(controller.board.squares[squareIndex(3, 6)]?.type, PieceType.rook);
+      expect(controller.board.squares[squareIndex(3, 3)], isNull);
+    },
+  );
+
+  testWidgets(
+    'Chess: 2 kişilik modda tahta her hamlede döner',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      expect(controller.boardFlipped, isFalse);
+
+      controller.selectSquare(squareIndex(4, 1));
+      controller.selectSquare(squareIndex(4, 3));
+      expect(controller.boardFlipped, isTrue);
+
+      controller.selectSquare(squareIndex(4, 6));
+      controller.selectSquare(squareIndex(4, 4));
+      expect(controller.boardFlipped, isFalse);
+    },
+  );
+
+  testWidgets(
+    'Chess: bilgisayara karşı modda tahta oyuncunun rengine sabit kalır',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      await tester.tap(find.text('Siyah'));
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      expect(controller.boardFlipped, isTrue);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(controller.boardFlipped, isTrue);
+    },
+  );
+
+  testWidgets(
+    'Chess: rok kral ve kaleyi birlikte taşır; geçiş karesi tehdit '
+    'altındaysa reddedilir',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(7, 0)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      controller.board = ChessBoard.custom(
+        squares: squares,
+        whiteKingsideRights: true,
+      );
+
+      controller.selectSquare(squareIndex(4, 0));
+      expect(
+        controller.selectedSquareLegalMoves.any(
+          (m) => m.flag == ChessMoveFlag.castleKingside,
+        ),
+        isTrue,
+      );
+      controller.selectSquare(squareIndex(6, 0));
+
+      expect(controller.board.squares[squareIndex(6, 0)]?.type, PieceType.king);
+      expect(controller.board.squares[squareIndex(5, 0)]?.type, PieceType.rook);
+      expect(controller.board.squares[squareIndex(4, 0)], isNull);
+      expect(controller.board.squares[squareIndex(7, 0)], isNull);
+
+      // Reddedilme durumu: f1 karesi siyah kale tarafından tehdit ediliyor.
+      final blockedSquares = List<ChessPiece?>.filled(64, null);
+      blockedSquares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      blockedSquares[squareIndex(7, 0)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      blockedSquares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      blockedSquares[squareIndex(5, 7)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.black,
+      );
+      final blockedBoard = ChessBoard.custom(
+        squares: blockedSquares,
+        whiteKingsideRights: true,
+      );
+      expect(
+        blockedBoard
+            .legalMovesFrom(squareIndex(4, 0))
+            .any((m) => m.flag == ChessMoveFlag.castleKingside),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'Chess: geçerken alma yakalanan piyonu doğru kareden kaldırır',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(4, 4)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.white,
+      ); // e5
+      squares[squareIndex(3, 4)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      ); // d5, az önce d7-d5 oynanmış gibi
+      controller.board = ChessBoard.custom(
+        squares: squares,
+        enPassantTargetSquare: squareIndex(3, 5), // d6
+      );
+
+      controller.selectSquare(squareIndex(4, 4));
+      controller.selectSquare(squareIndex(3, 5));
+
+      expect(controller.board.squares[squareIndex(3, 5)]?.type, PieceType.pawn);
+      expect(controller.board.squares[squareIndex(3, 4)], isNull);
+      expect(controller.board.squares[squareIndex(4, 4)], isNull);
+    },
+  );
+
+  testWidgets(
+    'Chess: terfi penceresi 4 seçenek gösterir, seçilen taşa dönüştürür',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(0, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.white,
+      ); // a7
+      controller.board = ChessBoard.custom(squares: squares);
+
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(0, 6)}')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(0, 7)}'))); // a8
+      await tester.pumpAndSettle();
+
+      expect(controller.pendingPromotionMoves, hasLength(4));
+      expect(find.text('Terfi'), findsOneWidget);
+
+      await tester.tap(find.text('♕'));
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.board.squares[squareIndex(0, 7)],
+        const ChessPiece(PieceType.queen, PieceColor.white),
+      );
+      expect(controller.pendingPromotionMoves, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'Chess: şah mat oyunu doğru sonuçla bitirir',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      // Klasik son sıra matı: siyah kral g8'de kendi piyonları arasına
+      // sıkışmış, beyaz kale a5'ten a8'e giderek mat eder.
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(6, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      ); // g8
+      squares[squareIndex(5, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      ); // f7
+      squares[squareIndex(6, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      ); // g7
+      squares[squareIndex(7, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      ); // h7
+      squares[squareIndex(0, 4)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      ); // a5
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      ); // e1
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(0, 4));
+      controller.selectSquare(squareIndex(0, 7)); // Ra5-a8#
+
+      expect(controller.phase, ChessGamePhase.finished);
+      expect(controller.outcome, ChessOutcome.whiteWins);
+      expect(controller.outcomeReason, ChessOutcomeReason.checkmate);
+    },
+  );
+
+  testWidgets(
+    'Chess: pat oyunu berabere olarak bitirir',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      // Klasik K+V pat kalıbı: beyaz vezir a5'ten b6'ya giderek siyah
+      // kralı (a8) hiçbir kaçış karesi bırakmadan (ama şah çekmeden) kilitler.
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(0, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      ); // a8
+      squares[squareIndex(2, 6)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      ); // c7
+      squares[squareIndex(0, 4)] = const ChessPiece(
+        PieceType.queen,
+        PieceColor.white,
+      ); // a5
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(0, 4));
+      controller.selectSquare(squareIndex(1, 5)); // Qa5-b6
+
+      expect(controller.phase, ChessGamePhase.finished);
+      expect(controller.outcome, ChessOutcome.draw);
+      expect(controller.outcomeReason, ChessOutcomeReason.stalemate);
+    },
+  );
+
+  test('Chess: çivilenmiş (pinned) taş hattı terk edemez', () {
+    final squares = List<ChessPiece?>.filled(64, null);
+    squares[squareIndex(4, 0)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.white,
+    ); // e1
+    squares[squareIndex(4, 1)] = const ChessPiece(
+      PieceType.bishop,
+      PieceColor.white,
+    ); // e2
+    squares[squareIndex(4, 7)] = const ChessPiece(
+      PieceType.rook,
+      PieceColor.black,
+    ); // e8
+    squares[squareIndex(0, 7)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.black,
+    ); // a8
+    final board = ChessBoard.custom(squares: squares);
+
+    expect(board.legalMovesFrom(squareIndex(4, 1)), isEmpty);
+  });
+
+  testWidgets(
+    'Chess: AI düşünme gecikmesi sonrası geçerli bir hamle oynar',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      await tester.tap(find.text('Siyah'));
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      expect(controller.aiThinking, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(controller.aiThinking, isFalse);
+      expect(controller.board.moveHistory, hasLength(1));
+      expect(controller.currentColor, PieceColor.black);
+    },
+  );
+
+  testWidgets(
+    'Chess: AI gecikmesi sırasında yeniden başlatmak yeni oyuna bayat '
+    'hamle sızdırmaz',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      await tester.tap(find.text('Siyah'));
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      expect(controller.aiThinking, isTrue);
+
+      controller.restart();
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      expect(controller.mode, ChessMode.twoPlayer);
+      expect(controller.board.moveHistory, isEmpty);
+
+      // Eski AI hamlesinin gecikmesi geçsin — generation korumasız olsaydı
+      // burada yeni oyuna sızardı.
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(controller.board.moveHistory, isEmpty);
+      expect(controller.aiThinking, isFalse);
     },
   );
 }

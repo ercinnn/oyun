@@ -6,6 +6,7 @@ import 'config/supabase_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/profile_controller.dart';
 import 'games/bombali_sayilar_game.dart';
+import 'games/chess_game.dart';
 import 'games/memory_match_game.dart';
 import 'games/pattern_game.dart';
 import 'games/puzzle_game.dart';
@@ -91,6 +92,7 @@ class GamePlatformApp extends StatelessWidget {
             ReflexGame.routeName => (BuildContext _) => const ReflexGame(),
             SimonGame.routeName => (BuildContext _) => const SimonGame(),
             PuzzleGame.routeName => (BuildContext _) => const PuzzleGame(),
+            ChessGame.routeName => (BuildContext _) => const ChessGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),
