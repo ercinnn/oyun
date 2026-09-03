@@ -1,6 +1,6 @@
 -- Bombalı Sayılar oyun sonuçları tablosu.
 -- Supabase Dashboard > SQL Editor içinde bir kez çalıştırın:
--- https://supabase.com/dashboard/project/aufindwuwwllseaveely/sql/new
+-- https://supabase.com/dashboard/project/fdvokdfuamwezuoffbyz/sql/new
 
 create table if not exists public.game_results (
   id uuid primary key default gen_random_uuid(),
