@@ -39,6 +39,16 @@ class ChessPiece {
       ? _whiteGlyphs[type]!
       : _blackGlyphs[type]!;
 
+  /// Taşın **içi dolu** sembolü — rengi ne olursa olsun "siyah" glyph seti.
+  ///
+  /// Unicode'un beyaz taş sembolleri (♔♕♖…) içi boş konturlardır: doğrudan
+  /// çizildiklerinde taşın içinden kare rengi görünür ve tahtada "şeffaf" bir
+  /// izlenim bırakır. Bunun yerine `widgets/chess_piece_glyph.dart` her iki
+  /// renk için de bu dolu sembolü kullanır ve taşı beyaz/siyah dolgu +
+  /// kontur olarak boyar. [glyph] hâlâ gerçek renk sembolünü döndürür (metin
+  /// olarak taş göstermek gerekirse diye) — çizim yolu artık burasıdır.
+  String get solidGlyph => _blackGlyphs[type]!;
+
   @override
   bool operator ==(Object other) =>
       other is ChessPiece && other.type == type && other.color == color;

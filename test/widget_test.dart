@@ -44,6 +44,7 @@ import 'package:bombali_sayilar/screens/setup_screen.dart';
 import 'package:bombali_sayilar/screens/simon_game_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
+import 'package:bombali_sayilar/widgets/chess_piece_glyph.dart';
 import 'package:bombali_sayilar/widgets/star_rating.dart';
 
 /// Platform ana menüsünden Bombalı Sayılar oyununa girer.
@@ -234,6 +235,16 @@ Future<void> _openChess(WidgetTester tester) async {
   await tester.pumpWidget(const GamePlatformApp());
   await tester.tap(find.text('Satranç'));
   await tester.pumpAndSettle();
+}
+
+/// Tahtadaki belirli bir taşı bulur. Taşlar Unicode sembolü olarak
+/// çizilmediği için (bkz. `widgets/chess_piece_glyph.dart`) metin yerine
+/// widget'ın taşına bakılır.
+Finder _findPiece(PieceType type, PieceColor color) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is ChessPieceGlyph && widget.piece == ChessPiece(type, color),
+  );
 }
 
 /// [controller.cards] içinde aynı sembole sahip kartları sembole göre
@@ -1549,10 +1560,13 @@ void main() {
 
       expect(controller.currentColor, PieceColor.white);
       expect(controller.boardFlipped, isFalse);
-      expect(find.text('♙'), findsNWidgets(8));
-      expect(find.text('♟'), findsNWidgets(8));
-      expect(find.text('♔'), findsOneWidget);
-      expect(find.text('♚'), findsOneWidget);
+      // Taşlar Unicode sembolü olarak değil, dolgu + kontur çizen
+      // ChessPieceGlyph ile çiziliyor (beyaz taşların içi şeffaf kalmasın
+      // diye); bu yüzden sembol metni yerine taşın kendisi aranıyor.
+      expect(_findPiece(PieceType.pawn, PieceColor.white), findsNWidgets(8));
+      expect(_findPiece(PieceType.pawn, PieceColor.black), findsNWidgets(8));
+      expect(_findPiece(PieceType.king, PieceColor.white), findsOneWidget);
+      expect(_findPiece(PieceType.king, PieceColor.black), findsOneWidget);
     },
   );
 
@@ -1842,7 +1856,7 @@ void main() {
       expect(controller.pendingPromotionMoves, hasLength(4));
       expect(find.text('Terfi'), findsOneWidget);
 
-      await tester.tap(find.text('♕'));
+      await tester.tap(find.byKey(const ValueKey('promote_queen')));
       await tester.pumpAndSettle();
 
       expect(
