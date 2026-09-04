@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../controllers/chess_controller.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_square.dart';
+import '../widgets/chess_clock_panel.dart';
+import '../widgets/chess_evaluation_bar.dart';
 import '../widgets/chess_piece_glyph.dart';
 import '../widgets/chess_square_widget.dart';
 
@@ -59,13 +61,14 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: _BoardFrame(
-              child: _ChessBoardView(controller: controller),
-            ),
-          ),
+        child: Column(
+          children: [
+            if (controller.hasClock) ...[
+              _ClockRow(controller: controller),
+              const SizedBox(height: 12),
+            ],
+            Expanded(child: _BoardArea(controller: controller)),
+          ],
         ),
       ),
     );
@@ -115,6 +118,89 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
                     ),
                   ),
                 ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// İki oyuncunun dijital saatleri. Yalnızca süreli oyunda gösterilir; sırası
+/// gelen tarafınki vurgulanır.
+class _ClockRow extends StatelessWidget {
+  const _ClockRow({required this.controller});
+
+  final ChessController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: ChessClockPanel(
+            key: const Key('chessClockWhite'),
+            name: controller.whiteName,
+            remaining: controller.whiteRemaining,
+            isActive: controller.currentColor == PieceColor.white,
+            isWhite: true,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: ChessClockPanel(
+            key: const Key('chessClockBlack'),
+            name: controller.blackName,
+            remaining: controller.blackRemaining,
+            isActive: controller.currentColor == PieceColor.black,
+            isWhite: false,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Değerlendirme çubuğu + tahta. Tahtanın kenar uzunluğu burada bir kez
+/// hesaplanıp ikisine de veriliyor: çubuk tam tahta boyunda olsun ve tahta
+/// kare kalsın diye (`AspectRatio` tek başına çubuğun yüksekliğini
+/// bilemezdi).
+class _BoardArea extends StatelessWidget {
+  const _BoardArea({required this.controller});
+
+  static const _barWidth = 30.0;
+  static const _gap = 12.0;
+
+  final ChessController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth - _barWidth - _gap;
+        final boardSize = available < constraints.maxHeight
+            ? available
+            : constraints.maxHeight;
+        return Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: _barWidth,
+                height: boardSize,
+                child: ChessEvaluationBar(
+                  whiteWinChance: controller.whiteWinChance,
+                  flipped: controller.boardFlipped,
+                ),
+              ),
+              const SizedBox(width: _gap),
+              SizedBox.square(
+                dimension: boardSize,
+                child: _BoardFrame(
+                  child: _ChessBoardView(controller: controller),
+                ),
+              ),
             ],
           ),
         );

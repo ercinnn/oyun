@@ -32,6 +32,7 @@ class ChessResultsScreen extends StatelessWidget {
       ChessOutcomeReason.fiftyMoveRule => '50 hamle kuralı.',
       ChessOutcomeReason.repetition => 'Üç kez tekrar.',
       ChessOutcomeReason.insufficientMaterial => 'Yetersiz taş.',
+      ChessOutcomeReason.timeout => 'Süre bitti.',
       null => '',
     };
   }

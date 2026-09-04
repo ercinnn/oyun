@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../controllers/chess_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../models/chess_difficulty.dart';
 import '../models/chess_mode.dart';
 import '../models/chess_piece.dart';
+import '../models/chess_time_control.dart';
 import '../widgets/player_count_selector.dart';
 
 class ChessSetupScreen extends StatefulWidget {
@@ -21,6 +23,8 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
   final _blackNameController = TextEditingController(text: '2. Oyuncu');
   int _playerCount = 2;
   PieceColor _humanColor = PieceColor.white;
+  ChessDifficulty _difficulty = ChessDifficulty.orta;
+  ChessTimeControl _timeControl = ChessTimeControl.unlimited;
 
   @override
   void initState() {
@@ -52,12 +56,15 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
             ? _soloNameController.text.trim()
             : 'Bilgisayar',
         humanColor: _humanColor,
+        difficulty: _difficulty,
+        timeControl: _timeControl,
       );
     } else {
       controller.startGame(
         mode: ChessMode.twoPlayer,
         whiteName: _whiteNameController.text.trim(),
         blackName: _blackNameController.text.trim(),
+        timeControl: _timeControl,
       );
     }
   }
@@ -127,6 +134,27 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
                             setState(() => _humanColor = selection.first),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    _SectionLabel(
+                      'Zorluk: ${_difficulty.level} · ${_difficulty.label}',
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: SegmentedButton<ChessDifficulty>(
+                        showSelectedIcon: false,
+                        segments: [
+                          for (final level in ChessDifficulty.values)
+                            ButtonSegment(
+                              value: level,
+                              label: Text('${level.level}'),
+                              tooltip: level.label,
+                            ),
+                        ],
+                        selected: {_difficulty},
+                        onSelectionChanged: (selection) =>
+                            setState(() => _difficulty = selection.first),
+                      ),
+                    ),
                   ] else ...[
                     TextFormField(
                       controller: _whiteNameController,
@@ -146,6 +174,24 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
                       validator: _validateName,
                     ),
                   ],
+                  const SizedBox(height: 20),
+                  const _SectionLabel('Oyun süresi (oyuncu başına)'),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: SegmentedButton<ChessTimeControl>(
+                      showSelectedIcon: false,
+                      segments: [
+                        for (final control in ChessTimeControl.values)
+                          ButtonSegment(
+                            value: control,
+                            label: Text(control.label),
+                          ),
+                      ],
+                      selected: {_timeControl},
+                      onSelectionChanged: (selection) =>
+                          setState(() => _timeControl = selection.first),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _startGame,
@@ -160,6 +206,22 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Kurulum ekranindaki secici basliklari.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.labelLarge,
     );
   }
 }

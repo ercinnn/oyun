@@ -6,4 +6,7 @@ enum ChessOutcomeReason {
   fiftyMoveRule,
   repetition,
   insufficientMaterial,
+
+  /// Oyuncunun süresi bitti (bkz. ChessController._onClockTick).
+  timeout,
 }

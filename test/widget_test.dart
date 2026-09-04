@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -18,12 +20,14 @@ import 'package:bombali_sayilar/controllers/stroop_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
 import 'package:bombali_sayilar/main.dart';
 import 'package:bombali_sayilar/models/chess_board.dart';
+import 'package:bombali_sayilar/models/chess_difficulty.dart';
 import 'package:bombali_sayilar/models/chess_game_phase.dart';
 import 'package:bombali_sayilar/models/chess_mode.dart';
 import 'package:bombali_sayilar/models/chess_move.dart';
 import 'package:bombali_sayilar/models/chess_outcome.dart';
 import 'package:bombali_sayilar/models/chess_piece.dart';
 import 'package:bombali_sayilar/models/chess_square.dart';
+import 'package:bombali_sayilar/models/chess_time_control.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
 import 'package:bombali_sayilar/models/puzzle_player_state.dart';
@@ -44,6 +48,8 @@ import 'package:bombali_sayilar/screens/setup_screen.dart';
 import 'package:bombali_sayilar/screens/simon_game_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
+import 'package:bombali_sayilar/services/chess_ai.dart';
+import 'package:bombali_sayilar/widgets/chess_evaluation_bar.dart';
 import 'package:bombali_sayilar/widgets/chess_piece_glyph.dart';
 import 'package:bombali_sayilar/widgets/star_rating.dart';
 
@@ -2037,4 +2043,157 @@ void main() {
       expect(controller.aiThinking, isFalse);
     },
   );
+
+  testWidgets(
+    'Chess: zorluk seçici yalnızca bilgisayara karşı modda görünür ve '
+    'seçilen seviye oyuna geçer',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+
+      // 2 kişilik mod (varsayılan): zorluk seçici yok.
+      expect(find.text('Zorluk: 3 · Orta'), findsNothing);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      expect(find.text('Zorluk: 3 · Orta'), findsOneWidget);
+
+      await tester.tap(find.text('5'));
+      await tester.pump();
+      expect(find.text('Zorluk: 5 · Çok Zor'), findsOneWidget);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      expect(controller.difficulty, ChessDifficulty.cokZor);
+    },
+  );
+
+  testWidgets(
+    'Chess: süre seçilince saat işler ve sırası gelen tarafınki azalır',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('5 dk'));
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      // Saat çalışırken pumpAndSettle asla "settle" etmez (her saniye yeni
+      // bir frame planlanır), bu yüzden bu testte hep tek tek pump edilir.
+      await tester.pump();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      expect(controller.timeControl, ChessTimeControl.fiveMinutes);
+      expect(controller.whiteRemaining, const Duration(minutes: 5));
+      expect(find.text('05:00'), findsNWidgets(2));
+
+      await tester.pump(const Duration(seconds: 3));
+
+      // Beyazın sırası: yalnızca beyazın saati işler.
+      expect(controller.whiteRemaining, const Duration(seconds: 297));
+      expect(controller.blackRemaining, const Duration(minutes: 5));
+      expect(find.text('04:57'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess: süresi biten taraf kaybeder',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('5 dk'));
+      await tester.pump();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pump();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+      // 5 dakikayı gerçekten saymak yerine saati doğrudan son saniyeye
+      // çekiyoruz (controller alanları public, testler doğrudan set eder).
+      controller.whiteRemaining = const Duration(seconds: 1);
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(controller.outcome, ChessOutcome.blackWins);
+      expect(controller.outcomeReason, ChessOutcomeReason.timeout);
+      expect(controller.phase, ChessGamePhase.finished);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Süre bitti.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess: değerlendirme çubuğu taş üstünlüğünü yansıtır',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      // Başlangıç dizilimi simetrik: şans ~%50.
+      expect(controller.whiteWinChance, closeTo(0.5, 0.05));
+      expect(find.byType(ChessEvaluationBar), findsOneWidget);
+
+      // Siyah vezirini kaybetmiş bir konumda çubuk beyaza kaymalı.
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(3, 0)] = const ChessPiece(
+        PieceType.queen,
+        PieceColor.white,
+      );
+      controller.board = ChessBoard.custom(squares: squares);
+      controller.selectSquare(squareIndex(3, 0));
+      controller.selectSquare(squareIndex(3, 1)); // vezirle bir hamle
+      await tester.pumpAndSettle();
+
+      expect(controller.whiteWinChance, greaterThan(0.9));
+    },
+  );
+
+  test('Chess AI: her zorluk seviyesi geçerli bir hamle döndürür', () {
+    final ai = ChessAI(random: Random(7));
+    final board = ChessBoard.initial();
+    final legal = board.legalMoves(PieceColor.white);
+    for (final difficulty in ChessDifficulty.values) {
+      final move = ai.findBestMove(board, difficulty: difficulty);
+      expect(move, isNotNull, reason: '${difficulty.label} hamle üretmedi');
+      expect(
+        legal.any((m) => m.from == move!.from && m.to == move.to),
+        isTrue,
+        reason: '${difficulty.label} geçersiz hamle üretti',
+      );
+    }
+  });
+
+  test('Chess AI: süre bütçesi aramayı sınırlar', () {
+    // Bütçe, senkron aramanın arayüzü kilitleme süresinin üst sınırı — en
+    // yüksek seviyede bile aşılmamalı (bkz. ChessDifficulty).
+    final ai = ChessAI(random: Random(1));
+    final stopwatch = Stopwatch()..start();
+    ai.findBestMove(ChessBoard.initial(), difficulty: ChessDifficulty.cokZor);
+    stopwatch.stop();
+
+    // Bütçe iki düğüm kontrolü arasında dolabildiği için bir miktar pay
+    // bırakılıyor; asıl mesele 5 ply'ın ölçülen ~11 sn'sine düşmemesi.
+    expect(
+      stopwatch.elapsedMilliseconds,
+      lessThan(ChessDifficulty.cokZor.timeBudgetMs * 2),
+    );
+  });
 }

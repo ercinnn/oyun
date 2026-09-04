@@ -1,20 +1,19 @@
+import 'dart:math';
+
 import '../models/chess_board.dart';
+import '../models/chess_difficulty.dart';
 import '../models/chess_move.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_square.dart';
 
-/// Ply cinsinden arama derinliği. Kendine has, benzersiz üst düzey isim —
-/// `test/widget_test.dart` tüm controller/model dosyalarını tek dosyada
-/// import ediyor, isim çakışması derleme hatası olurdu (bkz. diğer
-/// oyunların round-count sabitleri için CLAUDE.md'deki aynı kural).
-///
-/// 3 ply seçildi: dallanma faktörü ~35 iken ham arama ağacı 35³≈43k yaprak,
-/// MVV-LVA sıralamalı alfa-beta budamasıyla pratikte çok daha azına iner.
-/// Web'de `dart:isolate`/`compute()` güvenilir olmadığından arama tamamen
-/// senkron çalışır — bkz. `ChessController._makeAiMove`'daki `_generation`
-/// korumalı gecikme, aramanın önce bir frame'in boyanmasına izin vermesi
-/// için.
-const int chessAiSearchDepth = 3;
+/// Zorluk seçilmediğinde kullanılan varsayılan seviye (3 ply, "Orta") —
+/// oyunun ilk sürümündeki tek sabit derinlikle aynı güç.
+const ChessDifficulty chessDefaultDifficulty = ChessDifficulty.orta;
+
+/// Süre bütçesinin kaç düğümde bir kontrol edileceğini belirleyen maske.
+/// `Stopwatch` okumak ucuz ama bedava değil; her düğümde okumak aramayı
+/// gözle görülür yavaşlatıyordu.
+const int _timeCheckNodeMask = 1023;
 
 const int _infinity = 1 << 30;
 const int _mateScore = 1000000;
@@ -110,14 +109,70 @@ const Map<PieceType, List<List<int>>> _pieceSquareTables = {
 };
 
 /// Saf Dart satranç motoru: negamax + alfa-beta budama (minimax'ın
-/// standart tek-fonksiyonlu hâli). Flutter bağımlılığı yok, `ChessBoard`
-/// üzerinde çalışır.
+/// standart tek-fonksiyonlu hâli) + süre bütçeli iteratif derinleşme.
+/// Flutter bağımlılığı yok, `ChessBoard` üzerinde çalışır.
+///
+/// **İteratif derinleşme neden gerekli?** Arama tamamen senkron çalışıyor
+/// (web'de `dart:isolate`/`compute()` güvenilir değil), yani arama süresince
+/// arayüz donuyor. Doğrudan 5 ply aramak ölçümlere göre saniyeler sürüyor.
+/// Bunun yerine 1, 2, 3… ply sırayla aranır ve [ChessDifficulty.timeBudget]
+/// dolduğunda içinde bulunulan derinlik iptal edilip **tamamlanmış son
+/// derinliğin** en iyi hamlesi oynanır. Böylece "Çok Zor" bile sabit bir üst
+/// sınırdan fazla dondurmaz; sığ aramaların tekrar edilmesi ise en iyi
+/// hamlenin bir sonraki derinlikte başa alınmasıyla fazlasıyla telafi olur.
 class ChessAI {
-  ChessMove? findBestMove(ChessBoard board, {int depth = chessAiSearchDepth}) {
+  ChessAI({Random? random}) : _random = random ?? Random();
+
+  /// Testlerin tohumlu bir [Random] verip [ChessDifficulty.blunderChance]
+  /// davranışını belirlenebilir hâle getirebilmesi için enjekte edilebilir.
+  final Random _random;
+
+  Stopwatch? _clock;
+  int _budgetMs = 0;
+  int _nodes = 0;
+  bool _aborted = false;
+
+  ChessMove? findBestMove(
+    ChessBoard board, {
+    ChessDifficulty difficulty = chessDefaultDifficulty,
+  }) {
     final moves = board.legalMoves(board.sideToMove);
     if (moves.isEmpty) return null;
-    _orderMoves(moves);
 
+    if (difficulty.blunderChance > 0 &&
+        _random.nextDouble() < difficulty.blunderChance) {
+      return moves[_random.nextInt(moves.length)];
+    }
+
+    _clock = Stopwatch()..start();
+    _budgetMs = difficulty.timeBudgetMs;
+    _nodes = 0;
+    _aborted = false;
+
+    _orderMoves(moves);
+    var best = moves.first;
+    for (var depth = 1; depth <= difficulty.searchDepth; depth++) {
+      final result = _searchRoot(board, moves, depth);
+      // Bütçe bu derinliğin ortasında doldu: yarım kalan sonuç güvenilmez,
+      // bir önceki derinliğin hamlesiyle devam edilir.
+      if (result == null) break;
+      best = result;
+      // Bir sonraki derinlikte en iyi hamleyi ilk denemek budamayı
+      // belirgin şekilde hızlandırır.
+      moves
+        ..remove(best)
+        ..insert(0, best);
+    }
+    return best;
+  }
+
+  /// Beyaz açısından santipiyon cinsinden statik değerlendirme; pozitif =
+  /// beyaz önde. Değerlendirme çubuğu (`widgets/chess_evaluation_bar.dart`)
+  /// bunu kullanır, bu yüzden public.
+  int evaluateForWhite(ChessBoard board) =>
+      _evaluate(board, PieceColor.white);
+
+  ChessMove? _searchRoot(ChessBoard board, List<ChessMove> moves, int depth) {
     ChessMove? best;
     var bestScore = -_infinity;
     var alpha = -_infinity;
@@ -126,6 +181,7 @@ class ChessAI {
     for (final move in moves) {
       final child = board.applyMove(move);
       final score = -_negamax(child, depth - 1, -beta, -alpha);
+      if (_aborted) return null;
       if (score > bestScore) {
         bestScore = score;
         best = move;
@@ -135,7 +191,21 @@ class ChessAI {
     return best;
   }
 
+  /// Bütçe dolduysa `true` döner ve aramayı iptal eder. Süre kontrolü her
+  /// düğümde değil, [_timeCheckNodeMask] düğümde bir yapılır.
+  bool get _outOfTime {
+    if (_aborted) return true;
+    if (_budgetMs <= 0) return false;
+    if ((++_nodes & _timeCheckNodeMask) != 0) return false;
+    if (_clock!.elapsedMilliseconds >= _budgetMs) {
+      _aborted = true;
+      return true;
+    }
+    return false;
+  }
+
   int _negamax(ChessBoard board, int depth, int alpha, int beta) {
+    if (_outOfTime) return 0;
     final moves = board.legalMoves(board.sideToMove);
     if (moves.isEmpty) {
       // Daha hızlı matlar tercih edilsin diye skor kalan derinliğe göre
