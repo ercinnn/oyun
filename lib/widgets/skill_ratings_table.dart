@@ -1,43 +1,63 @@
 import 'package:flutter/material.dart';
 
 import '../models/game_catalog_entry.dart';
+import '../theme/home_palette.dart';
 import 'star_rating.dart';
 
-/// Bir oyunun [GameSkillRatings]'ini dört satırlık (Zeka/İngilizce/IQ/Hafıza)
-/// bir tabloya döker. Tüm kartlarda aynı tablo şekli görünsün diye 0 puanlı
-/// satırlar da (boş yıldızlarla) gösterilir, gizlenmez.
+/// Bir oyunun [GameSkillRatings]'ini dört hücreli (Zeka/IQ üstte,
+/// Hafıza/İngilizce altta) kompakt bir künyeye döker. Tüm kartlarda aynı tablo
+/// şekli görünsün diye 0 puanlı satırlar da (boş yıldızlarla) gösterilir,
+/// gizlenmez.
+///
+/// İki sütun tek sütun yerine bilinçli bir tercih: ana menü kartları sabit
+/// yükseklikli bir ızgarada duruyor (bkz. `widgets/game_card.dart`), dört
+/// satırlık dikey tablo o yüksekliğin yarısını yiyordu.
 class SkillRatingsTable extends StatelessWidget {
   const SkillRatingsTable({super.key, required this.ratings});
+
+  static const _labelWidth = 62.0;
 
   final GameSkillRatings ratings;
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.bodySmall;
     return Table(
-      columnWidths: const {0: IntrinsicColumnWidth()},
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
-        _row('Zeka', ratings.zeka, labelStyle),
-        _row('İngilizce', ratings.ingilizce, labelStyle),
-        _row('IQ', ratings.iq, labelStyle),
-        _row('Hafıza', ratings.hafiza, labelStyle),
+        TableRow(
+          children: [_cell('Zeka', ratings.zeka), _cell('IQ', ratings.iq)],
+        ),
+        TableRow(
+          children: [
+            _cell('Hafıza', ratings.hafiza),
+            _cell('İngilizce', ratings.ingilizce),
+          ],
+        ),
       ],
     );
   }
 
-  TableRow _row(String label, int rating, TextStyle? labelStyle) {
-    return TableRow(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8, bottom: 2),
-          child: Text(label, style: labelStyle),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: StarRating(rating: rating),
-        ),
-      ],
+  Widget _cell(String label, int rating) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _labelWidth,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: HomePalette.textMuted,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          StarRating(rating: rating, size: 12),
+        ],
+      ),
     );
   }
 }

@@ -16,6 +16,20 @@ class GameSkillRatings {
   final int ingilizce;
   final int iq;
   final int hafiza;
+
+  /// Oyunun en yüksek puanlı becerisini ana menü kartındaki küçük etikete
+  /// ("HAFIZA ODAKLI" gibi) uygun biçimde döndürür. Etiket bilerek yıldız
+  /// tablosundaki dört isimden birini kullanır (yorum katmaz), böylece hemen
+  /// altındaki tabloyla hiçbir zaman çelişemez. Eşitlikte Hafıza → IQ → Zeka →
+  /// İngilizce sırası kazanır; İngilizce yalnızca Kart Eşleştirme'de 0'dan
+  /// büyük olduğu için pratikte en sonda kalır.
+  String get dominantSkillLabel {
+    final best = [hafiza, iq, zeka, ingilizce].reduce((a, b) => a > b ? a : b);
+    if (hafiza == best) return 'HAFIZA ODAKLI';
+    if (iq == best) return 'IQ ODAKLI';
+    if (zeka == best) return 'ZEKA ODAKLI';
+    return 'İNGİLİZCE ODAKLI';
+  }
 }
 
 /// Platform ana menüsünde gösterilen tek bir oyunu tanımlar: kart üzerindeki

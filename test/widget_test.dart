@@ -313,6 +313,25 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Game catalog: telefon genişliğinde kartlar taşmadan tek sütuna düşer',
+    (WidgetTester tester) async {
+      // Kartların yüksekliği sabit (GameCatalogScreen._cardHeight); dar
+      // ekranda açıklama 3 satıra çıktığı için taşma riski en yüksek yer
+      // burası. Taşma debug'da exception attığından test kendiliğinden
+      // kırmızıya döner — ayrıca assert etmeye gerek yok.
+      tester.view.physicalSize = const Size(400, 4200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const GamePlatformApp());
+
+      expect(find.text('Bombalı Sayılar'), findsOneWidget);
+      expect(find.text('Satranç'), findsOneWidget);
+    },
+  );
+
   testWidgets('Setup screen shows player name fields and start button', (
     WidgetTester tester,
   ) async {

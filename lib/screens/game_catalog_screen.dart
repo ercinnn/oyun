@@ -12,7 +12,11 @@ import '../games/sequence_memory_game.dart';
 import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
 import '../models/game_catalog_entry.dart';
-import '../widgets/skill_ratings_table.dart';
+import '../theme/home_palette.dart';
+import '../widgets/game_card.dart';
+import '../widgets/home_backdrop.dart';
+import '../widgets/platform_logo_mark.dart';
+import '../widgets/stat_chip.dart';
 import 'profile_screen.dart';
 
 /// Platformda oynanabilir tüm oyunların listesi. Yeni bir oyun eklerken
@@ -110,78 +114,263 @@ const List<GameCatalogEntry> gameCatalog = [
   ),
 ];
 
+/// Platformun künyesi: hem giriş ekranı hem ana menü aynı üç rozeti gösterir,
+/// böylece kullanıcı daha giriş yapmadan platformda ne olduğunu görür. Oyun
+/// sayısı [gameCatalog]'dan okunur — yeni oyun eklendiğinde iki ekranda da
+/// kendiliğinden güncellenir.
+List<Widget> platformStatChips() => [
+  StatChip(
+    icon: Icons.grid_view_rounded,
+    label: '${gameCatalog.length} oyun',
+  ),
+  const StatChip(icon: Icons.people_alt_outlined, label: '1-2 oyuncu'),
+  const StatChip(icon: Icons.insights_outlined, label: '4 beceri alanı'),
+];
+
+/// Platformun ana sayfası: koyu bir "konsol paneli" görünümünde oyun
+/// kataloğu.
+///
+/// Ekran, platformun açık `MaterialApp.theme`'i yerine kendi koyu temasını
+/// ([homeThemeData]) yerel bir [Theme] ile kendi alt ağacına uygular — oyun
+/// ekranları platform temasıyla olduğu gibi kalır (bkz. CLAUDE.md,
+/// "Theming": aynı yerel-tema deseni Bombalı Sayılar'da da var).
+///
+/// [AppBar] yok, yerine kaydırılmayan bir [_TopBar] var: katalog kök route
+/// olduğu için geri butonuna ihtiyaç duymuyor ve başlık + profil düğmesi liste
+/// kaydırılırken de yerinde kalıyor.
 class GameCatalogScreen extends StatelessWidget {
   const GameCatalogScreen({super.key});
 
   static const routeName = '/';
 
+  /// Kart ızgarasının kırılma noktaları ve sabit kart yüksekliği. Yükseklik
+  /// sabit, çünkü değişken yükseklikli kartlar yan yana dizildiğinde tırtıklı
+  /// bir ızgara oluşuyor; kart içeriği bu yüksekliğe göre sınırlandırılmış
+  /// durumda (bkz. `GameCard`).
+  static const _twoColumnWidth = 720.0;
+  static const _threeColumnWidth = 1080.0;
+  static const _cardHeight = 234.0;
+
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileController>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Oyun Platformu'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            tooltip: profile.hasName ? profile.name : 'Profil',
-            onPressed: () =>
-                Navigator.of(context).pushNamed(ProfileScreen.routeName),
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: gameCatalog.length,
-            separatorBuilder: (context, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final entry = gameCatalog[index];
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(entry.routeName),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: entry.color,
-                          child: Icon(entry.icon, color: Colors.white),
+    return Theme(
+      data: homeThemeData(),
+      child: Scaffold(
+        backgroundColor: HomePalette.backdropTop,
+        body: HomeBackdrop(
+          child: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1180),
+                child: Column(
+                  children: [
+                    const _TopBar(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _Hero(),
+                            const SizedBox(height: 22),
+                            _GameGrid(),
+                            const SizedBox(height: 18),
+                            const _FooterNote(),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.title,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                entry.description,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              SkillRatingsTable(ratings: entry.skills),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        children: [
+          const PlatformLogoMark(),
+          const SizedBox(width: 12),
+          const Text(
+            'Oyun Platformu',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+              color: HomePalette.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          Tooltip(
+            message: profile.hasName ? profile.name : 'Profil',
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(11),
+                onTap: () =>
+                    Navigator.of(context).pushNamed(ProfileScreen.routeName),
+                child: Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: HomePalette.outline),
+                  ),
+                  child: const Icon(
+                    Icons.person,
+                    size: 20,
+                    color: HomePalette.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Hero extends StatelessWidget {
+  const _Hero();
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>();
+    final greeting = profile.hasName
+        ? 'Hoş geldin, ${profile.name}.'
+        : 'Hoş geldin.';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF3DDC97),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'OYUN KÜTÜPHANESİ',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.4,
+                color: HomePalette.textMuted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          greeting,
+          style: const TextStyle(
+            fontSize: 30,
+            height: 1.15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: HomePalette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: const Text(
+            'Bir oyun seç ve başla. Her oyun zeka, IQ, hafıza ve İngilizce '
+            'becerilerini farklı ölçüde çalıştırır.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: HomePalette.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: platformStatChips(),
+        ),
+      ],
+    );
+  }
+}
+
+/// Kartların responsive ızgarası. `shrinkWrap` + `NeverScrollableScrollPhysics`
+/// ile dış [SingleChildScrollView]'in içinde yaşar: 9 kart için tembel kurulum
+/// gerekmiyor ve bu sayede kartların hepsi her zaman kurulu oluyor (küçük
+/// görünümlerde ve widget testlerinde de).
+class _GameGrid extends StatelessWidget {
+  const _GameGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= GameCatalogScreen._threeColumnWidth
+            ? 3
+            : width >= GameCatalogScreen._twoColumnWidth
+            ? 2
+            : 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            mainAxisExtent: GameCatalogScreen._cardHeight,
+          ),
+          itemCount: gameCatalog.length,
+          itemBuilder: (context, index) {
+            final entry = gameCatalog[index];
+            return GameCard(
+              entry: entry,
+              index: index,
+              onTap: () => Navigator.of(context).pushNamed(entry.routeName),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _FooterNote extends StatelessWidget {
+  const _FooterNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Icon(Icons.info_outline, size: 14, color: HomePalette.textMuted),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Her karttaki yıldızlar, o oyunun dört beceri alanını ne kadar '
+            'geliştirdiğini gösterir.',
+            style: TextStyle(fontSize: 12, color: HomePalette.textMuted),
+          ),
+        ),
+      ],
     );
   }
 }
