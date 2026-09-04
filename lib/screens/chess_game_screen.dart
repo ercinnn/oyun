@@ -6,6 +6,7 @@ import '../models/chess_piece.dart';
 import '../models/chess_square.dart';
 import '../widgets/chess_clock_panel.dart';
 import '../widgets/chess_evaluation_bar.dart';
+import '../widgets/chess_move_history.dart';
 import '../widgets/chess_piece_glyph.dart';
 import '../widgets/chess_square_widget.dart';
 
@@ -162,15 +163,24 @@ class _ClockRow extends StatelessWidget {
   }
 }
 
-/// Değerlendirme çubuğu + tahta. Tahtanın kenar uzunluğu burada bir kez
-/// hesaplanıp ikisine de veriliyor: çubuk tam tahta boyunda olsun ve tahta
-/// kare kalsın diye (`AspectRatio` tek başına çubuğun yüksekliğini
-/// bilemezdi).
+/// Değerlendirme çubuğu + tahta + hamle geçmişi. Tahtanın kenar uzunluğu
+/// burada bir kez hesaplanıp hepsine veriliyor: çubuk ve panel tam tahta
+/// boyunda olsun ve tahta kare kalsın diye (`AspectRatio` tek başına
+/// yanındakilerin yüksekliğini bilemezdi).
+///
+/// Hamle geçmişi geniş ekranda tahtanın sağında dikey panel, dar ekranda
+/// tahtanın altında yatay şerit olarak çizilir — telefonda dikey bir panel
+/// için yeterli genişlik yok, tahtayı küçültmek de oynanabilirliği bozardı.
 class _BoardArea extends StatelessWidget {
   const _BoardArea({required this.controller});
 
   static const _barWidth = 30.0;
   static const _gap = 12.0;
+  static const _historyPanelWidth = 190.0;
+  static const _historyStripHeight = 44.0;
+
+  /// Bu genişliğin altında geçmiş, tahtanın sağına değil altına konur.
+  static const _sidePanelBreakpoint = 640.0;
 
   final ChessController controller;
 
@@ -178,31 +188,63 @@ class _BoardArea extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final available = constraints.maxWidth - _barWidth - _gap;
-        final boardSize = available < constraints.maxHeight
-            ? available
-            : constraints.maxHeight;
-        return Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: _barWidth,
-                height: boardSize,
-                child: ChessEvaluationBar(
-                  whiteWinChance: controller.whiteWinChance,
-                  flipped: controller.boardFlipped,
-                ),
+        final sidePanel = constraints.maxWidth >= _sidePanelBreakpoint;
+        final widthForBoard =
+            constraints.maxWidth -
+            _barWidth -
+            _gap -
+            (sidePanel ? _historyPanelWidth + _gap : 0);
+        final heightForBoard = sidePanel
+            ? constraints.maxHeight
+            : constraints.maxHeight - _historyStripHeight - _gap;
+        final boardSize = widthForBoard < heightForBoard
+            ? widthForBoard
+            : heightForBoard;
+
+        final row = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: _barWidth,
+              height: boardSize,
+              child: ChessEvaluationBar(
+                whiteWinChance: controller.whiteWinChance,
+                flipped: controller.boardFlipped,
               ),
+            ),
+            const SizedBox(width: _gap),
+            SizedBox.square(
+              dimension: boardSize,
+              child: _BoardFrame(
+                child: _ChessBoardView(controller: controller),
+              ),
+            ),
+            if (sidePanel) ...[
               const SizedBox(width: _gap),
-              SizedBox.square(
-                dimension: boardSize,
-                child: _BoardFrame(
-                  child: _ChessBoardView(controller: controller),
-                ),
+              SizedBox(
+                width: _historyPanelWidth,
+                height: boardSize,
+                child: ChessMoveHistory(notations: controller.moveNotations),
               ),
             ],
-          ),
+          ],
+        );
+
+        if (sidePanel) return Center(child: row);
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            row,
+            const SizedBox(height: _gap),
+            SizedBox(
+              width: boardSize + _barWidth + _gap,
+              height: _historyStripHeight,
+              child: ChessMoveHistory(
+                notations: controller.moveNotations,
+                axis: Axis.horizontal,
+              ),
+            ),
+          ],
         );
       },
     );

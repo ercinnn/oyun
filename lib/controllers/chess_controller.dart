@@ -8,6 +8,7 @@ import '../models/chess_difficulty.dart';
 import '../models/chess_game_phase.dart';
 import '../models/chess_mode.dart';
 import '../models/chess_move.dart';
+import '../models/chess_notation.dart';
 import '../models/chess_outcome.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_time_control.dart';
@@ -38,6 +39,12 @@ class ChessController extends ChangeNotifier {
   /// Beyaz açısından santipiyon cinsinden son değerlendirme; her hamleden
   /// sonra güncellenir. Değerlendirme çubuğu bunu okur.
   int evaluationCentipawns = 0;
+
+  /// Oynanan hamlelerin cebirsel gösterimleri ("e4", "Axd5", "0-0"),
+  /// oynandıkları sırada. `board.moveHistory` ham hamleleri tutar; gösterim
+  /// ise hamle anındaki tahtayı gerektirdiği için (belirsizlik eki, şah/mat)
+  /// burada, hamle oynanırken üretiliyor.
+  List<String> moveNotations = [];
 
   /// Sadece [mode] `vsAi` iken dolu — insan oyuncunun oynadığı renk.
   PieceColor? humanColor;
@@ -119,6 +126,7 @@ class ChessController extends ChangeNotifier {
     whiteRemaining = initialTime;
     blackRemaining = initialTime;
     evaluationCentipawns = 0;
+    moveNotations = [];
     selectedSquare = null;
     selectedSquareLegalMoves = [];
     pendingPromotionMoves = [];
@@ -228,7 +236,7 @@ class ChessController extends ChangeNotifier {
   }
 
   void _commitMove(ChessMove move) {
-    board = board.applyMove(move);
+    _applyAndRecord(move);
     selectedSquare = null;
     selectedSquareLegalMoves = [];
     _updateEvaluation();
@@ -260,10 +268,22 @@ class ChessController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    board = board.applyMove(move);
+    _applyAndRecord(move);
     _updateEvaluation();
     _checkGameEnd();
     notifyListeners();
+  }
+
+  /// Hamleyi uygular ve gösterimini kaydeder. Gösterim, hamleden önceki ve
+  /// sonraki tahtanın ikisini de gerektirdiği için hamlenin uygulandığı tek
+  /// nokta burası.
+  void _applyAndRecord(ChessMove move) {
+    final before = board;
+    board = board.applyMove(move);
+    moveNotations = [
+      ...moveNotations,
+      chessMoveNotation(before: before, move: move, after: board),
+    ];
   }
 
   void _checkGameEnd() {

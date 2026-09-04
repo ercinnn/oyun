@@ -24,6 +24,7 @@ import 'package:bombali_sayilar/models/chess_difficulty.dart';
 import 'package:bombali_sayilar/models/chess_game_phase.dart';
 import 'package:bombali_sayilar/models/chess_mode.dart';
 import 'package:bombali_sayilar/models/chess_move.dart';
+import 'package:bombali_sayilar/models/chess_notation.dart';
 import 'package:bombali_sayilar/models/chess_outcome.dart';
 import 'package:bombali_sayilar/models/chess_piece.dart';
 import 'package:bombali_sayilar/models/chess_square.dart';
@@ -50,6 +51,7 @@ import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
 import 'package:bombali_sayilar/services/chess_ai.dart';
 import 'package:bombali_sayilar/widgets/chess_evaluation_bar.dart';
+import 'package:bombali_sayilar/widgets/chess_move_history.dart';
 import 'package:bombali_sayilar/widgets/chess_piece_glyph.dart';
 import 'package:bombali_sayilar/widgets/star_rating.dart';
 
@@ -2179,6 +2181,204 @@ void main() {
         reason: '${difficulty.label} geçersiz hamle üretti',
       );
     }
+  });
+
+  testWidgets(
+    'Chess: oynanan hamleler geçmiş panelinde görünür',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      expect(find.byType(ChessMoveHistory), findsOneWidget);
+      expect(find.text('Henüz hamle\nyapılmadı'), findsOneWidget);
+
+      // e2-e4, ardından siyah e7-e5.
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 1)}')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 3)}')));
+      await tester.pumpAndSettle();
+
+      expect(controller.moveNotations, ['e4']);
+      expect(find.text('e4'), findsOneWidget);
+
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 6)}')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 4)}')));
+      await tester.pumpAndSettle();
+
+      expect(controller.moveNotations, ['e4', 'e5']);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.text('e5'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Chess: dar ekranda hamle geçmişi tahtanın altında şerit olur',
+    (WidgetTester tester) async {
+      // Yan panel eşiğinin (640) altında bir telefon genişliği; taşma olursa
+      // debug'da exception atılır ve test kendiliğinden kırmızıya döner.
+      // Yükseklik bilerek büyük: katalogdaki Satranç kartı tek sütunda çok
+      // aşağıda kalıyor ve kısa bir görünümde dokunulamıyor. Eşik yalnızca
+      // genişliğe baktığı için bu, dar ekran yerleşimini bozmuyor.
+      tester.view.physicalSize = const Size(400, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const GamePlatformApp());
+      await tester.tap(find.text('Satranç'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 1)}')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey('sq_${squareIndex(4, 3)}')));
+      await tester.pumpAndSettle();
+
+      final history = tester.widget<ChessMoveHistory>(
+        find.byType(ChessMoveHistory),
+      );
+      expect(history.axis, Axis.horizontal);
+      expect(find.text('1. e4'), findsOneWidget);
+    },
+  );
+
+  test('Chess gösterimi: taş harfi, alma, rok, terfi ve şah ekleri', () {
+    String notationFor(ChessBoard board, int from, int to, {PieceType? promo}) {
+      final move = board
+          .legalMoves(board.sideToMove)
+          .firstWhere(
+            (m) =>
+                m.from == from &&
+                m.to == to &&
+                (promo == null || m.promotionType == promo),
+          );
+      return chessMoveNotation(
+        before: board,
+        move: move,
+        after: board.applyMove(move),
+      );
+    }
+
+    // Piyon ilerlemesi ve at hamlesi (Türkçe harf: At = A).
+    final opening = ChessBoard.initial();
+    expect(notationFor(opening, squareIndex(4, 1), squareIndex(4, 3)), 'e4');
+    expect(notationFor(opening, squareIndex(6, 0), squareIndex(5, 2)), 'Af3');
+
+    // Rok: beyaz şah e1, kale h1.
+    final castleSquares = List<ChessPiece?>.filled(64, null);
+    castleSquares[squareIndex(4, 0)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.white,
+    );
+    castleSquares[squareIndex(7, 0)] = const ChessPiece(
+      PieceType.rook,
+      PieceColor.white,
+    );
+    castleSquares[squareIndex(4, 7)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.black,
+    );
+    final castleBoard = ChessBoard.custom(
+      squares: castleSquares,
+      whiteKingsideRights: true,
+    );
+    expect(
+      notationFor(castleBoard, squareIndex(4, 0), squareIndex(6, 0)),
+      '0-0',
+    );
+
+    // Terfi + şah: a7 piyonu a8'de vezire çıkıp e8'deki şaha şah çeker.
+    final promoSquares = List<ChessPiece?>.filled(64, null);
+    promoSquares[squareIndex(4, 0)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.white,
+    );
+    promoSquares[squareIndex(4, 7)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.black,
+    );
+    promoSquares[squareIndex(0, 6)] = const ChessPiece(
+      PieceType.pawn,
+      PieceColor.white,
+    );
+    final promoBoard = ChessBoard.custom(squares: promoSquares);
+    expect(
+      notationFor(
+        promoBoard,
+        squareIndex(0, 6),
+        squareIndex(0, 7),
+        promo: PieceType.queen,
+      ),
+      'a8=V+',
+    );
+
+    // Alma: beyaz vezir d1'den d7'deki siyah piyonu alır.
+    final captureSquares = List<ChessPiece?>.filled(64, null);
+    captureSquares[squareIndex(4, 0)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.white,
+    );
+    captureSquares[squareIndex(4, 7)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.black,
+    );
+    captureSquares[squareIndex(3, 0)] = const ChessPiece(
+      PieceType.queen,
+      PieceColor.white,
+    );
+    captureSquares[squareIndex(3, 6)] = const ChessPiece(
+      PieceType.pawn,
+      PieceColor.black,
+    );
+    final captureBoard = ChessBoard.custom(squares: captureSquares);
+    expect(
+      notationFor(captureBoard, squareIndex(3, 0), squareIndex(3, 6)),
+      'Vxd7+',
+    );
+  });
+
+  test('Chess gösterimi: aynı kareye giden iki taşı ayırt eder', () {
+    // a1 ve h1'deki iki beyaz kale de d1'e gidebilir → kalkış dosyası yazılır.
+    final squares = List<ChessPiece?>.filled(64, null);
+    squares[squareIndex(4, 4)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.white,
+    );
+    squares[squareIndex(4, 7)] = const ChessPiece(
+      PieceType.king,
+      PieceColor.black,
+    );
+    squares[squareIndex(0, 0)] = const ChessPiece(
+      PieceType.rook,
+      PieceColor.white,
+    );
+    squares[squareIndex(7, 0)] = const ChessPiece(
+      PieceType.rook,
+      PieceColor.white,
+    );
+    final board = ChessBoard.custom(squares: squares);
+    final move = board
+        .legalMoves(PieceColor.white)
+        .firstWhere(
+          (m) => m.from == squareIndex(0, 0) && m.to == squareIndex(3, 0),
+        );
+
+    expect(
+      chessMoveNotation(
+        before: board,
+        move: move,
+        after: board.applyMove(move),
+      ),
+      'Kad1',
+    );
   });
 
   test('Chess AI: süre bütçesi aramayı sınırlar', () {
