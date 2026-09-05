@@ -5,6 +5,7 @@ import '../controllers/profile_controller.dart';
 import '../games/bombali_sayilar_game.dart';
 import '../games/chess_game.dart';
 import '../games/memory_match_game.dart';
+import '../games/multiplication_game.dart';
 import '../games/pattern_game.dart';
 import '../games/puzzle_game.dart';
 import '../games/reflex_game.dart';
@@ -111,6 +112,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.brown,
     routeName: ChessGame.routeName,
     skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 5, hafiza: 3),
+  ),
+  GameCatalogEntry(
+    title: 'Çarpım Bahçesi',
+    description:
+        '3 × 4 demek, 4 tanesini üç kere almak demek! Nesne ızgaralarını '
+        'say, kendi ızgaranı kur, çarpmanın mantığını kavra.',
+    icon: Icons.calculate,
+    color: Colors.green,
+    routeName: MultiplicationGame.routeName,
+    skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 4, hafiza: 3),
   ),
 ];
 

@@ -8,6 +8,7 @@ import 'controllers/profile_controller.dart';
 import 'games/bombali_sayilar_game.dart';
 import 'games/chess_game.dart';
 import 'games/memory_match_game.dart';
+import 'games/multiplication_game.dart';
 import 'games/pattern_game.dart';
 import 'games/puzzle_game.dart';
 import 'games/reflex_game.dart';
@@ -93,6 +94,8 @@ class GamePlatformApp extends StatelessWidget {
             SimonGame.routeName => (BuildContext _) => const SimonGame(),
             PuzzleGame.routeName => (BuildContext _) => const PuzzleGame(),
             ChessGame.routeName => (BuildContext _) => const ChessGame(),
+            MultiplicationGame.routeName => (BuildContext _) =>
+                const MultiplicationGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),

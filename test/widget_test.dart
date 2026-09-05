@@ -10,6 +10,7 @@ import 'package:bombali_sayilar/controllers/auth_controller.dart';
 import 'package:bombali_sayilar/controllers/chess_controller.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
+import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
 import 'package:bombali_sayilar/controllers/profile_controller.dart';
 import 'package:bombali_sayilar/controllers/puzzle_controller.dart';
@@ -30,6 +31,7 @@ import 'package:bombali_sayilar/models/chess_piece.dart';
 import 'package:bombali_sayilar/models/chess_square.dart';
 import 'package:bombali_sayilar/models/chess_time_control.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
+import 'package:bombali_sayilar/models/multiplication_trial.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
 import 'package:bombali_sayilar/models/puzzle_player_state.dart';
 import 'package:bombali_sayilar/models/reflex_round_state.dart';
@@ -40,6 +42,7 @@ import 'package:bombali_sayilar/models/simon_trial.dart';
 import 'package:bombali_sayilar/screens/chess_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_screen.dart';
 import 'package:bombali_sayilar/screens/memory_game_screen.dart';
+import 'package:bombali_sayilar/screens/multiplication_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_catalog_screen.dart';
 import 'package:bombali_sayilar/screens/pattern_game_screen.dart';
 import 'package:bombali_sayilar/screens/puzzle_game_screen.dart';
@@ -49,6 +52,7 @@ import 'package:bombali_sayilar/screens/setup_screen.dart';
 import 'package:bombali_sayilar/screens/simon_game_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
+import 'package:bombali_sayilar/widgets/multiplication_array_view.dart';
 import 'package:bombali_sayilar/services/chess_ai.dart';
 import 'package:bombali_sayilar/widgets/chess_evaluation_bar.dart';
 import 'package:bombali_sayilar/widgets/chess_move_history.dart';
@@ -245,6 +249,52 @@ Future<void> _openChess(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Platform ana menüsünden Çarpım Bahçesi oyununa girer. Katalogdaki 10. kart
+/// olduğu için görünümü bir kademe daha uzatıyoruz (bkz. _openChess).
+Future<void> _openMultiplication(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 6000);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Çarpım Bahçesi'));
+  await tester.pumpAndSettle();
+}
+
+/// Çarpım Bahçesi'nde açık olan turu doğru cevaplar ve açıklama panelindeki
+/// "Devam"a basarak bir sonraki tura geçer.
+///
+/// Kurma turunda ızgarayı `+` düğmeleriyle kurmak tur başına 10'a varan
+/// dokunuş demek; onun yerine kontrolcünün alanları doğrudan set ediliyor —
+/// Kayan Yapboz testlerinin `controller.currentPlayer.tiles`'ı doğrudan
+/// kurmasıyla aynı yerleşik konvansiyon.
+Future<void> _answerMultiplicationCorrectly(
+  WidgetTester tester,
+  MultiplicationController controller,
+) async {
+  final trial = controller.currentTrial;
+  if (trial.kind == MultiplicationTrialKind.array) {
+    await tester.tap(find.byKey(ValueKey(trial.answer)));
+  } else {
+    controller.buildRows = trial.rows;
+    controller.buildColumns = trial.columns;
+    await tester.tap(find.byKey(const Key('multiplicationConfirm')));
+  }
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.byKey(const Key('multiplicationContinue')));
+  await tester.pumpAndSettle();
+}
+
+/// Çarpım Bahçesi kontrolcüsünü oyun ekranının context'inden alır.
+MultiplicationController _multiplicationController(WidgetTester tester) {
+  return Provider.of<MultiplicationController>(
+    tester.element(find.byType(MultiplicationGameScreen)),
+    listen: false,
+  );
+}
+
 /// Tahtadaki belirli bir taşı bulur. Taşlar Unicode sembolü olarak
 /// çizilmediği için (bkz. `widgets/chess_piece_glyph.dart`) metin yerine
 /// widget'ın taşına bakılır.
@@ -286,10 +336,10 @@ void main() {
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
-    // Katalog listesi 9 karta çıktığı için varsayılan test görünümünde
+    // Katalog listesi 10 karta çıktığı için varsayılan test görünümünde
     // ListView'in lazy build cache'i son kartı henüz kurmayabilir; tam
     // liste görünür olsun diye görünümü uzatıyoruz.
-    tester.view.physicalSize = const Size(800, 5400);
+    tester.view.physicalSize = const Size(800, 6000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -306,6 +356,7 @@ void main() {
     expect(find.text('Simon Diyor ki'), findsOneWidget);
     expect(find.text('Kayan Yapboz'), findsOneWidget);
     expect(find.text('Satranç'), findsOneWidget);
+    expect(find.text('Çarpım Bahçesi'), findsOneWidget);
   });
 
   testWidgets(
@@ -314,7 +365,7 @@ void main() {
       // Her kart artık 4 satırlık bir yıldız tablosu da içeriyor; ListView'in
       // lazy build cache'i tüm kartları kurabilsin diye görünümü daha da
       // uzatıyoruz.
-      tester.view.physicalSize = const Size(800, 5400);
+      tester.view.physicalSize = const Size(800, 6000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -339,7 +390,7 @@ void main() {
       // ekranda açıklama 3 satıra çıktığı için taşma riski en yüksek yer
       // burası. Taşma debug'da exception attığından test kendiliğinden
       // kırmızıya döner — ayrıca assert etmeye gerek yok.
-      tester.view.physicalSize = const Size(400, 4200);
+      tester.view.physicalSize = const Size(400, 4600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -347,7 +398,7 @@ void main() {
       await tester.pumpWidget(const GamePlatformApp());
 
       expect(find.text('Bombalı Sayılar'), findsOneWidget);
-      expect(find.text('Satranç'), findsOneWidget);
+      expect(find.text('Çarpım Bahçesi'), findsOneWidget);
     },
   );
 
@@ -2396,4 +2447,176 @@ void main() {
       lessThan(ChessDifficulty.cokZor.timeBudgetMs * 2),
     );
   });
+
+  testWidgets(
+    'Çarpım Bahçesi: oyun ilk turda ızgarayı ve 4 seçeneği gösterir',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('oynuyor'), findsOneWidget);
+      expect(
+        find.text('Tur 1 / $multiplicationRoundsPerPlayer'),
+        findsOneWidget,
+      );
+      expect(find.byType(MultiplicationArrayView), findsOneWidget);
+
+      // Turlar dönüşümlü: ilk tur her zaman okuma turudur.
+      final controller = _multiplicationController(tester);
+      expect(controller.currentTrial.kind, MultiplicationTrialKind.array);
+      expect(controller.currentTrial.options, hasLength(4));
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: doğru cevaptan sonra açıklama paneli tekrarlı toplamayı '
+    'gösterir ve tur ancak Devam ile ilerler',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = _multiplicationController(tester);
+      final trial = controller.currentTrial;
+
+      await tester.tap(find.byKey(ValueKey(trial.answer)));
+      await tester.pumpAndSettle();
+
+      // Panel kendi kendine kapanmaz: puan işlendi ama tur hâlâ ekranda.
+      expect(controller.showingExplanation, isTrue);
+      expect(find.text('Doğru!'), findsOneWidget);
+      expect(find.text(trial.repeatedAdditionText), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('multiplicationContinue')));
+      await tester.pumpAndSettle();
+
+      expect(controller.currentPlayer.correctCount, 1);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+      expect(controller.currentTrial.kind, MultiplicationTrialKind.build);
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: ters çevrilmiş ızgara da doğru sayılır ve açıklama '
+    'değişme özelliğini anlatır',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = _multiplicationController(tester);
+      // 1. tur okuma; doğru cevaplayınca 2. tur kurma turu olur.
+      await _answerMultiplicationCorrectly(tester, controller);
+      expect(controller.currentTrial.kind, MultiplicationTrialKind.build);
+
+      // Hedefi sabitliyoruz: rastgele üretilen tur kare (örn. 3 × 3) çıkarsa
+      // "ters çevirmek" hedefin aynısı olur ve test anlamsızlaşırdı.
+      controller.currentTrial = const MultiplicationTrial(
+        kind: MultiplicationTrialKind.build,
+        rows: 2,
+        columns: 3,
+        emoji: '🍎',
+      );
+      controller.buildRows = 3;
+      controller.buildColumns = 2;
+
+      await tester.tap(find.byKey(const Key('multiplicationConfirm')));
+      await tester.pumpAndSettle();
+
+      expect(controller.lastAnswerCorrect, isTrue);
+      expect(controller.lastAnswerCommuted, isTrue);
+      expect(controller.currentPlayer.correctCount, 2);
+      expect(find.textContaining('sonucu değiştirmez'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: 1 Kişi tamamlanınca sonuç ekranında doğru sayısı görünür',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      expect(find.text('2. Oyuncu adı'), findsNothing);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = _multiplicationController(tester);
+      expect(controller.players, hasLength(1));
+
+      for (var round = 0; round < multiplicationRoundsPerPlayer; round++) {
+        await _answerMultiplicationCorrectly(tester, controller);
+      }
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sonuçlar'), findsOneWidget);
+      expect(find.textContaining('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+      expect(
+        find.text(
+          '$multiplicationRoundsPerPlayer / '
+          '$multiplicationRoundsPerPlayer doğru',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: Zor seviyenin 12 × 12 ızgarası dar telefonda taşmaz',
+    (WidgetTester tester) async {
+      // En kötü durum: en büyük çarpanlar (MultiplicationDifficulty.zor) +
+      // birikimli toplam etiketleri + dar bir telefon. Taşma debug'da
+      // exception attığından ayrıca assert etmeye gerek yok.
+      tester.view.physicalSize = const Size(320, 560);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Padding(
+              padding: EdgeInsets.all(16),
+              child: MultiplicationArrayView(
+                rows: 12,
+                columns: 12,
+                emoji: '🍎',
+                showRunningTotals: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MultiplicationArrayView), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: 2 Kişi — ilk oyuncu bitirince sıra ikinciye geçer',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = _multiplicationController(tester);
+
+      for (var round = 0; round < multiplicationRoundsPerPlayer; round++) {
+        await _answerMultiplicationCorrectly(tester, controller);
+      }
+      await tester.pumpAndSettle();
+
+      expect(controller.players[0].correctCount, multiplicationRoundsPerPlayer);
+      expect(find.text('Hazırım'), findsOneWidget);
+
+      await tester.tap(find.text('Hazırım'));
+      await tester.pumpAndSettle();
+
+      expect(controller.currentPlayerIndex, 1);
+      expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
 }
