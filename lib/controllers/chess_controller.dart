@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/chess_board.dart';
 import '../models/chess_difficulty.dart';
 import '../models/chess_game_phase.dart';
+import '../models/chess_material.dart';
 import '../models/chess_mode.dart';
 import '../models/chess_move.dart';
 import '../models/chess_notation.dart';
@@ -91,6 +92,38 @@ class ChessController extends ChangeNotifier {
     final cp = evaluationCentipawns.clamp(-1500, 1500);
     return 1 / (1 + pow(10, -cp / 400));
   }
+
+  /// Beyazın ele geçirdiği (siyahın kaybettiği) taşlar. Ayrı bir state alanı
+  /// tutulmuyor — her alma zaten `board.moveHistory`'deki ilgili
+  /// `ChessMove.capturedPiece`'te duruyor (normal alma, sürgülü/adımlı alma
+  /// ve geçerken alma dahil hepsinde dolduruluyor, bkz. `ChessBoard`), bu
+  /// yüzden `whiteWinChance` gibi her okunuşta oradan türeyen bir getter
+  /// yeterli.
+  List<ChessPiece> get capturedByWhite => [
+    for (final move in board.moveHistory)
+      if (move.capturedPiece != null &&
+          move.movingPiece.color == PieceColor.white)
+        move.capturedPiece!,
+  ];
+
+  /// Siyahın ele geçirdiği (beyazın kaybettiği) taşlar.
+  List<ChessPiece> get capturedByBlack => [
+    for (final move in board.moveHistory)
+      if (move.capturedPiece != null &&
+          move.movingPiece.color == PieceColor.black)
+        move.capturedPiece!,
+  ];
+
+  /// Pozitifse beyaz, negatifse siyah taş puanında (bkz.
+  /// `chessStandardPieceValues`) öndedir; 0 ise eşitlik.
+  ///
+  /// İki tarafın başlangıç taş değeri eşit (39 puan) olduğu için "tahtada
+  /// kalan taşların değer farkı" ile "ele geçirilenlerin değer farkı"
+  /// matematiksel olarak birbirine eşittir — tahtayı yeniden taramak yerine
+  /// zaten hesaplanmış [capturedByWhite]/[capturedByBlack]'ten türetmek
+  /// daha basit.
+  int get materialDifference =>
+      totalPieceValue(capturedByWhite) - totalPieceValue(capturedByBlack);
 
   /// 2 kişilik modda sırası gelen tarafa göre değişir (her hamlede
   /// dönüşü tetikler); bilgisayara karşı modda insan oyuncunun rengine

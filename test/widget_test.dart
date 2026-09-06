@@ -1852,6 +1852,171 @@ void main() {
   );
 
   testWidgets(
+    'Chess: ele geçirilen taş doğru tarafa yazılır ve taş puanı farkını '
+    'günceller',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(3, 3)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      squares[squareIndex(3, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      );
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(3, 3));
+      controller.selectSquare(squareIndex(3, 6));
+
+      // Beyaz bir piyon aldı: bu taş beyazın "capturedByWhite" listesinde
+      // olmalı (kaybeden siyah olduğu için siyah tarafında görünecek olan
+      // taş bu), siyah henüz hiçbir şey almadı.
+      expect(controller.capturedByWhite, [
+        const ChessPiece(PieceType.pawn, PieceColor.black),
+      ]);
+      expect(controller.capturedByBlack, isEmpty);
+      expect(controller.materialDifference, 1);
+    },
+  );
+
+  testWidgets(
+    'Chess: iki taraf da taş aldığında taş puanı farkı ikisini birden '
+    'yansıtır',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      // Beyaz kale d4 -> d7'de siyah atı alacak (3 puan).
+      squares[squareIndex(3, 3)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      squares[squareIndex(3, 6)] = const ChessPiece(
+        PieceType.knight,
+        PieceColor.black,
+      );
+      // Siyah kale a5 -> a2'de beyaz piyonu alacak (1 puan).
+      squares[squareIndex(0, 4)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.black,
+      );
+      squares[squareIndex(0, 1)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.white,
+      );
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(3, 3));
+      controller.selectSquare(squareIndex(3, 6));
+      controller.selectSquare(squareIndex(0, 4));
+      controller.selectSquare(squareIndex(0, 1));
+
+      expect(controller.capturedByWhite, [
+        const ChessPiece(PieceType.knight, PieceColor.black),
+      ]);
+      expect(controller.capturedByBlack, [
+        const ChessPiece(PieceType.pawn, PieceColor.white),
+      ]);
+      // Beyaz 3 puanlık at aldı, siyah 1 puanlık piyon aldı: fark 3-1=2,
+      // beyaz öndedir.
+      expect(controller.materialDifference, 2);
+    },
+  );
+
+  testWidgets(
+    'Chess: ele geçirilen taş paneli doğru simgeyi ve "+N" rozetini gösterir',
+    (WidgetTester tester) async {
+      await _openChess(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<ChessController>(
+        tester.element(find.byType(ChessGameScreen)),
+        listen: false,
+      );
+
+      final squares = List<ChessPiece?>.filled(64, null);
+      squares[squareIndex(4, 0)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.white,
+      );
+      squares[squareIndex(4, 7)] = const ChessPiece(
+        PieceType.king,
+        PieceColor.black,
+      );
+      squares[squareIndex(3, 3)] = const ChessPiece(
+        PieceType.rook,
+        PieceColor.white,
+      );
+      squares[squareIndex(3, 6)] = const ChessPiece(
+        PieceType.pawn,
+        PieceColor.black,
+      );
+      controller.board = ChessBoard.custom(squares: squares);
+
+      controller.selectSquare(squareIndex(3, 3));
+      controller.selectSquare(squareIndex(3, 6));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('chessCapturedByWhite')),
+          matching: _findPiece(PieceType.pawn, PieceColor.black),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('chessCapturedByWhite')),
+          matching: find.text('+1'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('chessCapturedByBlack')),
+          matching: find.text('+1'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+
+  testWidgets(
     'Chess: 2 kişilik modda tahta her hamlede döner',
     (WidgetTester tester) async {
       await _openChess(tester);

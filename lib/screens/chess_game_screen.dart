@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../controllers/chess_controller.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_square.dart';
+import '../widgets/chess_captured_pieces.dart';
 import '../widgets/chess_clock_panel.dart';
 import '../widgets/chess_evaluation_bar.dart';
 import '../widgets/chess_move_history.dart';
@@ -179,6 +180,11 @@ class _BoardArea extends StatelessWidget {
   static const _historyPanelWidth = 190.0;
   static const _historyStripHeight = 44.0;
 
+  /// Ele geçirilen taş şeritlerinin (tahtanın üstünde ve altında birer tane)
+  /// sabit yüksekliği ve tahta çerçevesiyle arasındaki boşluk.
+  static const _capturedRowHeight = 26.0;
+  static const _capturedRowGap = 4.0;
+
   /// Bu genişliğin altında geçmiş, tahtanın sağına değil altına konur.
   static const _sidePanelBreakpoint = 640.0;
 
@@ -194,36 +200,70 @@ class _BoardArea extends StatelessWidget {
             _barWidth -
             _gap -
             (sidePanel ? _historyPanelWidth + _gap : 0);
-        final heightForBoard = sidePanel
-            ? constraints.maxHeight
-            : constraints.maxHeight - _historyStripHeight - _gap;
+        // Ele geçirilen taş şeritleri tahta çerçevesinin üstüne/altına
+        // eklendiği için (bkz. aşağıdaki sütun), tahtanın kendi kare kenar
+        // uzunluğu bu iki şeridin yüksekliği düşülerek hesaplanır — tıpkı
+        // dar ekranda yatay geçmiş şeridinin zaten aynı şekilde
+        // düşülmesi gibi.
+        final capturedOverhead = 2 * (_capturedRowHeight + _capturedRowGap);
+        final heightForBoard =
+            (sidePanel
+                ? constraints.maxHeight
+                : constraints.maxHeight - _historyStripHeight - _gap) -
+            capturedOverhead;
         final boardSize = widthForBoard < heightForBoard
             ? widthForBoard
             : heightForBoard;
+        // Değerlendirme çubuğu ve hamle geçmişi paneli artık sadece tahtayla
+        // değil, tahta + iki taş şeridiyle birlikte aynı boyda olmalı.
+        final columnHeight = boardSize + capturedOverhead;
+
+        final bottomColor = controller.viewpointColor;
+        final topColor = bottomColor == PieceColor.white
+            ? PieceColor.black
+            : PieceColor.white;
 
         final row = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
               width: _barWidth,
-              height: boardSize,
+              height: columnHeight,
               child: ChessEvaluationBar(
                 whiteWinChance: controller.whiteWinChance,
                 flipped: controller.boardFlipped,
               ),
             ),
             const SizedBox(width: _gap),
-            SizedBox.square(
-              dimension: boardSize,
-              child: _BoardFrame(
-                child: _ChessBoardView(controller: controller),
+            SizedBox(
+              width: boardSize,
+              height: columnHeight,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: _capturedRowHeight,
+                    child: _capturedRowFor(topColor),
+                  ),
+                  const SizedBox(height: _capturedRowGap),
+                  SizedBox.square(
+                    dimension: boardSize,
+                    child: _BoardFrame(
+                      child: _ChessBoardView(controller: controller),
+                    ),
+                  ),
+                  const SizedBox(height: _capturedRowGap),
+                  SizedBox(
+                    height: _capturedRowHeight,
+                    child: _capturedRowFor(bottomColor),
+                  ),
+                ],
               ),
             ),
             if (sidePanel) ...[
               const SizedBox(width: _gap),
               SizedBox(
                 width: _historyPanelWidth,
-                height: boardSize,
+                height: columnHeight,
                 child: ChessMoveHistory(notations: controller.moveNotations),
               ),
             ],
@@ -247,6 +287,31 @@ class _BoardArea extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  /// [color] tarafının ele geçirdiği taşları ve (öndeyse) taş puanı farkını
+  /// gösteren şerit. Alttaki taraf her zaman `controller.viewpointColor`,
+  /// üstteki onun tersi — tahta döndüğünde (2 kişilik modda) şeritler de
+  /// `_ChessBoardView`'ın kendisiyle aynı mantıkla birlikte döner.
+  Widget _capturedRowFor(PieceColor color) {
+    final pieces = color == PieceColor.white
+        ? controller.capturedByWhite
+        : controller.capturedByBlack;
+    final diff = controller.materialDifference;
+    final advantage = switch (color) {
+      PieceColor.white when diff > 0 => diff,
+      PieceColor.black when diff < 0 => -diff,
+      _ => null,
+    };
+    return ChessCapturedPieces(
+      key: Key(
+        color == PieceColor.white
+            ? 'chessCapturedByWhite'
+            : 'chessCapturedByBlack',
+      ),
+      pieces: pieces,
+      advantage: advantage,
     );
   }
 }
