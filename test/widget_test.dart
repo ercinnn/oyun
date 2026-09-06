@@ -379,9 +379,10 @@ void main() {
       expect(find.text('İngilizce'), findsNWidgets(gameCatalog.length));
       expect(find.text('IQ'), findsNWidgets(gameCatalog.length));
       expect(find.text('Hafıza'), findsNWidgets(gameCatalog.length));
+      expect(find.text('Dikkat'), findsNWidgets(gameCatalog.length));
       expect(
         find.byType(StarRating),
-        findsNWidgets(gameCatalog.length * 4),
+        findsNWidgets(gameCatalog.length * 5),
       );
     },
   );

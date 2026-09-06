@@ -31,7 +31,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.grid_on,
     color: Colors.indigo,
     routeName: BombaliSayilarGame.routeName,
-    skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 1, hafiza: 5),
+    skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 1, hafiza: 5, dikkat: 3),
   ),
   GameCatalogEntry(
     title: 'Kart Eşleştirme',
@@ -41,7 +41,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.style,
     color: Colors.teal,
     routeName: MemoryMatchGame.routeName,
-    skills: GameSkillRatings(zeka: 2, ingilizce: 3, iq: 1, hafiza: 5),
+    skills: GameSkillRatings(zeka: 2, ingilizce: 3, iq: 1, hafiza: 5, dikkat: 3),
   ),
   GameCatalogEntry(
     title: 'Renk mi Kelime mi?',
@@ -51,7 +51,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.palette,
     color: Colors.deepPurple,
     routeName: StroopGame.routeName,
-    skills: GameSkillRatings(zeka: 3, ingilizce: 0, iq: 2, hafiza: 1),
+    skills: GameSkillRatings(zeka: 3, ingilizce: 0, iq: 2, hafiza: 1, dikkat: 5),
   ),
   GameCatalogEntry(
     title: 'Dizi Hafızası',
@@ -61,7 +61,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.touch_app,
     color: Colors.orange,
     routeName: SequenceMemoryGame.routeName,
-    skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 2, hafiza: 5),
+    skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 2, hafiza: 5, dikkat: 4),
   ),
   GameCatalogEntry(
     title: 'Diziler',
@@ -71,7 +71,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.psychology,
     color: Colors.blueGrey,
     routeName: PatternGame.routeName,
-    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 5, hafiza: 1),
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 5, hafiza: 1, dikkat: 3),
   ),
   GameCatalogEntry(
     title: 'Tepki Süresi',
@@ -81,7 +81,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.bolt,
     color: Colors.red,
     routeName: ReflexGame.routeName,
-    skills: GameSkillRatings(zeka: 1, ingilizce: 0, iq: 2, hafiza: 0),
+    skills: GameSkillRatings(zeka: 1, ingilizce: 0, iq: 2, hafiza: 0, dikkat: 5),
   ),
   GameCatalogEntry(
     title: 'Simon Diyor ki',
@@ -91,7 +91,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.record_voice_over,
     color: Colors.pink,
     routeName: SimonGame.routeName,
-    skills: GameSkillRatings(zeka: 3, ingilizce: 0, iq: 2, hafiza: 1),
+    skills: GameSkillRatings(zeka: 3, ingilizce: 0, iq: 2, hafiza: 1, dikkat: 5),
   ),
   GameCatalogEntry(
     title: 'Kayan Yapboz',
@@ -101,7 +101,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.extension,
     color: Colors.cyan,
     routeName: PuzzleGame.routeName,
-    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 4, hafiza: 2),
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 4, hafiza: 2, dikkat: 3),
   ),
   GameCatalogEntry(
     title: 'Satranç',
@@ -111,7 +111,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.castle,
     color: Colors.brown,
     routeName: ChessGame.routeName,
-    skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 5, hafiza: 3),
+    skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 5, hafiza: 3, dikkat: 4),
   ),
   GameCatalogEntry(
     title: 'Çarpım Bahçesi',
@@ -121,7 +121,7 @@ const List<GameCatalogEntry> gameCatalog = [
     icon: Icons.calculate,
     color: Colors.green,
     routeName: MultiplicationGame.routeName,
-    skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 4, hafiza: 3),
+    skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 4, hafiza: 3, dikkat: 3),
   ),
 ];
 
@@ -135,7 +135,7 @@ List<Widget> platformStatChips() => [
     label: '${gameCatalog.length} oyun',
   ),
   const StatChip(icon: Icons.people_alt_outlined, label: '1-2 oyuncu'),
-  const StatChip(icon: Icons.insights_outlined, label: '4 beceri alanı'),
+  const StatChip(icon: Icons.insights_outlined, label: '5 beceri alanı'),
 ];
 
 /// Platformun ana sayfası: koyu bir "konsol paneli" görünümünde oyun
@@ -160,7 +160,7 @@ class GameCatalogScreen extends StatelessWidget {
   /// durumda (bkz. `GameCard`).
   static const _twoColumnWidth = 720.0;
   static const _threeColumnWidth = 1080.0;
-  static const _cardHeight = 234.0;
+  static const _cardHeight = 258.0;
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +376,7 @@ class _FooterNote extends StatelessWidget {
         SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Her karttaki yıldızlar, o oyunun dört beceri alanını ne kadar '
+            'Her karttaki yıldızlar, o oyunun beş beceri alanını ne kadar '
             'geliştirdiğini gösterir.',
             style: TextStyle(fontSize: 12, color: HomePalette.textMuted),
           ),
