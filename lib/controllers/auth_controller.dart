@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/supabase_config.dart';
+
 /// Platform genelinde tek örnek olarak sağlanan oturum kapısı (bkz.
 /// CLAUDE.md — Google ile giriş): [ProfileController]'ın aksine bu bir
 /// gerçek kimlik doğrulamasıdır — Supabase Auth'un Google OAuth sağlayıcısı
@@ -27,9 +29,16 @@ class AuthController extends ChangeNotifier {
     });
   }
 
+  /// Web'de OAuth akışı tam sayfa yönlendirmeyle çalışır ve kullanıcı zaten
+  /// sitenin kendi adresine döner; bu yüzden `redirectTo` verilmez. Mobilde
+  /// ise tarayıcı ayrı bir uygulamadır — geri dönebilmesi için
+  /// [SupabaseConfig.mobileAuthRedirectUrl] derin bağlantısı gerekir (aynı
+  /// adres AndroidManifest'te intent-filter olarak ve Supabase panelinde
+  /// izinli yönlendirme adresi olarak tanımlı olmalı).
   Future<void> signInWithGoogle() {
     return Supabase.instance.client.auth.signInWithOAuth(
       OAuthProvider.google,
+      redirectTo: kIsWeb ? null : SupabaseConfig.mobileAuthRedirectUrl,
     );
   }
 

@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Elle derlenen APK çıktı dosyaları (bkz. CLAUDE.md, "Android / APK derleme")
+*.apk
+
+# Supabase veritabanı yedekleri (asla depoya girmemeli)
+*.backup.gz
