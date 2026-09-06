@@ -27,7 +27,7 @@ Stop-Process -Id <OwningProcess> -Force
 
 ## Architecture
 
-This is a Flutter **game platform** with Supabase as its backend (see "Repository abstraction" and "Kimlik doğrulama" below — Bombalı Sayılar persists results and the whole platform now gates behind Google sign-in): a `Navigator`-based shell that hosts multiple independent games — currently "Bombalı Sayılar", "Kart Eşleştirme", "Renk mi Kelime mi?", "Dizi Hafızası", "Diziler", "Tepki Süresi", "Simon Diyor ki", and "Kayan Yapboz". State management is `provider` (`ChangeNotifier` + `MultiProvider`), scoped **per game** — with the deliberate platform-wide exceptions of `ProfileController` and `AuthController` (see below).
+This is a Flutter **game platform** with Supabase as its backend (see "Repository abstraction" and "Kimlik doğrulama" below — Bombalı Sayılar persists results and the whole platform now gates behind Google sign-in): a `Navigator`-based shell that hosts multiple independent games — currently "Bombalı Sayılar", "Kart Eşleştirme", "Renk mi Kelime mi?", "Dizi Hafızası", "Diziler", "Tepki Süresi", "Simon Diyor ki", "Kayan Yapboz", "Satranç", and "Çarpım Bahçesi". State management is `provider` (`ChangeNotifier` + `MultiProvider`), scoped **per game** — with the deliberate platform-wide exceptions of `ProfileController` and `AuthController` (see below).
 
 ### Platform shell and adding a new game
 
