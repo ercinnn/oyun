@@ -10,12 +10,35 @@
 ///   demek; 12'ye çıkmak çocuk için sıkıcı bir dokunma maratonu olurdu. Bu
 ///   yüzden [buildMaxFactor] her seviyede daha düşük tutulur.
 ///
+/// **Seviye aynı zamanda gerçek hayat sahnelerini de seçer**: çarpanların
+/// büyüklüğü tek başına zorluğu anlatmıyor. Kolay seviyede sahneler
+/// sayılabilir ve elle tutulur (bisiklet tekerleği, yumurta kolisi), Orta'da
+/// para ve zaman gibi ilk soyutlamalar giriyor, Zor'da ise alan modeli,
+/// kombinasyon ve kat kat karşılaştırma — yani çarpmanın "tekrarlı toplama"
+/// tanımının ötesine geçtiği durumlar. Bu dağılım
+/// `models/multiplication_context.dart` içindeki `levels` alanında yaşıyor.
+///
 /// Alt sınır her seviyede 2'dir: `1 × n` hem düşünmeyi gerektirmiyor hem de
 /// tek sıralık bir ızgara olarak çarpmanın "dikdörtgen" sezgisini vermiyor.
 enum MultiplicationDifficulty {
-  kolay(label: 'Kolay', hint: '1-5 tablosu', arrayMaxFactor: 5, buildMaxFactor: 4),
-  orta(label: 'Orta', hint: '1-10 tablosu', arrayMaxFactor: 10, buildMaxFactor: 6),
-  zor(label: 'Zor', hint: '1-12 tablosu', arrayMaxFactor: 12, buildMaxFactor: 8);
+  kolay(
+    label: 'Kolay',
+    hint: '1-5 tablosu · eşit gruplar',
+    arrayMaxFactor: 5,
+    buildMaxFactor: 4,
+  ),
+  orta(
+    label: 'Orta',
+    hint: '1-10 tablosu · para ve zaman',
+    arrayMaxFactor: 10,
+    buildMaxFactor: 6,
+  ),
+  zor(
+    label: 'Zor',
+    hint: '1-12 tablosu · alan ve kombinasyon',
+    arrayMaxFactor: 12,
+    buildMaxFactor: 8,
+  );
 
   const MultiplicationDifficulty({
     required this.label,

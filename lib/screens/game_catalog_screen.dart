@@ -116,8 +116,8 @@ const List<GameCatalogEntry> gameCatalog = [
   GameCatalogEntry(
     title: 'Çarpım Bahçesi',
     description:
-        '3 × 4 demek, 4 tanesini üç kere almak demek! Nesne ızgaralarını '
-        'say, kendi ızgaranı kur, çarpmanın mantığını kavra.',
+        'Yumurta kolisi, bisiklet tekerleği, hafta, halı, kıyafet kombini… '
+        'Gerçek hayattaki sahneleri say ve kur, çarpmanın mantığını kavra.',
     icon: Icons.calculate,
     color: Colors.green,
     routeName: MultiplicationGame.routeName,

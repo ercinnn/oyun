@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/multiplication_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../models/multiplication_context.dart';
 import '../models/multiplication_difficulty.dart';
 import '../widgets/multiplication_difficulty_selector.dart';
 import '../widgets/player_count_selector.dart';
@@ -46,6 +47,16 @@ class _MultiplicationSetupScreenState extends State<MultiplicationSetupScreen> {
     ], difficulty: _difficulty);
   }
 
+  /// Seçili seviyenin sahnelerinden birkaçının adı ("Yumurta kolisi ·
+  /// Bisiklet tekerlekleri · …"). Tamamı yazılsa kurulum ekranı bir metin
+  /// duvarına dönerdi; kaçının sığdığını sahne sayısı değil okunabilirlik
+  /// belirliyor.
+  static String _sceneExamples(MultiplicationDifficulty difficulty) {
+    final scenes = multiplicationContextsFor(difficulty);
+    final shown = scenes.take(4).map((scene) => scene.title).join(' · ');
+    return scenes.length > 4 ? '$shown ve ${scenes.length - 4} sahne daha' : shown;
+  }
+
   String? _validateName(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'İsim boş olamaz';
@@ -69,9 +80,10 @@ class _MultiplicationSetupScreenState extends State<MultiplicationSetupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    '3 × 4 demek, 4 tanesini üç kere almak demek! Bazı '
-                    'turlarda ızgaradaki nesneleri sayacaksın, bazılarında '
-                    'ızgarayı sen kuracaksın.',
+                    '3 × 4 demek, 4 tanesini üç kere almak demek! Her tur '
+                    'gerçek hayattan bir sahnede geçer: bazılarında '
+                    'sahnedeki nesneleri sayacaksın, bazılarında sahneyi sen '
+                    'kuracaksın.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
@@ -102,6 +114,15 @@ class _MultiplicationSetupScreenState extends State<MultiplicationSetupScreen> {
                       onChanged: (value) =>
                           setState(() => _difficulty = value),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Seviye seçimi sadece sayıları değil, hangi gerçek hayat
+                  // sahnelerinin çıkacağını da belirliyor; oyuncu neyi seçtiğini
+                  // görebilsin diye o seviyenin sahneleri burada listeleniyor.
+                  Text(
+                    'Sahneler: ${_sceneExamples(_difficulty)}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 20),
                   TextFormField(

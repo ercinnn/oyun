@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/multiplication_controller.dart';
+import '../models/multiplication_context.dart';
 import '../models/multiplication_trial.dart';
 import '../widgets/multiplication_array_view.dart';
 
@@ -78,15 +79,19 @@ class _ArrayQuestion extends StatelessWidget {
 
     return Column(
       children: [
+        _SceneChip(scene: trial.context),
+        const SizedBox(height: 8),
         Text(
-          'Toplam kaç tane ${trial.emoji} var?',
-          style: Theme.of(context).textTheme.titleLarge,
+          trial.sceneQuestion,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         Text(
           trial.groupingText,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: Theme.of(context).textTheme.bodySmall,
           textAlign: TextAlign.center,
         ),
         Expanded(
@@ -96,6 +101,8 @@ class _ArrayQuestion extends StatelessWidget {
               rows: trial.rows,
               columns: trial.columns,
               emoji: trial.emoji,
+              rowLeadingEmoji: trial.context.groupEmoji,
+              columnHeaderEmoji: trial.context.columnHeaderEmoji,
             ),
           ),
         ),
@@ -131,15 +138,21 @@ class _BuildQuestion extends StatelessWidget {
 
     return Column(
       children: [
+        _SceneChip(scene: trial.context),
+        const SizedBox(height: 8),
         Text(
-          '${trial.rows} × ${trial.columns} kur!',
-          style: Theme.of(context).textTheme.titleLarge,
+          // Kurmaya uygun olmayan bir sahne buraya normalde hiç düşmez (bkz.
+          // MultiplicationController._pickContext); yedek metin güvenlik ağı.
+          trial.buildPrompt ?? '${trial.rows} × ${trial.columns} kur!',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
         Text(
-          '${trial.rows} sıra yap, her sıraya ${trial.columns} tane koy.',
-          style: Theme.of(context).textTheme.bodyMedium,
+          '${trial.rows} × ${trial.columns} kur',
+          style: Theme.of(context).textTheme.bodySmall,
           textAlign: TextAlign.center,
         ),
         Expanded(
@@ -151,6 +164,8 @@ class _BuildQuestion extends StatelessWidget {
               emoji: trial.emoji,
               maxRows: maxFactor,
               maxColumns: maxFactor,
+              rowLeadingEmoji: trial.context.groupEmoji,
+              columnHeaderEmoji: trial.context.columnHeaderEmoji,
             ),
           ),
         ),
@@ -250,6 +265,9 @@ class _ExplanationPanel extends StatelessWidget {
                       columns: trial.columns,
                       emoji: trial.emoji,
                       showRunningTotals: true,
+                      rowLeadingEmoji: trial.context.groupEmoji,
+                      columnHeaderEmoji: trial.context.columnHeaderEmoji,
+                      totalUnit: trial.unit,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -265,6 +283,28 @@ class _ExplanationPanel extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    const SizedBox(height: 8),
+                    // Sayıyı sahneye geri bağlayan cümle. Panelin sonunda
+                    // durması bilinçli: çocuk önce dikdörtgeni toplayarak
+                    // sayıyı buluyor, sonra o sayının gerçek hayatta neye
+                    // karşılık geldiğini okuyor.
+                    Text(
+                      trial.sceneConclusion,
+                      style: theme.textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (trial.context.kind ==
+                        MultiplicationContextKind.kombinasyon) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Bir sıra, bir '
+                        '${trial.context.groupEmoji} demek: o sıra boyunca '
+                        'bütün ${trial.context.columnHeaderEmoji} '
+                        'seçenekleriyle birer kez eşleştirdik.',
+                        style: theme.textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                     if (controller.lastAnswerCommuted) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -293,6 +333,33 @@ class _ExplanationPanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+/// Turun geçtiği gerçek hayat sahnesini adıyla duyuran küçük başlık.
+///
+/// Sahne adı soru cümlesinin *içinde* de geçiyor; buradaki tekrar bilinçli:
+/// çocuk aynı 3 × 4 dikdörtgenini bir turda yumurta kolisi, bir sonrakinde
+/// bisiklet tekerleği olarak görünce sahnenin değiştiğini ama matematiğin
+/// değişmediğini fark etsin diye sahne adı hep aynı yerde duruyor.
+class _SceneChip extends StatelessWidget {
+  const _SceneChip({required this.scene});
+
+  final MultiplicationContext scene;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '${scene.groupEmoji ?? scene.emoji}  ${scene.title}',
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
     );
   }
 }

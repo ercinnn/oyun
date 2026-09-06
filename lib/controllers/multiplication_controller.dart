@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/multiplication_context.dart';
 import '../models/multiplication_difficulty.dart';
 import '../models/multiplication_game_phase.dart';
 import '../models/multiplication_player_state.dart';
@@ -12,19 +13,6 @@ import '../models/multiplication_trial.dart';
 /// kullanmıyoruz: hepsi test/widget_test.dart içinde birlikte import
 /// edildiğinde Dart bunu "ambiguous import" hatası sayar.
 const int multiplicationRoundsPerPlayer = 8;
-
-/// Izgarada çizilen nesneler. Tamamen kozmetik — hangi emoji seçildiği oyun
-/// mantığını hiç etkilemez, sadece her tur farklı görünsün diye var.
-const List<String> multiplicationEmojis = [
-  '🍎',
-  '🍓',
-  '⭐',
-  '🐞',
-  '🎈',
-  '🐟',
-  '🌸',
-  '🍇',
-];
 
 /// Çarpım Bahçesi'nin durum makinesi.
 ///
@@ -204,18 +192,62 @@ class MultiplicationController extends ChangeNotifier {
         ? difficulty.arrayMaxFactor
         : difficulty.buildMaxFactor;
 
+    final context = _pickContext(kind, maxFactor);
+
     final rows = _factor(maxFactor);
-    final columns = _factor(maxFactor);
+    // Sahnenin doğasından gelen bir sütun sayısı varsa (bisiklet 2 tekerlek,
+    // hafta 7 gün) o kullanılır: "her bisikletin 5 tekerleği" sorusu çocuğa
+    // gerçek hayattan bir şey öğretmez, üstelik saçmadır.
+    final columns = context.fixedColumns ?? _factor(maxFactor);
 
     return MultiplicationTrial(
       kind: kind,
       rows: rows,
       columns: columns,
-      emoji: multiplicationEmojis[_rng.nextInt(multiplicationEmojis.length)],
+      context: context,
       options: kind == MultiplicationTrialKind.array
           ? _generateOptions(rows, columns)
           : const [],
     );
+  }
+
+  /// Tura uygun bir gerçek hayat sahnesi seçer.
+  ///
+  /// İki eleme yapılır: sahne bu zorluk seviyesinde sunuluyor olmalı, ve
+  /// sabit sütun sayısı varsa bu turun çarpan tavanına sığmalı — örümceğin 8
+  /// bacağı "Kolay" seviyenin 5'lik tavanına sığmadığı için o seviyede hiç
+  /// çıkmaz, kurma turunun daha düşük tavanında ise "Orta"da da çıkmaz.
+  /// Ayrıca kurma turunda yalnızca kurma yönergesi olan sahneler kullanılır
+  /// (bkz. [MultiplicationContext.buildPrompt]).
+  ///
+  /// Eleme sonunda liste boş kalırsa (yeni bir sahne/tavan bileşimi eklenip
+  /// gözden kaçarsa) seviyedeki tüm sahnelere, o da boşsa tüm sahnelere
+  /// düşülür: bir tur asla üretilemeden oyunun kilitlenmesindense sahnenin
+  /// biraz eğreti durması yeğdir.
+  MultiplicationContext _pickContext(MultiplicationTrialKind kind, int maxFactor) {
+    final levelContexts = multiplicationContextsFor(difficulty);
+    final fitting = levelContexts.where((context) {
+      if (kind == MultiplicationTrialKind.build && !context.isBuildable) {
+        return false;
+      }
+      final fixed = context.fixedColumns;
+      return fixed == null || fixed <= maxFactor;
+    }).toList();
+
+    final candidates = fitting.isNotEmpty
+        ? fitting
+        : (levelContexts.isNotEmpty ? levelContexts : multiplicationContexts);
+
+    // Seviyeye yeni gelen sahneler havuza iki kez konur — bkz.
+    // [MultiplicationContext.introducedAt]. "Kolay"da her sahne yeni olduğu
+    // için bu ağırlıklandırma orada hiçbir şeyi değiştirmez.
+    final pool = <MultiplicationContext>[];
+    for (final context in candidates) {
+      pool.add(context);
+      if (context.introducedAt == difficulty) pool.add(context);
+    }
+
+    return pool[_rng.nextInt(pool.length)];
   }
 
   int _factor(int maxFactor) =>

@@ -31,6 +31,8 @@ import 'package:bombali_sayilar/models/chess_piece.dart';
 import 'package:bombali_sayilar/models/chess_square.dart';
 import 'package:bombali_sayilar/models/chess_time_control.dart';
 import 'package:bombali_sayilar/models/color_theme.dart';
+import 'package:bombali_sayilar/models/multiplication_context.dart';
+import 'package:bombali_sayilar/models/multiplication_difficulty.dart';
 import 'package:bombali_sayilar/models/multiplication_trial.dart';
 import 'package:bombali_sayilar/models/player_state.dart';
 import 'package:bombali_sayilar/models/puzzle_player_state.dart';
@@ -2512,11 +2514,13 @@ void main() {
 
       // Hedefi sabitliyoruz: rastgele üretilen tur kare (örn. 3 × 3) çıkarsa
       // "ters çevirmek" hedefin aynısı olur ve test anlamsızlaşırdı.
-      controller.currentTrial = const MultiplicationTrial(
+      controller.currentTrial = MultiplicationTrial(
         kind: MultiplicationTrialKind.build,
         rows: 2,
         columns: 3,
-        emoji: '🍎',
+        context: multiplicationContexts.firstWhere(
+          (scene) => scene.id == 'yumurta',
+        ),
       );
       controller.buildRows = 3;
       controller.buildColumns = 2;
@@ -2528,6 +2532,146 @@ void main() {
       expect(controller.lastAnswerCommuted, isTrue);
       expect(controller.currentPlayer.correctCount, 2);
       expect(find.textContaining('sonucu değiştirmez'), findsOneWidget);
+    },
+  );
+
+  test(
+    'Çarpım Bahçesi: her seviyede hem okuma hem kurma turu için sahne bulunur',
+    () {
+      for (final difficulty in MultiplicationDifficulty.values) {
+        final scenes = multiplicationContextsFor(difficulty);
+        expect(
+          scenes,
+          isNotEmpty,
+          reason: '${difficulty.label} seviyesinde hiç sahne yok',
+        );
+
+        // Okuma turu sahneleri: sabit sütunlu sahneler (örümceğin 8 bacağı)
+        // seviyenin çarpan tavanına sığmalı, yoksa o seviyede hiç seçilemez.
+        final readable = scenes.where(
+          (scene) =>
+              scene.fixedColumns == null ||
+              scene.fixedColumns! <= difficulty.arrayMaxFactor,
+        );
+        expect(
+          readable,
+          isNotEmpty,
+          reason: '${difficulty.label} seviyesinde okuma turu sahnesi yok',
+        );
+
+        // Kurma turunda tavan daha düşük ve sahnenin kurma yönergesi olmalı.
+        final buildable = scenes.where(
+          (scene) =>
+              scene.isBuildable &&
+              (scene.fixedColumns == null ||
+                  scene.fixedColumns! <= difficulty.buildMaxFactor),
+        );
+        expect(
+          buildable,
+          isNotEmpty,
+          reason: '${difficulty.label} seviyesinde kurma turu sahnesi yok',
+        );
+      }
+    },
+  );
+
+  test('Çarpım Bahçesi: sahne cümlelerinde doldurulmamış yer tutucu kalmaz', () {
+    for (final scene in multiplicationContexts) {
+      final columns = scene.fixedColumns ?? 4;
+      final texts = <String>[
+        scene.questionFor(3, columns),
+        scene.groupingFor(3, columns),
+        scene.conclusionFor(3, columns),
+        if (scene.isBuildable) scene.buildPromptFor(3, columns)!,
+      ];
+      for (final text in texts) {
+        expect(
+          text,
+          isNot(contains('{')),
+          reason: '${scene.id} sahnesinde doldurulmamış yer tutucu var: $text',
+        );
+      }
+      // Sonuç cümlesi sayıyı gerçekten söylemeli, yoksa panel sahneyi
+      // matematiğe bağlamıyor demektir.
+      expect(
+        scene.conclusionFor(3, columns),
+        contains('${3 * columns}'),
+        reason: '${scene.id} sahnesinin sonuç cümlesi sonucu içermiyor',
+      );
+    }
+  });
+
+  test(
+    'Çarpım Bahçesi: üretilen turlar seviyenin sahnelerinden ve tavanından '
+    'çıkar',
+    () {
+      for (final difficulty in MultiplicationDifficulty.values) {
+        final controller = MultiplicationController(random: Random(7));
+        controller.startGame(['Test'], difficulty: difficulty);
+
+        // 8 turun tamamını oynayıp her turun ürettiği sahneyi denetliyoruz;
+        // tek tur bakmak sahne havuzunun tamamını örneklemezdi.
+        for (var round = 0; round < multiplicationRoundsPerPlayer; round++) {
+          final trial = controller.currentTrial;
+          expect(
+            trial.context.levels,
+            contains(difficulty),
+            reason: '${trial.context.id} sahnesi ${difficulty.label} '
+                'seviyesine ait değil',
+          );
+
+          final maxFactor = trial.kind == MultiplicationTrialKind.array
+              ? difficulty.arrayMaxFactor
+              : difficulty.buildMaxFactor;
+          expect(trial.rows, inInclusiveRange(2, maxFactor));
+          if (trial.context.fixedColumns != null) {
+            // Sahnenin doğasından gelen sütun sayısı (bisiklet 2, hafta 7)
+            // rastgeleye çevrilmemeli.
+            expect(trial.columns, trial.context.fixedColumns);
+          } else {
+            expect(trial.columns, inInclusiveRange(2, maxFactor));
+          }
+          expect(trial.columns, lessThanOrEqualTo(maxFactor));
+          if (trial.kind == MultiplicationTrialKind.build) {
+            expect(trial.context.isBuildable, isTrue);
+            expect(trial.buildPrompt, isNotNull);
+          }
+
+          // Turu doğru cevaplayıp bir sonrakine geç.
+          if (trial.kind == MultiplicationTrialKind.array) {
+            controller.answerArray(trial.answer);
+          } else {
+            controller.buildRows = trial.rows;
+            controller.buildColumns = trial.columns;
+            controller.submitBuild();
+          }
+          controller.continueAfterExplanation();
+        }
+
+        expect(controller.players.first.correctCount,
+            multiplicationRoundsPerPlayer);
+      }
+    },
+  );
+
+  testWidgets(
+    'Çarpım Bahçesi: soru ve açıklama sahnenin gerçek hayat cümlelerini '
+    'kullanır',
+    (WidgetTester tester) async {
+      await _openMultiplication(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = _multiplicationController(tester);
+      final trial = controller.currentTrial;
+
+      expect(find.text(trial.sceneQuestion), findsOneWidget);
+      expect(find.textContaining(trial.context.title), findsOneWidget);
+
+      await tester.tap(find.byKey(ValueKey(trial.answer)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(trial.sceneConclusion), findsOneWidget);
     },
   );
 
@@ -2567,8 +2711,10 @@ void main() {
     'Çarpım Bahçesi: Zor seviyenin 12 × 12 ızgarası dar telefonda taşmaz',
     (WidgetTester tester) async {
       // En kötü durum: en büyük çarpanlar (MultiplicationDifficulty.zor) +
-      // birikimli toplam etiketleri + dar bir telefon. Taşma debug'da
-      // exception attığından ayrıca assert etmeye gerek yok.
+      // birikimli toplam etiketleri + gerçek hayat sahnelerinin iki kenar
+      // şeridi (sıra başı grup emojisi, sütun başlığı) + birim ekli toplam
+      // etiketi + dar bir telefon. Taşma debug'da exception attığından ayrıca
+      // assert etmeye gerek yok.
       tester.view.physicalSize = const Size(320, 560);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -2584,6 +2730,9 @@ void main() {
                 columns: 12,
                 emoji: '🍎',
                 showRunningTotals: true,
+                rowLeadingEmoji: '🎁',
+                columnHeaderEmoji: '👖',
+                totalUnit: ' m²',
               ),
             ),
           ),

@@ -6,7 +6,8 @@ const double _spacing = 4;
 const double _minCellSize = 14;
 const double _maxCellSize = 44;
 
-/// Birikimli toplam etiketleri için ızgaranın sağında ayrılan sabit genişlik.
+/// Birikimli toplam etiketleri için ızgaranın sağında ayrılan taban genişlik.
+/// Birim varsa ("12 gün") bunun üzerine harf başına biraz daha eklenir.
 const double _totalLabelWidth = 56;
 
 /// Çarpım Bahçesi'nin görsel çekirdeği: [rows] sıra × [columns] sütun nesneden
@@ -21,6 +22,12 @@ const double _totalLabelWidth = 56;
 /// [LayoutBuilder]'dan hesaplanır ve kırpılır: "Zor" seviyede 12 × 12'lik bir
 /// ızgara da dar bir pencerede taşmadan sığsın diye. Sabit bir hücre boyutu
 /// tek bir ekran genişliğinde doğru görünürdü.
+///
+/// [rowLeadingEmoji] ve [columnHeaderEmoji], aynı dikdörtgenin farklı gerçek
+/// hayat sahnelerinde ne anlama geldiğini görünür kılan iki kenar şeridi:
+/// eşit grup sahnelerinde her sıranın başına grubun kendisi (🚲 → 🛞 🛞),
+/// kombinasyon sahnelerinde ayrıca sütunların üstüne ikinci küme (👕 × 👖)
+/// çizilir. İkisi de yalnızca etikettir — sayıma dahil değildir.
 class MultiplicationArrayView extends StatelessWidget {
   const MultiplicationArrayView({
     super.key,
@@ -30,6 +37,9 @@ class MultiplicationArrayView extends StatelessWidget {
     this.maxRows,
     this.maxColumns,
     this.showRunningTotals = false,
+    this.rowLeadingEmoji,
+    this.columnHeaderEmoji,
+    this.totalUnit = '',
   });
 
   /// Dolu (nesne çizilen) sıra ve sütun sayısı.
@@ -49,21 +59,39 @@ class MultiplicationArrayView extends StatelessWidget {
   /// gidiyoruz" anlatımı bu.
   final bool showRunningTotals;
 
+  /// Her sıranın soluna konan grup emojisi (eşit grup / kombinasyon
+  /// sahnelerinde). `null` ise şerit hiç çizilmez.
+  final String? rowLeadingEmoji;
+
+  /// Sütunların üstüne konan ikinci küme emojisi (yalnız kombinasyon).
+  final String? columnHeaderEmoji;
+
+  /// Birikimli toplamların birimi (" TL", " gün", " m²").
+  final String totalUnit;
+
   @override
   Widget build(BuildContext context) {
     final layoutRows = math.max(rows, maxRows ?? rows);
     final layoutColumns = math.max(columns, maxColumns ?? columns);
+    final leading = rowLeadingEmoji;
+    final header = columnHeaderEmoji;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final labelWidth = showRunningTotals ? _totalLabelWidth : 0.0;
+        final labelWidth = showRunningTotals
+            ? _totalLabelWidth + totalUnit.length * 8
+            : 0.0;
+        // Kenar şeritleri de birer hücre genişliği/yüksekliği kadar yer
+        // kapladığı için hücre boyutu hesabına sanal bir sütun/sıra olarak
+        // girer; yoksa şerit eklenince ızgara taşardı.
+        final gridColumns = layoutColumns + (leading != null ? 1 : 0);
+        final gridRows = layoutRows + (header != null ? 1 : 0);
+
         final cellFromWidth =
-            (constraints.maxWidth -
-                labelWidth -
-                (layoutColumns - 1) * _spacing) /
-            layoutColumns;
+            (constraints.maxWidth - labelWidth - (gridColumns - 1) * _spacing) /
+            gridColumns;
         final cellFromHeight = constraints.maxHeight.isFinite
-            ? (constraints.maxHeight - (layoutRows - 1) * _spacing) / layoutRows
+            ? (constraints.maxHeight - (gridRows - 1) * _spacing) / gridRows
             : _maxCellSize;
         final cellSize = math
             .min(cellFromWidth, cellFromHeight)
@@ -88,6 +116,33 @@ class MultiplicationArrayView extends StatelessWidget {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (header != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: _spacing),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (leading != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: _spacing),
+                                child: SizedBox.square(dimension: cellSize),
+                              ),
+                            for (var col = 0; col < layoutColumns; col++)
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  right: col == layoutColumns - 1
+                                      ? 0
+                                      : _spacing,
+                                ),
+                                child: _LabelCell(
+                                  size: cellSize,
+                                  emoji: col < columns ? header : null,
+                                ),
+                              ),
+                            if (showRunningTotals) SizedBox(width: labelWidth),
+                          ],
+                        ),
+                      ),
                     for (var row = 0; row < layoutRows; row++)
                       Padding(
                         padding: EdgeInsets.only(
@@ -96,6 +151,14 @@ class MultiplicationArrayView extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (leading != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: _spacing),
+                                child: _LabelCell(
+                                  size: cellSize,
+                                  emoji: row < rows ? leading : null,
+                                ),
+                              ),
                             for (var col = 0; col < layoutColumns; col++)
                               Padding(
                                 padding: EdgeInsets.only(
@@ -112,12 +175,12 @@ class MultiplicationArrayView extends StatelessWidget {
                               ),
                             if (showRunningTotals)
                               SizedBox(
-                                width: _totalLabelWidth,
+                                width: labelWidth,
                                 child: Opacity(
                                   opacity: (revealed - row).clamp(0.0, 1.0),
                                   child: Text(
                                     row < rows
-                                        ? '= ${(row + 1) * columns}'
+                                        ? '= ${(row + 1) * columns}$totalUnit'
                                         : '',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -167,6 +230,29 @@ class _ArrayCell extends StatelessWidget {
       child: filled
           ? Text(emoji!, style: TextStyle(fontSize: size * 0.6))
           : null,
+    );
+  }
+}
+
+/// Kenar şeridi hücresi: sıranın grubunu ya da sütunun kümesini gösteren
+/// etiket. Bilerek çerçevesizdir — sayılan nesnelerle karışmaması, "bu da bir
+/// tane daha" diye sayılmaması gerekiyor.
+class _LabelCell extends StatelessWidget {
+  const _LabelCell({required this.size, required this.emoji});
+
+  final double size;
+  final String? emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: emoji == null
+          ? null
+          : Center(
+              child: Text(emoji!, style: TextStyle(fontSize: size * 0.7)),
+            ),
     );
   }
 }
