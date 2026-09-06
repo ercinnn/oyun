@@ -1,4 +1,4 @@
-/// Desen Tamamlama oyunundaki bir oyuncunun durumu. Kazanan, en çok doğru
+/// Diziler oyunundaki bir oyuncunun durumu. Kazanan, en çok doğru
 /// cevap verendir.
 class PatternPlayerState {
   PatternPlayerState({required this.name});

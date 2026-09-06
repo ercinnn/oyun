@@ -9,7 +9,7 @@ import '../models/multiplication_player_state.dart';
 import '../models/multiplication_trial.dart';
 
 /// Her oyuncunun oynadığı tur sayısı. Stroop'un `roundsPerPlayer`,
-/// Desen Tamamlama'nın `patternRoundsPerPlayer` gibi sabitleriyle aynı adı
+/// Diziler'in `patternRoundsPerPlayer` gibi sabitleriyle aynı adı
 /// kullanmıyoruz: hepsi test/widget_test.dart içinde birlikte import
 /// edildiğinde Dart bunu "ambiguous import" hatası sayar.
 const int multiplicationRoundsPerPlayer = 8;

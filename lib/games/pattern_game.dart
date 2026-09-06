@@ -8,13 +8,13 @@ import '../screens/pattern_results_screen.dart';
 import '../screens/pattern_setup_screen.dart';
 import '../screens/pattern_turn_transition_screen.dart';
 
-/// "Desen Tamamlama" (IQ testi tarzı sayı dizisi tamamlama) oyununun
-/// platforma eklenen route'u. Diğer oyunlar gibi kendi [PatternController]
-/// örneğini route'a her girişte taze kurar.
+/// "Diziler" (IQ testi tarzı sayı dizisi tamamlama) oyununun platforma
+/// eklenen route'u. Diğer oyunlar gibi kendi [PatternController] örneğini
+/// route'a her girişte taze kurar.
 class PatternGame extends StatelessWidget {
   const PatternGame({super.key});
 
-  static const routeName = '/games/desen-tamamlama';
+  static const routeName = '/games/diziler';
 
   @override
   Widget build(BuildContext context) {

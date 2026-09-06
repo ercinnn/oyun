@@ -1,4 +1,4 @@
-/// Desen Tamamlama oyunundaki tek bir tur: [sequence] dizideki bilinen ilk
+/// Diziler oyunundaki tek bir tur: [sequence] dizideki bilinen ilk
 /// dört terimi, [answer] gizli beşinci terimi, [options] ise cevap
 /// butonlarının (karışık) sırasını tutar.
 class PatternTrial {

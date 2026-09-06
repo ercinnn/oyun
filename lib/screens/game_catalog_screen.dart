@@ -64,10 +64,10 @@ const List<GameCatalogEntry> gameCatalog = [
     skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 2, hafiza: 5),
   ),
   GameCatalogEntry(
-    title: 'Desen Tamamlama',
+    title: 'Diziler',
     description:
-        'Sayı dizisindeki örüntüyü bul, sırada geleni seç! En çok doğru '
-        'cevabı veren kazanır.',
+        'Dizideki örüntüyü bul, sırada geleni seç! Kolay seviye çarpım '
+        'tablosunu pekiştirir, Zor seviye bölünen dizilere kadar çıkar.',
     icon: Icons.psychology,
     color: Colors.blueGrey,
     routeName: PatternGame.routeName,

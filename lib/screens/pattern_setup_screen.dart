@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../controllers/pattern_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../models/pattern_difficulty.dart';
+import '../widgets/pattern_difficulty_selector.dart';
 import '../widgets/player_count_selector.dart';
 
 class PatternSetupScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class _PatternSetupScreenState extends State<PatternSetupScreen> {
   late final TextEditingController _player1Controller;
   final _player2Controller = TextEditingController(text: '2. Oyuncu');
   int _playerCount = 2;
+  PatternDifficulty _difficulty = PatternDifficulty.kolay;
 
   @override
   void initState() {
@@ -39,7 +42,7 @@ class _PatternSetupScreenState extends State<PatternSetupScreen> {
     context.read<PatternController>().startGame([
       _player1Controller.text.trim(),
       if (_playerCount == 2) _player2Controller.text.trim(),
-    ]);
+    ], difficulty: _difficulty);
   }
 
   String? _validateName(String? value) {
@@ -52,7 +55,7 @@ class _PatternSetupScreenState extends State<PatternSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Desen Tamamlama')),
+      appBar: AppBar(title: const Text('Diziler')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -76,6 +79,20 @@ class _PatternSetupScreenState extends State<PatternSetupScreen> {
                       playerCount: _playerCount,
                       onChanged: (value) =>
                           setState(() => _playerCount = value),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Zorluk: ${_difficulty.hint}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: PatternDifficultySelector(
+                      difficulty: _difficulty,
+                      onChanged: (value) =>
+                          setState(() => _difficulty = value),
                     ),
                   ),
                   const SizedBox(height: 16),

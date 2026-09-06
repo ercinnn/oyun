@@ -12,6 +12,7 @@ import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
+import 'package:bombali_sayilar/models/pattern_difficulty.dart';
 import 'package:bombali_sayilar/controllers/profile_controller.dart';
 import 'package:bombali_sayilar/controllers/puzzle_controller.dart';
 import 'package:bombali_sayilar/controllers/reflex_controller.dart';
@@ -134,20 +135,20 @@ Future<void> _tapCurrentSequenceCorrectly(
   }
 }
 
-/// Platform ana menüsünden Desen Tamamlama oyununa girer. Katalog listesi
+/// Platform ana menüsünden Diziler oyununa girer. Katalog listesi
 /// 5 karta çıktığı için (bkz. "Game catalog shows the available games")
 /// son kartın ListView'in lazy build cache'i dışında kalmaması için
 /// görünümü uzatıyoruz.
 Future<void> _openPattern(WidgetTester tester) async {
   // Bkz. _openSequenceMemory — kartlardaki beceri tablosu yüzünden
-  // "Desen Tamamlama" (5. kart) lazy build cache dışında kalabiliyor.
+  // "Diziler" (5. kart) lazy build cache dışında kalabiliyor.
   tester.view.physicalSize = const Size(800, 3000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(const GamePlatformApp());
-  await tester.tap(find.text('Desen Tamamlama'));
+  await tester.tap(find.text('Diziler'));
   await tester.pumpAndSettle();
 }
 
@@ -353,7 +354,7 @@ void main() {
     expect(find.text('Kart Eşleştirme'), findsOneWidget);
     expect(find.text('Renk mi Kelime mi?'), findsOneWidget);
     expect(find.text('Dizi Hafızası'), findsOneWidget);
-    expect(find.text('Desen Tamamlama'), findsOneWidget);
+    expect(find.text('Diziler'), findsOneWidget);
     expect(find.text('Tepki Süresi'), findsOneWidget);
     expect(find.text('Simon Diyor ki'), findsOneWidget);
     expect(find.text('Kayan Yapboz'), findsOneWidget);
@@ -1159,6 +1160,137 @@ void main() {
 
       expect(controller.currentPlayerIndex, 1);
       expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
+
+  test('Diziler: Kolay seviye çarpım tablosunu pekiştirir', () async {
+    final controller = PatternController(random: Random(1));
+    controller.startGame(['Test'], difficulty: PatternDifficulty.kolay);
+
+    for (var round = 0; round < patternRoundsPerPlayer; round++) {
+      final trial = controller.currentTrial;
+      final sequence = trial.sequence;
+      final step = sequence[1] - sequence[0];
+
+      expect(step, inInclusiveRange(2, 9));
+      // Dizinin tamamı aynı adımla artan bir çarpım tablosu satırı olmalı,
+      // ve her terim o tablonun bir katı olmalı (2,4,6,8 gibi, 3,5,7,9 gibi
+      // değil).
+      for (var i = 0; i < sequence.length; i++) {
+        expect(sequence[i] % step, 0);
+        if (i > 0) expect(sequence[i] - sequence[i - 1], step);
+      }
+      expect(trial.answer - sequence.last, step);
+      expect(trial.answer % step, 0);
+
+      await controller.answer(trial.answer);
+    }
+  });
+
+  test(
+    'Diziler: Orta seviye eski (zorluksuz) davranışla aynı kural '
+    'tiplerini üretir',
+    () async {
+      final controller = PatternController(random: Random(2));
+      controller.startGame(['Test'], difficulty: PatternDifficulty.orta);
+
+      for (var round = 0; round < patternRoundsPerPlayer; round++) {
+        final trial = controller.currentTrial;
+        final sequence = trial.sequence;
+        final diffs = [
+          for (var i = 1; i < sequence.length; i++)
+            sequence[i] - sequence[i - 1],
+        ];
+        final isArithmetic = diffs.toSet().length == 1;
+        final isGeometric =
+            sequence[0] > 0 &&
+            List.generate(
+              sequence.length,
+              (i) => sequence[0] * pow(sequence[1] ~/ sequence[0], i).toInt(),
+            ).join(',') ==
+                sequence.join(',');
+        expect(
+          isArithmetic || isGeometric,
+          isTrue,
+          reason: 'Orta seviyede beklenmeyen bir dizi üretildi: $sequence',
+        );
+
+        await controller.answer(trial.answer);
+      }
+    },
+  );
+
+  test(
+    'Diziler: Zor seviye büyük aralıklar kullanır ve azalan (bölen) '
+    'geometrik diziler üretebilir',
+    () async {
+      final controller = PatternController(random: Random(3));
+      controller.startGame(['Test'], difficulty: PatternDifficulty.zor);
+
+      var sawDescendingGeometric = false;
+      for (var round = 0; round < patternRoundsPerPlayer; round++) {
+        final trial = controller.currentTrial;
+        final sequence = trial.sequence;
+        final diffs = [
+          for (var i = 1; i < sequence.length; i++)
+            sequence[i] - sequence[i - 1],
+        ];
+        final isDescending = diffs.every((d) => d < 0);
+        final isArithmetic = diffs.toSet().length == 1;
+        if (isDescending && !isArithmetic) sawDescendingGeometric = true;
+
+        await controller.answer(trial.answer);
+      }
+
+      // Rastgelelik yüzünden 8 turda en az bir azalan geometrik (bölen) dizi
+      // çıkması garanti değil ama sabit bir seed ile deterministik; bu seed
+      // (3) en az bir tane üretiyor.
+      expect(sawDescendingGeometric, isTrue);
+    },
+  );
+
+  test(
+    'Diziler: her üç seviyede de üretilen seçenekler her zaman 4 tekrarsız '
+    'aday içerir',
+    () async {
+      for (final difficulty in PatternDifficulty.values) {
+        final controller = PatternController(random: Random(4));
+        controller.startGame(['Test'], difficulty: difficulty);
+
+        for (var round = 0; round < patternRoundsPerPlayer; round++) {
+          final trial = controller.currentTrial;
+          expect(trial.options, hasLength(4));
+          expect(trial.options.toSet(), hasLength(4));
+          expect(trial.options, contains(trial.answer));
+
+          await controller.answer(trial.answer);
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'Diziler: kurulum ekranında zorluk seçici görünür ve seçim '
+    'değiştirince ipucu metni güncellenir',
+    (WidgetTester tester) async {
+      await _openPattern(tester);
+
+      expect(
+        find.text('Zorluk: ${PatternDifficulty.kolay.hint}'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Zor'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Zorluk: ${PatternDifficulty.zor.hint}'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Zorluk: ${PatternDifficulty.kolay.hint}'),
+        findsNothing,
+      );
     },
   );
 
