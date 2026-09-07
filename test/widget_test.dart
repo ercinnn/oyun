@@ -19,6 +19,7 @@ import 'package:bombali_sayilar/controllers/reflex_controller.dart';
 import 'package:bombali_sayilar/controllers/sequence_memory_controller.dart';
 import 'package:bombali_sayilar/controllers/simon_controller.dart';
 import 'package:bombali_sayilar/controllers/stroop_controller.dart';
+import 'package:bombali_sayilar/controllers/sudoku_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
 import 'package:bombali_sayilar/main.dart';
 import 'package:bombali_sayilar/models/chess_board.dart';
@@ -42,6 +43,9 @@ import 'package:bombali_sayilar/models/sequence_tile_color.dart';
 import 'package:bombali_sayilar/models/simon_attribute_type.dart';
 import 'package:bombali_sayilar/models/simon_tile_id.dart';
 import 'package:bombali_sayilar/models/simon_trial.dart';
+import 'package:bombali_sayilar/models/sudoku_board.dart';
+import 'package:bombali_sayilar/models/sudoku_difficulty.dart';
+import 'package:bombali_sayilar/models/sudoku_game_phase.dart';
 import 'package:bombali_sayilar/screens/chess_game_screen.dart';
 import 'package:bombali_sayilar/screens/game_screen.dart';
 import 'package:bombali_sayilar/screens/memory_game_screen.dart';
@@ -54,6 +58,7 @@ import 'package:bombali_sayilar/screens/sequence_memory_game_screen.dart';
 import 'package:bombali_sayilar/screens/setup_screen.dart';
 import 'package:bombali_sayilar/screens/simon_game_screen.dart';
 import 'package:bombali_sayilar/screens/stroop_game_screen.dart';
+import 'package:bombali_sayilar/screens/sudoku_game_screen.dart';
 import 'package:bombali_sayilar/widgets/memory_card_widget.dart';
 import 'package:bombali_sayilar/widgets/multiplication_array_view.dart';
 import 'package:bombali_sayilar/services/chess_ai.dart';
@@ -265,6 +270,19 @@ Future<void> _openMultiplication(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Platform ana menüsünden Sudoku oyununa girer. Katalogdaki 11. kart
+/// olduğu için görünümü bir kademe daha uzatıyoruz (bkz. _openMultiplication).
+Future<void> _openSudoku(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 6600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Sudoku'));
+  await tester.pumpAndSettle();
+}
+
 /// Çarpım Bahçesi'nde açık olan turu doğru cevaplar ve açıklama panelindeki
 /// "Devam"a basarak bir sonraki tura geçer.
 ///
@@ -339,10 +357,10 @@ void main() {
   testWidgets('Game catalog shows the available games', (
     WidgetTester tester,
   ) async {
-    // Katalog listesi 10 karta çıktığı için varsayılan test görünümünde
+    // Katalog listesi 11 karta çıktığı için varsayılan test görünümünde
     // ListView'in lazy build cache'i son kartı henüz kurmayabilir; tam
     // liste görünür olsun diye görünümü uzatıyoruz.
-    tester.view.physicalSize = const Size(800, 6000);
+    tester.view.physicalSize = const Size(800, 6600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -360,6 +378,7 @@ void main() {
     expect(find.text('Kayan Yapboz'), findsOneWidget);
     expect(find.text('Satranç'), findsOneWidget);
     expect(find.text('Çarpım Bahçesi'), findsOneWidget);
+    expect(find.text('Sudoku'), findsOneWidget);
   });
 
   testWidgets(
@@ -368,7 +387,7 @@ void main() {
       // Her kart artık 4 satırlık bir yıldız tablosu da içeriyor; ListView'in
       // lazy build cache'i tüm kartları kurabilsin diye görünümü daha da
       // uzatıyoruz.
-      tester.view.physicalSize = const Size(800, 6000);
+      tester.view.physicalSize = const Size(800, 6600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -1716,6 +1735,228 @@ void main() {
 
       expect(controller.currentPlayerIndex, 1);
       expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
+    },
+  );
+
+  test(
+    'Sudoku: üretilen çözüm her satır/sütun/kutuda 1-9 permütasyonu içerir',
+    () {
+      final grid = generateSolvedSudokuGrid(Random(1));
+
+      bool isPermutation(List<int> values) {
+        final set = values.toSet();
+        return set.length == sudokuSize &&
+            set.every((v) => v >= 1 && v <= sudokuSize);
+      }
+
+      for (var r = 0; r < sudokuSize; r++) {
+        expect(
+          isPermutation([
+            for (var c = 0; c < sudokuSize; c++) grid[r * sudokuSize + c],
+          ]),
+          isTrue,
+        );
+      }
+      for (var c = 0; c < sudokuSize; c++) {
+        expect(
+          isPermutation([
+            for (var r = 0; r < sudokuSize; r++) grid[r * sudokuSize + c],
+          ]),
+          isTrue,
+        );
+      }
+      for (var box = 0; box < sudokuSize; box++) {
+        final boxRow = (box ~/ sudokuBoxSize) * sudokuBoxSize;
+        final boxCol = (box % sudokuBoxSize) * sudokuBoxSize;
+        final values = [
+          for (var r = boxRow; r < boxRow + sudokuBoxSize; r++)
+            for (var c = boxCol; c < boxCol + sudokuBoxSize; c++)
+              grid[r * sudokuSize + c],
+        ];
+        expect(isPermutation(values), isTrue);
+      }
+    },
+  );
+
+  test(
+    'Sudoku: her zorluk seviyesi 81\'den az, hedefe en az eşit sayıda ipucu '
+    'üretir',
+    () {
+      for (final difficulty in SudokuDifficulty.values) {
+        final puzzle = generateSudokuPuzzle(difficulty, Random(2));
+        final clueCount = puzzle.given.where((g) => g).length;
+
+        expect(clueCount, greaterThanOrEqualTo(difficulty.targetClues));
+        // Gevşek bir üst sınır: üretici anlamlı miktarda hücre çıkarabildi mi
+        // diye kontrol ediyor (81 kalırsa üretici bozuk demektir).
+        expect(clueCount, lessThan(60));
+      }
+    },
+  );
+
+  test('Sudoku: doğru son rakamı girince oyuncu biter ve devreder', () {
+    final controller = SudokuController(random: Random(3));
+    controller.startGame(['A', 'B'], difficulty: SudokuDifficulty.kolay);
+
+    final player = controller.players[0];
+    final lastEmpty = player.given.indexWhere((g) => !g);
+    for (var i = 0; i < player.values.length; i++) {
+      if (i != lastEmpty) player.values[i] = player.solution[i];
+    }
+
+    controller.selectCell(lastEmpty);
+    controller.enterDigit(player.solution[lastEmpty]);
+
+    expect(player.finished, isTrue);
+    expect(player.mistakeCount, 0);
+    expect(player.isSolved, isTrue);
+    expect(controller.currentPlayerIndex, 1);
+    expect(controller.phase, SudokuGamePhase.turnTransition);
+    expect(controller.rankedByMistakes.first, same(player));
+  });
+
+  test(
+    'Sudoku: yanlış rakam hata sayısını artırır ama 3\'ten az ise tur '
+    'bitmez',
+    () {
+      final controller = SudokuController(random: Random(4));
+      controller.startGame(['A'], difficulty: SudokuDifficulty.kolay);
+      final player = controller.players[0];
+      final index = player.given.indexWhere((g) => !g);
+      final wrong = player.solution[index] == sudokuSize
+          ? 1
+          : player.solution[index] + 1;
+
+      controller.selectCell(index);
+      controller.enterDigit(wrong);
+
+      expect(player.mistakeCount, 1);
+      expect(player.finished, isFalse);
+      expect(controller.phase, SudokuGamePhase.playing);
+    },
+  );
+
+  test(
+    'Sudoku: 3. yanlış girişte tahta tamamlanmamış olsa da tur biter',
+    () {
+      final controller = SudokuController(random: Random(5));
+      controller.startGame(['A', 'B'], difficulty: SudokuDifficulty.kolay);
+      final player = controller.players[0];
+      final index = player.given.indexWhere((g) => !g);
+      final wrong = player.solution[index] == sudokuSize
+          ? 1
+          : player.solution[index] + 1;
+
+      controller.selectCell(index);
+      for (var i = 0; i < sudokuMaxMistakes; i++) {
+        controller.enterDigit(wrong);
+      }
+
+      expect(player.mistakeCount, sudokuMaxMistakes);
+      expect(player.finished, isTrue);
+      expect(player.isSolved, isFalse);
+      expect(controller.currentPlayerIndex, 1);
+      expect(controller.phase, SudokuGamePhase.turnTransition);
+    },
+  );
+
+  test('Sudoku: given hücre seçilemez ve değiştirilemez', () {
+    final controller = SudokuController(random: Random(6));
+    controller.startGame(['A'], difficulty: SudokuDifficulty.kolay);
+    final player = controller.players[0];
+    final givenIndex = player.given.indexWhere((g) => g);
+    final originalValue = player.values[givenIndex];
+
+    controller.selectCell(givenIndex);
+
+    expect(controller.selectedIndex, isNull);
+    expect(player.values[givenIndex], originalValue);
+  });
+
+  test(
+    'Sudoku: clearSelectedCell hücreyi hata sayısına dokunmadan sıfırlar',
+    () {
+      final controller = SudokuController(random: Random(7));
+      controller.startGame(['A'], difficulty: SudokuDifficulty.kolay);
+      final player = controller.players[0];
+      final index = player.given.indexWhere((g) => !g);
+      final wrong = player.solution[index] == sudokuSize
+          ? 1
+          : player.solution[index] + 1;
+
+      controller.selectCell(index);
+      controller.enterDigit(wrong);
+      expect(player.values[index], wrong);
+      expect(player.mistakeCount, 1);
+
+      controller.clearSelectedCell();
+
+      expect(player.values[index], 0);
+      expect(player.mistakeCount, 1);
+    },
+  );
+
+  testWidgets(
+    'Sudoku setup: zorluk seçici ve ipucu metni görünür, oyunu başlatır',
+    (WidgetTester tester) async {
+      await _openSudoku(tester);
+
+      expect(find.text('Kolay'), findsOneWidget);
+      expect(find.text('Orta'), findsOneWidget);
+      expect(find.text('Zor'), findsOneWidget);
+      expect(find.textContaining('Zorluk:'), findsOneWidget);
+
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('oynuyor'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Sudoku: düzenlenebilir hücreye dokunup rakam girmek değeri günceller',
+    (WidgetTester tester) async {
+      await _openSudoku(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SudokuController>(
+        tester.element(find.byType(SudokuGameScreen)),
+        listen: false,
+      );
+      final player = controller.currentPlayer;
+      final editableIndex = player.given.indexWhere((g) => !g);
+      final digit = player.solution[editableIndex];
+
+      await tester.tap(find.byKey(ValueKey('sudokuCell_$editableIndex')));
+      await tester.pump();
+      await tester.tap(find.byKey(ValueKey(digit)));
+      await tester.pump();
+
+      expect(player.values[editableIndex], digit);
+    },
+  );
+
+  testWidgets(
+    'Sudoku: given hücreye dokunmak hiçbir şey değiştirmez',
+    (WidgetTester tester) async {
+      await _openSudoku(tester);
+      await tester.tap(find.text('Oyunu Başlat'));
+      await tester.pumpAndSettle();
+
+      final controller = Provider.of<SudokuController>(
+        tester.element(find.byType(SudokuGameScreen)),
+        listen: false,
+      );
+      final player = controller.currentPlayer;
+      final givenIndex = player.given.indexWhere((g) => g);
+      final originalValue = player.values[givenIndex];
+
+      await tester.tap(find.byKey(ValueKey('sudokuCell_$givenIndex')));
+      await tester.pump();
+
+      expect(controller.selectedIndex, isNull);
+      expect(player.values[givenIndex], originalValue);
     },
   );
 

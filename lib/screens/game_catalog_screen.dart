@@ -12,6 +12,7 @@ import '../games/reflex_game.dart';
 import '../games/sequence_memory_game.dart';
 import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
+import '../games/sudoku_game.dart';
 import '../models/game_catalog_entry.dart';
 import '../theme/home_palette.dart';
 import '../widgets/game_card.dart';
@@ -122,6 +123,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.green,
     routeName: MultiplicationGame.routeName,
     skills: GameSkillRatings(zeka: 5, ingilizce: 0, iq: 4, hafiza: 3, dikkat: 3),
+  ),
+  GameCatalogEntry(
+    title: 'Sudoku',
+    description:
+        '9×9 ızgarayı 1-9 ile doldur! Her satır, sütun ve 3×3 kutuda her '
+        'rakam yalnızca bir kez bulunsun. 3 hakkın var, dikkatli ol!',
+    icon: Icons.grid_4x4,
+    color: Colors.amber,
+    routeName: SudokuGame.routeName,
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 5, hafiza: 1, dikkat: 4),
   ),
 ];
 

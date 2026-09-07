@@ -15,6 +15,7 @@ import 'games/reflex_game.dart';
 import 'games/sequence_memory_game.dart';
 import 'games/simon_game.dart';
 import 'games/stroop_game.dart';
+import 'games/sudoku_game.dart';
 import 'screens/auth_gate.dart';
 import 'screens/game_catalog_screen.dart';
 import 'screens/profile_screen.dart';
@@ -96,6 +97,7 @@ class GamePlatformApp extends StatelessWidget {
             ChessGame.routeName => (BuildContext _) => const ChessGame(),
             MultiplicationGame.routeName => (BuildContext _) =>
                 const MultiplicationGame(),
+            SudokuGame.routeName => (BuildContext _) => const SudokuGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),
