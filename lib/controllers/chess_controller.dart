@@ -14,6 +14,7 @@ import '../models/chess_outcome.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_time_control.dart';
 import '../services/chess_ai.dart';
+import '../services/sound_service.dart';
 
 /// Saatin ne sıklıkla işlediği. Kalan süre bilerek `Stopwatch`/`DateTime`
 /// farkıyla değil, her tıkta bu kadar **düşülerek** hesaplanıyor: widget
@@ -25,7 +26,36 @@ import '../services/chess_ai.dart';
 /// işlemesi; bu platform için kabul edilebilir bir sapma.
 const Duration chessClockTick = Duration(seconds: 1);
 
+/// Bilgisayarın "düşünme" süresi: hamle sayısına (pozisyonun karmaşıklığına)
+/// doğru orantılı bir tavan ve rastgele bir çarpan. Tek yasal hamle ya da
+/// dar bir pozisyonda neredeyse anında, geniş pozisyonlarda 3-5 saniyeye
+/// kadar çıkar; böylece rakip hem makine gibi hızlı hem de hep aynı tempoda
+/// oynamaz.
+Duration chessAiThinkTime(ChessBoard board, Random random) {
+  const minMs = 300;
+  const maxMs = 5000;
+  final legalCount = board.legalMoves(board.sideToMove).length;
+  final complexity = ((legalCount - 5) / 35).clamp(0.0, 1.0);
+  // Çarpan 0.1-1.0: bazen çok kısa, bazen tavana yakın.
+  final jitter = 0.1 + 0.9 * random.nextDouble();
+  final ms = minMs + ((maxMs - minMs) * complexity * jitter).round();
+  return Duration(milliseconds: ms);
+}
+
 class ChessController extends ChangeNotifier {
+  ChessController({SoundService? soundService, Random? random})
+    : _soundService = soundService,
+      _random = random ?? Random();
+
+  /// Bilgisayarın düşünme süresine uygulanan çarpan. Testler 0 yapıp
+  /// gecikmeyi kapatır (sanal zamanda 5 saniye beklemek yerine); üretimde
+  /// hep 1'dir.
+  @visibleForTesting
+  static double aiThinkTimeScale = 1.0;
+
+  final SoundService? _soundService;
+  final Random _random;
+
   ChessGamePhase phase = ChessGamePhase.setup;
   ChessBoard board = ChessBoard.initial();
   ChessMode mode = ChessMode.vsAi;
@@ -293,8 +323,18 @@ class ChessController extends ChangeNotifier {
     await Future<void>.delayed(const Duration(milliseconds: 150));
     if (generation != _generation) return;
 
+    final thinkTime = chessAiThinkTime(board, _random) * aiThinkTimeScale;
+    final stopwatch = Stopwatch()..start();
     final move = _ai.findBestMove(board, difficulty: difficulty);
     if (generation != _generation) return;
+
+    // Arama süresi düşünme süresinin bir parçası sayılır: yalnızca kalanı
+    // beklenir. Bu sırada "Bilgisayar düşünüyor..." görünmeye devam eder.
+    final remaining = thinkTime - stopwatch.elapsed;
+    if (remaining > Duration.zero) {
+      await Future<void>.delayed(remaining);
+      if (generation != _generation) return;
+    }
 
     aiThinking = false;
     if (move == null) {
@@ -313,6 +353,7 @@ class ChessController extends ChangeNotifier {
   void _applyAndRecord(ChessMove move) {
     final before = board;
     board = board.applyMove(move);
+    unawaited(_soundService?.playMove());
     moveNotations = [
       ...moveNotations,
       chessMoveNotation(before: before, move: move, after: board),
@@ -360,6 +401,7 @@ class ChessController extends ChangeNotifier {
   @override
   void dispose() {
     _stopClock();
+    _soundService?.dispose();
     super.dispose();
   }
 }

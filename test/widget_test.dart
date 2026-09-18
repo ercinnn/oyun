@@ -352,6 +352,9 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+    // Bilgisayarın insansı düşünme gecikmesi testlerde kapalı; kendi testi
+    // çarpanı geçici olarak 1'e çeker.
+    ChessController.aiThinkTimeScale = 0;
     await Supabase.initialize(
       url: 'https://test.supabase.co',
       publishableKey: 'test-anon-key',
@@ -2580,6 +2583,61 @@ void main() {
     final board = ChessBoard.custom(squares: squares);
 
     expect(board.legalMovesFrom(squareIndex(4, 1)), isEmpty);
+  });
+
+  test('Chess: AI düşünme süresi 0.3-5 sn arasında ve karmaşıklıkla artar', () {
+    final rng = Random(1);
+    // Tek yasal hamleli dar pozisyon → tam alt sınır.
+    final narrow = ChessBoard.fromFen('7k/8/8/8/8/8/5q2/7K w - - 0 1');
+    expect(
+      narrow.legalMoves(narrow.sideToMove).length,
+      lessThanOrEqualTo(5),
+    );
+    expect(
+      chessAiThinkTime(narrow, rng),
+      const Duration(milliseconds: 300),
+    );
+
+    final wide = ChessBoard.initial();
+    var max = Duration.zero;
+    var min = const Duration(days: 1);
+    for (var i = 0; i < 300; i++) {
+      final t = chessAiThinkTime(wide, rng);
+      expect(t, greaterThanOrEqualTo(const Duration(milliseconds: 300)));
+      expect(t, lessThanOrEqualTo(const Duration(milliseconds: 5000)));
+      if (t > max) max = t;
+      if (t < min) min = t;
+    }
+    // Aynı pozisyonda süre rastgele değişir: hem kısa hem uzun düşünülür.
+    expect(max - min, greaterThan(const Duration(seconds: 1)));
+  });
+
+  testWidgets('Chess: AI hamlesi düşünme süresi dolmadan oynanmaz', (
+    WidgetTester tester,
+  ) async {
+    ChessController.aiThinkTimeScale = 1;
+    addTearDown(() => ChessController.aiThinkTimeScale = 0);
+
+    await _openChess(tester);
+    await tester.tap(find.text('1 Kişi'));
+    await tester.pump();
+    await tester.tap(find.text('Siyah'));
+    await tester.pump();
+    await tester.tap(find.text('Oyunu Başlat'));
+    await tester.pump();
+
+    final controller = Provider.of<ChessController>(
+      tester.element(find.byType(ChessGameScreen)),
+      listen: false,
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    // Alt sınır 300 ms + 150 ms başlangıç gecikmesi: hâlâ düşünüyor.
+    expect(controller.aiThinking, isTrue);
+    expect(controller.board.moveHistory, isEmpty);
+
+    await tester.pump(const Duration(seconds: 6));
+    expect(controller.aiThinking, isFalse);
+    expect(controller.board.moveHistory, hasLength(1));
   });
 
   testWidgets(

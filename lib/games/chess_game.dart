@@ -6,6 +6,7 @@ import '../models/chess_game_phase.dart';
 import '../screens/chess_game_screen.dart';
 import '../screens/chess_results_screen.dart';
 import '../screens/chess_setup_screen.dart';
+import '../services/sound_service.dart';
 
 class ChessGame extends StatelessWidget {
   const ChessGame({super.key});
@@ -15,7 +16,7 @@ class ChessGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ChessController(),
+      create: (_) => ChessController(soundService: SoundService()),
       child: const _ChessRoot(),
     );
   }
