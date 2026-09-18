@@ -16,11 +16,7 @@ class SoundService {
   final AudioPlayer _winPlayer = AudioPlayer()
     ..setReleaseMode(ReleaseMode.stop);
 
-  final AudioPlayer _movePlayer = AudioPlayer()
-    ..setReleaseMode(ReleaseMode.stop);
-
   Uint8List? _bombBytes;
-  Uint8List? _moveBytes;
   Uint8List? _winBytes;
 
   Future<Uint8List> _load(String assetPath) async {
@@ -51,20 +47,7 @@ class SoundService {
     }
   }
 
-  /// Satrançta her taş oynandığında çalan kısa "tak".
-  Future<void> playMove() async {
-    try {
-      _moveBytes ??= await _load('assets/sounds/move.wav');
-      await _movePlayer.play(
-        BytesSource(_moveBytes!, mimeType: 'audio/wav'),
-      );
-    } catch (_) {
-      // Bkz. playBomb.
-    }
-  }
-
   void dispose() {
-    _movePlayer.dispose();
     _bombPlayer.dispose();
     _winPlayer.dispose();
   }

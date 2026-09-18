@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bombali_sayilar/controllers/auth_controller.dart';
 import 'package:bombali_sayilar/controllers/chess_controller.dart';
 import 'package:bombali_sayilar/controllers/chess_lesson_controller.dart';
+import 'package:bombali_sayilar/services/chess_move_sound.dart';
+import 'package:bombali_sayilar/services/chess_move_sound_recipe.dart';
+import 'package:bombali_sayilar/services/chess_move_sound_synth.dart';
 import 'package:bombali_sayilar/data/chess_lesson_catalog.dart';
 import 'package:bombali_sayilar/models/chess_lesson.dart';
 import 'package:bombali_sayilar/screens/chess_lesson_screen.dart';
@@ -3563,4 +3567,122 @@ void main() {
       expect(progress.completed, contains('b1'));
     });
   });
+
+  group('Satranç hamle sesleri', () {
+    test('Tarif her çalınışta frekans ve kazancı en fazla %5 saptırır', () {
+      final rng = Random(3);
+      for (var i = 0; i < 200; i++) {
+        final r = captureRecipe.randomized(rng);
+        expect(r.gain / captureRecipe.gain, inInclusiveRange(0.95, 1.05));
+        expect(
+          r.bodyModes.first.hz / captureRecipe.bodyModes.first.hz,
+          inInclusiveRange(0.95, 1.05),
+        );
+        // Harmonik oranı korunur: 450 / 650 aynı çarpanla kayar.
+        expect(
+          r.bodyModes[1].hz / r.bodyModes[0].hz,
+          closeTo(650 / 450, 1e-9),
+        );
+      }
+      final a = normalMoveRecipe.randomized(Random(1));
+      final b = normalMoveRecipe.randomized(Random(2));
+      expect(a.gain, isNot(b.gain));
+    });
+
+    test('Sentezleyici üç ses için geçerli, duyulur ve bitişi sönük WAV üretir', () {
+      const sampleRate = 44100;
+      final lengths = <ChessMoveSoundKind, int>{};
+      for (final kind in ChessMoveSoundKind.values) {
+        final recipe = recipeFor(kind);
+        final wav = renderMoveSoundWav(recipe, Random(5), sampleRate: sampleRate);
+        final bytes = ByteData.sublistView(wav);
+        expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
+        expect(String.fromCharCodes(wav.sublist(8, 12)), 'WAVE');
+        final samples = (wav.length - 44) ~/ 2;
+        expect(bytes.getUint32(40, Endian.little), samples * 2);
+        lengths[kind] = samples;
+
+        var peak = 0;
+        for (var i = 0; i < samples; i++) {
+          peak = max(peak, bytes.getInt16(44 + i * 2, Endian.little).abs());
+        }
+        expect(peak, greaterThan(3000), reason: '$kind duyulmalı');
+        expect(peak, lessThanOrEqualTo(32767), reason: '$kind kırpılmamalı');
+
+        // Son 10 ms neredeyse sessiz: tık sesi ("pop") kalmamalı.
+        var tailPeak = 0;
+        for (var i = samples - sampleRate ~/ 100; i < samples; i++) {
+          tailPeak = max(tailPeak, bytes.getInt16(44 + i * 2, Endian.little).abs());
+        }
+        expect(tailPeak, lessThan(peak ~/ 20), reason: '$kind kuyruğu sönmeli');
+      }
+      // Süre sıralaması tariflerle uyumlu: yeme > normal, şah en uzun.
+      expect(lengths[ChessMoveSoundKind.capture]!,
+          greaterThan(lengths[ChessMoveSoundKind.normal]!));
+      expect(lengths[ChessMoveSoundKind.check]!,
+          greaterThan(lengths[ChessMoveSoundKind.capture]!));
+    });
+
+    test('Aynı ses iki çalınışta birebir aynı değildir', () {
+      final a = renderMoveSoundWav(
+        normalMoveRecipe.randomized(Random(1)),
+        Random(1),
+      );
+      final b = renderMoveSoundWav(
+        normalMoveRecipe.randomized(Random(2)),
+        Random(2),
+      );
+      expect(a, isNot(b));
+    });
+
+    test('Controller hamleye göre normal / yeme / şah sesi seçer', () {
+      final fake = _FakeMoveSounds();
+      final c = ChessController(moveSounds: fake);
+      c.startGame(
+        mode: ChessMode.twoPlayer,
+        whiteName: 'A',
+        blackName: 'B',
+      );
+
+      void play(String from, String to) {
+        c.selectSquare(squareFromName(from));
+        c.selectSquare(squareFromName(to));
+      }
+
+      play('e2', 'e4'); // boş kare
+      expect(fake.calls, ['normal']);
+
+      c.board = ChessBoard.fromFen('4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1');
+      play('e4', 'd5'); // yeme
+      expect(fake.calls.last, 'capture');
+
+      c.board = ChessBoard.fromFen('4k3/8/8/8/8/8/8/R3K3 w - - 0 1');
+      play('a1', 'a8'); // şah (yeme değil)
+      expect(fake.calls.last, 'check');
+
+      c.board = ChessBoard.fromFen('r3k3/8/8/8/8/8/8/R3K3 w - - 0 1');
+      play('a1', 'a8'); // hem yeme hem şah → şah sesi
+      expect(fake.calls.last, 'check');
+
+      c.dispose();
+      expect(fake.disposed, isTrue);
+    });
+  });
+}
+
+class _FakeMoveSounds implements ChessMoveSounds {
+  final calls = <String>[];
+  bool disposed = false;
+
+  @override
+  void playNormalMove() => calls.add('normal');
+
+  @override
+  void playCaptureSound() => calls.add('capture');
+
+  @override
+  void playCheckSound() => calls.add('check');
+
+  @override
+  void dispose() => disposed = true;
 }

@@ -12,39 +12,14 @@ const int sampleRate = 44100;
 void main() {
   final bomb = _generateBombSound();
   final win = _generateWinSound();
-  final move = _generateMoveSound();
 
   final outDir = Directory('assets/sounds');
   if (!outDir.existsSync()) outDir.createSync(recursive: true);
 
   File('assets/sounds/bomb.wav').writeAsBytesSync(_encodeWav(bomb));
   File('assets/sounds/win.wav').writeAsBytesSync(_encodeWav(win));
-  File('assets/sounds/move.wav').writeAsBytesSync(_encodeWav(move));
 
-  stdout.writeln('Yazıldı: assets/sounds/bomb.wav, assets/sounds/win.wav, '
-    'assets/sounds/move.wav');
-}
-
-/// Ahşap bir taşın tahtaya konmasını andıran kısa "tak": çok hızlı sönen
-/// bir gürültü darbesi (vuruş) + alçak, kısa bir ahşap tınısı.
-List<double> _generateMoveSound() {
-  const duration = 0.14;
-  final total = (sampleRate * duration).round();
-  final rng = math.Random(11);
-  final samples = List<double>.filled(total, 0);
-  var lowpass = 0.0;
-
-  for (var i = 0; i < total; i++) {
-    final t = i / sampleRate;
-    // Gürültüyü basit bir tek kutuplu alçak geçirgenle yumuşatıp koyulaştır.
-    lowpass += 0.35 * ((rng.nextDouble() * 2 - 1) - lowpass);
-    final click = lowpass * math.exp(-t * 110) * 1.2;
-    final body = math.sin(2 * math.pi * 210 * t) * math.exp(-t * 38) * 0.7;
-    final knock = math.sin(2 * math.pi * 520 * t) * math.exp(-t * 60) * 0.3;
-    samples[i] = click + body + knock;
-  }
-
-  return _normalize(samples);
+  stdout.writeln('Yazıldı: assets/sounds/bomb.wav, assets/sounds/win.wav');
 }
 
 /// Alçak frekanslı bir "gümbürtü" ile hızlı sönümlenen gürültüyü karıştırarak

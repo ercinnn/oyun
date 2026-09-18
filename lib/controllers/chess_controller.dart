@@ -14,7 +14,7 @@ import '../models/chess_outcome.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_time_control.dart';
 import '../services/chess_ai.dart';
-import '../services/sound_service.dart';
+import '../services/chess_move_sound.dart';
 
 /// Saatin ne sıklıkla işlediği. Kalan süre bilerek `Stopwatch`/`DateTime`
 /// farkıyla değil, her tıkta bu kadar **düşülerek** hesaplanıyor: widget
@@ -43,8 +43,8 @@ Duration chessAiThinkTime(ChessBoard board, Random random) {
 }
 
 class ChessController extends ChangeNotifier {
-  ChessController({SoundService? soundService, Random? random})
-    : _soundService = soundService,
+  ChessController({ChessMoveSounds? moveSounds, Random? random})
+    : _moveSounds = moveSounds,
       _random = random ?? Random();
 
   /// Bilgisayarın düşünme süresine uygulanan çarpan. Testler 0 yapıp
@@ -53,7 +53,7 @@ class ChessController extends ChangeNotifier {
   @visibleForTesting
   static double aiThinkTimeScale = 1.0;
 
-  final SoundService? _soundService;
+  final ChessMoveSounds? _moveSounds;
   final Random _random;
 
   ChessGamePhase phase = ChessGamePhase.setup;
@@ -347,13 +347,28 @@ class ChessController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Hamlenin sonucuna göre ses: şah çekildiyse (mat dahil) şah sesi, taş
+  /// alındıysa yeme sesi, aksi halde normal hamle sesi. Şah, yemeden önce
+  /// gelir — şah çeken bir yeme de "uyarı" sesini duyurmalı.
+  void _playMoveSound(ChessMove move) {
+    final sounds = _moveSounds;
+    if (sounds == null) return;
+    if (board.isInCheck) {
+      sounds.playCheckSound();
+    } else if (move.isCapture) {
+      sounds.playCaptureSound();
+    } else {
+      sounds.playNormalMove();
+    }
+  }
+
   /// Hamleyi uygular ve gösterimini kaydeder. Gösterim, hamleden önceki ve
   /// sonraki tahtanın ikisini de gerektirdiği için hamlenin uygulandığı tek
   /// nokta burası.
   void _applyAndRecord(ChessMove move) {
     final before = board;
     board = board.applyMove(move);
-    unawaited(_soundService?.playMove());
+    _playMoveSound(move);
     moveNotations = [
       ...moveNotations,
       chessMoveNotation(before: before, move: move, after: board),
@@ -401,7 +416,7 @@ class ChessController extends ChangeNotifier {
   @override
   void dispose() {
     _stopClock();
-    _soundService?.dispose();
+    _moveSounds?.dispose();
     super.dispose();
   }
 }
