@@ -19,3 +19,13 @@ String algebraic(int square) {
   final rank = rankOf(square);
   return '${String.fromCharCode('a'.codeUnitAt(0) + file)}${rank + 1}';
 }
+
+/// [algebraic]'in tersi: 'e4' -> 28. Ders içeriği ve testler kareleri
+/// ham index yerine bu okunaklı adlarla yazar.
+int squareFromName(String name) {
+  assert(name.length == 2, 'Kare adı 2 karakter olmalı: $name');
+  final file = name.codeUnitAt(0) - 'a'.codeUnitAt(0);
+  final rank = name.codeUnitAt(1) - '1'.codeUnitAt(0);
+  assert(isOnBoard(file, rank), 'Tahta dışı kare: $name');
+  return squareIndex(file, rank);
+}

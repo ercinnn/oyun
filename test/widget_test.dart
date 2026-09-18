@@ -8,6 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bombali_sayilar/controllers/auth_controller.dart';
 import 'package:bombali_sayilar/controllers/chess_controller.dart';
+import 'package:bombali_sayilar/controllers/chess_lesson_controller.dart';
+import 'package:bombali_sayilar/data/chess_lesson_catalog.dart';
+import 'package:bombali_sayilar/models/chess_lesson.dart';
+import 'package:bombali_sayilar/screens/chess_lesson_screen.dart';
 import 'package:bombali_sayilar/controllers/game_controller.dart';
 import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
@@ -3307,4 +3311,198 @@ void main() {
       expect(find.textContaining('2. Oyuncu oynuyor'), findsOneWidget);
     },
   );
+
+  group('Satranç dersleri', () {
+    test('FEN başlangıç pozisyonu ChessBoard.initial() ile aynı', () {
+      final fen = ChessBoard.fromFen(
+        'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      );
+      final initial = ChessBoard.initial();
+      for (var i = 0; i < 64; i++) {
+        expect(fen.squares[i], initial.squares[i], reason: 'kare $i');
+      }
+      expect(fen.sideToMove, PieceColor.white);
+      expect(fen.whiteKingsideRights, isTrue);
+      expect(fen.blackQueensideRights, isTrue);
+      expect(fen.enPassantTargetSquare, isNull);
+    });
+
+    test('FEN geçerken alma karesini ve sırayı okur', () {
+      final board = ChessBoard.fromFen('7k/8/8/3pP3/8/8/8/4K3 b - d6 0 1');
+      expect(board.sideToMove, PieceColor.black);
+      expect(board.enPassantTargetSquare, squareFromName('d6'));
+      expect(board.squares[squareFromName('e5')]?.type, PieceType.pawn);
+    });
+
+    test('ders verisi tutarlı: her alıştırma çözülebilir', () {
+      final ids = chessLessons.map((l) => l.id).toList();
+      expect(ids.toSet().length, ids.length, reason: 'ders kimlikleri tekil');
+      for (final level in ChessLessonLevel.values) {
+        expect(
+          chessLessons.where((l) => l.level == level),
+          isNotEmpty,
+          reason: '${level.label} seviyesinde ders olmalı',
+        );
+      }
+
+      for (final lesson in chessLessons) {
+        expect(lesson.steps, isNotEmpty, reason: lesson.id);
+        for (var i = 0; i < lesson.steps.length; i++) {
+          final where = '${lesson.id} adım ${i + 1}';
+          final step = lesson.steps[i];
+          switch (step) {
+            case LessonInfoStep():
+              if (step.fen != null) ChessBoard.fromFen(step.fen!);
+              for (final h in step.highlights) {
+                squareFromName(h);
+              }
+            case LessonQuizStep():
+              if (step.fen != null) ChessBoard.fromFen(step.fen!);
+              expect(step.options.length, greaterThanOrEqualTo(2), reason: where);
+              expect(
+                step.correctIndex,
+                inInclusiveRange(0, step.options.length - 1),
+                reason: where,
+              );
+            case LessonMarkStep():
+              final board = ChessBoard.fromFen(step.fen);
+              final square = squareFromName(step.pieceSquare);
+              expect(board.squares[square], isNotNull, reason: where);
+              expect(board.legalMovesFrom(square), isNotEmpty, reason: where);
+            case LessonMoveStep():
+              final board = ChessBoard.fromFen(step.fen);
+              for (final h in step.highlights) {
+                squareFromName(h);
+              }
+              expect(
+                step.accepted.isNotEmpty || step.anyMate,
+                isTrue,
+                reason: '$where: kabul edilen hamle yok',
+              );
+              final legal = board.legalMoves(board.sideToMove);
+              for (final move in step.accepted) {
+                expect(
+                  legal.any(
+                    (m) =>
+                        m.from == squareFromName(move.substring(0, 2)) &&
+                        m.to == squareFromName(move.substring(2, 4)),
+                  ),
+                  isTrue,
+                  reason: '$where: $move yasal değil',
+                );
+              }
+              if (step.anyMate) {
+                expect(
+                  legal.any((m) => board.applyMove(m).isCheckmate),
+                  isTrue,
+                  reason: '$where: mat eden hamle yok',
+                );
+              }
+          }
+        }
+      }
+    });
+
+    test('İşaretleme adımı: eksik kare hata verir, tam küme çözer', () {
+      final lesson = chessLessons.firstWhere((l) => l.id == 'b2');
+      final c = ChessLessonController(lesson);
+      c.next(); // kale anlatımı → işaretleme
+      expect(c.step, isA<LessonMarkStep>());
+      // Kale d4: d5, d3, d2, d1, c4, b4 (alma), e4, f4, g4, h4.
+      for (final n in ['d5', 'd3', 'd2', 'd1', 'c4', 'b4', 'e4', 'f4', 'g4']) {
+        c.tapSquare(squareFromName(n));
+      }
+      c.checkMarks();
+      expect(c.solved, isFalse);
+      expect(c.feedback, contains('Eksik'));
+      c.tapSquare(squareFromName('h4'));
+      c.checkMarks();
+      expect(c.solved, isTrue);
+    });
+
+    testWidgets('Ders akışı: quiz, hamle, yanlış hamle ve tamamlama', (
+      tester,
+    ) async {
+      final progress = ChessLessonProgress();
+      final lesson = chessLessons.firstWhere((l) => l.id == 'b1');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ChessLessonScreen(lesson: lesson, progress: progress),
+                    ),
+                  ),
+                  child: const Text('aç'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('aç'));
+      await tester.pumpAndSettle();
+
+      Future<void> tapContinue() async {
+        await tester.ensureVisible(find.byKey(const Key('lessonContinue')));
+        await tester.tap(find.byKey(const Key('lessonContinue')));
+        await tester.pumpAndSettle();
+      }
+
+      // Adım 1 (anlatım) → 2 (quiz).
+      await tapContinue();
+      // Yanlış seçenek: geri bildirim var ama devam kapalı.
+      await tester.tap(find.byKey(const ValueKey('lessonOption_0')));
+      await tester.pumpAndSettle();
+      expect(find.text('Olmadı, tekrar dene.'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('lessonContinue')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const ValueKey('lessonOption_1')));
+      await tester.pumpAndSettle();
+      await tapContinue();
+      await tapContinue(); // anlatım 3 → 4
+      await tapContinue(); // anlatım 4 → quiz 5
+      await tester.tap(find.byKey(const ValueKey('lessonOption_1')));
+      await tester.pumpAndSettle();
+      await tapContinue(); // → hamle adımı
+
+      Future<void> tapSquare(String name) async {
+        final finder = find.byKey(ValueKey('sq_${squareFromName(name)}'));
+        await tester.ensureVisible(finder);
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+      }
+
+      // Yanlış (yasal ama hedef değil) hamle: e2-e3 → sıfırlanır.
+      await tapSquare('e2');
+      await tapSquare('e3');
+      expect(find.byKey(const Key('lessonFeedback')), findsOneWidget);
+      expect(find.textContaining('hedef değildi'), findsOneWidget);
+      expect(find.text('Dersi Bitir'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('lessonContinue')))
+            .onPressed,
+        isNull,
+      );
+
+      // Doğru hamle: e2-e4.
+      await tapSquare('e2');
+      await tapSquare('e4');
+      expect(find.textContaining('Harika'), findsOneWidget);
+
+      await tapContinue();
+      expect(find.text('aç'), findsOneWidget);
+      expect(progress.completed, contains('b1'));
+    });
+  });
 }

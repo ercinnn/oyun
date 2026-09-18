@@ -26,6 +26,7 @@ class ChessSquareWidget extends StatelessWidget {
     this.isLegalDestination = false,
     this.isLastMove = false,
     this.isCheckedKing = false,
+    this.isHint = false,
     this.fileLabel,
     this.rankLabel,
     this.onTap,
@@ -33,13 +34,12 @@ class ChessSquareWidget extends StatelessWidget {
 
   /// Taşın sığdırıldığı kutunun, karenin kenar uzunluğuna oranı.
   ///
-  /// 1'den büyük olması kasıtlı: [ChessPieceGlyph] kutusunun içinde
-  /// kırpılmaya karşı bilerek pay bırakıyor (bkz. `_lineHeight`), dolayısıyla
-  /// taşın görünen mürekkebi kutudan belirgin biçimde küçük. Bu oranla taş
-  /// karenin ~%72'sini kaplıyor — gerçek satranç arayüzlerindeki orana yakın,
-  /// eski sabit `fontSize: 30` çiziminin yaklaşık iki katı. Kutu kareyi
-  /// taşsa da mürekkep taşmadığı için komşu kareye görsel sızma olmaz.
-  static const _pieceScale = 1.12;
+  /// 1'den küçük: [ChessPieceGlyph] kutusunun içinde kırpılmaya karşı bilerek
+  /// pay bırakıyor (bkz. `_lineHeight`), dolayısıyla taşın görünen mürekkebi
+  /// kutudan küçük; taşlar karenin belirgin biçimde altında bir oranda
+  /// çiziliyor (kullanıcı isteğiyle eski 1.12 ölçeğinin ×0.75'i). Piyon
+  /// vektör çizildiği için aynı orandan doğrudan etkilenir.
+  static const _pieceScale = 0.84;
 
   final ChessPiece? piece;
   final bool isLight;
@@ -53,6 +53,9 @@ class ChessSquareWidget extends StatelessWidget {
 
   /// Şah çekilmiş kral bu karede duruyorsa kırmızı hâle çizilir.
   final bool isCheckedKing;
+
+  /// Ders anlatımının işaret ettiği kare (mavi-yeşil vurgu).
+  final bool isHint;
 
   /// Yalnızca tahtanın alt sırasında (a-h) ve sol sütununda (1-8) dolu olur.
   final String? fileLabel;
@@ -88,6 +91,10 @@ class ChessSquareWidget extends StatelessWidget {
               if (isLastMove)
                 ColoredBox(
                   color: const Color(0xFFF7D26B).withValues(alpha: 0.45),
+                ),
+              if (isHint)
+                ColoredBox(
+                  color: const Color(0xFF26A69A).withValues(alpha: 0.5),
                 ),
               if (isSelected)
                 ColoredBox(

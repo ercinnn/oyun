@@ -3,13 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../controllers/chess_controller.dart';
 import '../models/chess_piece.dart';
-import '../models/chess_square.dart';
+import '../widgets/chess_board_view.dart';
 import '../widgets/chess_captured_pieces.dart';
 import '../widgets/chess_clock_panel.dart';
 import '../widgets/chess_evaluation_bar.dart';
 import '../widgets/chess_move_history.dart';
 import '../widgets/chess_piece_glyph.dart';
-import '../widgets/chess_square_widget.dart';
 
 class ChessGameScreen extends StatefulWidget {
   const ChessGameScreen({super.key});
@@ -175,8 +174,11 @@ class _ClockRow extends StatelessWidget {
 class _BoardArea extends StatelessWidget {
   const _BoardArea({required this.controller});
 
-  static const _barWidth = 30.0;
+  static const _barWidth = 22.5;
   static const _gap = 12.0;
+
+  /// Değerlendirme çubuğu ile tahta arasındaki boşluk (eskisinin 1/10'u).
+  static const _barGap = 1.2;
   static const _historyPanelWidth = 190.0;
   static const _historyStripHeight = 44.0;
 
@@ -198,7 +200,7 @@ class _BoardArea extends StatelessWidget {
         final widthForBoard =
             constraints.maxWidth -
             _barWidth -
-            _gap -
+            _barGap -
             (sidePanel ? _historyPanelWidth + _gap : 0);
         // Ele geçirilen taş şeritleri tahta çerçevesinin üstüne/altına
         // eklendiği için (bkz. aşağıdaki sütun), tahtanın kendi kare kenar
@@ -234,7 +236,7 @@ class _BoardArea extends StatelessWidget {
                 flipped: controller.boardFlipped,
               ),
             ),
-            const SizedBox(width: _gap),
+            const SizedBox(width: _barGap),
             SizedBox(
               width: boardSize,
               height: columnHeight,
@@ -247,7 +249,7 @@ class _BoardArea extends StatelessWidget {
                   const SizedBox(height: _capturedRowGap),
                   SizedBox.square(
                     dimension: boardSize,
-                    child: _BoardFrame(
+                    child: ChessBoardFrame(
                       child: _ChessBoardView(controller: controller),
                     ),
                   ),
@@ -277,7 +279,7 @@ class _BoardArea extends StatelessWidget {
             row,
             const SizedBox(height: _gap),
             SizedBox(
-              width: boardSize + _barWidth + _gap,
+              width: boardSize + _barWidth + _barGap,
               height: _historyStripHeight,
               child: ChessMoveHistory(
                 notations: controller.moveNotations,
@@ -316,119 +318,29 @@ class _BoardArea extends StatelessWidget {
   }
 }
 
-/// Tahtayı saran koyu ahşap kasa: kareler bittiği yerde tahta bitmesin diye
-/// ince bir çerçeve, yumuşak bir gölge ve yuvarlatılmış köşeler. Kırpma
-/// [ClipRRect] ile yapılır, böylece köşedeki kareler çerçevenin dışına
-/// taşmaz.
-class _BoardFrame extends StatelessWidget {
-  const _BoardFrame({required this.child});
-
-  static const _frameColor = Color(0xFF4A3728);
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: _frameColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: child,
-      ),
-    );
-  }
-}
-
+/// Oyun ekranının tahtası: [ChessController] durumunu ortak
+/// [ChessBoardView]'a düz parametrelere çevirir.
 class _ChessBoardView extends StatelessWidget {
   const _ChessBoardView({required this.controller});
-
-  static const _fileLetters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
   final ChessController controller;
 
   @override
   Widget build(BuildContext context) {
-    final flipped = controller.boardFlipped;
-    final ranks = flipped
-        ? List<int>.generate(8, (r) => r)
-        : List<int>.generate(8, (r) => 7 - r);
-    final files = flipped
-        ? List<int>.generate(8, (f) => 7 - f)
-        : List<int>.generate(8, (f) => f);
-    final displayOrder = [
-      for (final r in ranks)
-        for (final f in files) squareIndex(f, r),
-    ];
-
-    final legalTargets = {
-      for (final m in controller.selectedSquareLegalMoves) m.to,
-    };
-
     final history = controller.board.moveHistory;
     final lastMove = history.isEmpty ? null : history.last;
-    final checkedKingSquare = controller.isCheck
-        ? _kingSquareOf(controller)
-        : null;
-
-    return GridView.count(
-      crossAxisCount: 8,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        for (var i = 0; i < displayOrder.length; i++)
-          ChessSquareWidget(
-            key: ValueKey('sq_${displayOrder[i]}'),
-            piece: controller.board.squares[displayOrder[i]],
-            // a1 (file 0, rank 0) koyu kare olmalı — gerçek satranç
-            // diziliminin tersine dönmemesi için toplam tek olduğunda açık.
-            isLight: (fileOf(displayOrder[i]) + rankOf(displayOrder[i])).isOdd,
-            isSelected: controller.selectedSquare == displayOrder[i],
-            isLegalDestination: legalTargets.contains(displayOrder[i]),
-            isLastMove:
-                lastMove != null &&
-                (lastMove.from == displayOrder[i] ||
-                    lastMove.to == displayOrder[i]),
-            isCheckedKing: checkedKingSquare == displayOrder[i],
-            // Koordinatlar tahtanın kendi kenarlarına yazılır: sol sütuna
-            // sıra numarası, alt satıra dosya harfi. Tahta döndüğünde
-            // displayOrder da döndüğü için etiketler kendiliğinden doğru
-            // kareye denk gelir.
-            rankLabel: i % 8 == 0
-                ? '${rankOf(displayOrder[i]) + 1}'
-                : null,
-            fileLabel: i ~/ 8 == 7
-                ? _fileLetters[fileOf(displayOrder[i])]
-                : null,
-            onTap: () => controller.selectSquare(displayOrder[i]),
-          ),
-      ],
+    return ChessBoardView(
+      squares: controller.board.squares,
+      flipped: controller.boardFlipped,
+      selectedSquare: controller.selectedSquare,
+      legalTargets: {for (final m in controller.selectedSquareLegalMoves) m.to},
+      lastMoveSquares: lastMove == null ? const {} : {lastMove.from, lastMove.to},
+      // Şah çekilen tarafın kralı; tam bir tane vardır ama test kurulumları
+      // kralsız konum kurabildiği için null'a karşı korunur.
+      checkedKingSquare: controller.isCheck
+          ? controller.board.kingSquare(controller.currentColor)
+          : null,
+      onSquareTap: controller.selectSquare,
     );
-  }
-
-  /// Şah çekilen tarafın kralının karesi; tahtada tam olarak bir tane vardır,
-  /// ama yine de `-1` ile korunuyor (test kurulumları
-  /// [ChessBoard.custom] ile kralsız bir konum kurabilir).
-  int? _kingSquareOf(ChessController controller) {
-    final squares = controller.board.squares;
-    for (var square = 0; square < squares.length; square++) {
-      final piece = squares[square];
-      if (piece != null &&
-          piece.type == PieceType.king &&
-          piece.color == controller.currentColor) {
-        return square;
-      }
-    }
-    return null;
   }
 }

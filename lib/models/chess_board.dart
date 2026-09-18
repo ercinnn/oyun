@@ -89,6 +89,59 @@ class ChessBoard {
     );
   }
 
+  /// FEN metninden pozisyon kurar ('8/8/8/8/8/8/4P3/4K3 w - - 0 1' gibi).
+  /// Ders içeriğindeki onlarca pozisyonun 64'lük listeler elle
+  /// yazılmadan tanımlanabilmesi için var. Hamle sayacı (son alan)
+  /// kullanılmaz; yarım-hamle sayacı ise okunur.
+  factory ChessBoard.fromFen(String fen) {
+    final parts = fen.trim().split(RegExp(r'\s+'));
+    final rows = parts[0].split('/');
+    assert(rows.length == 8, 'FEN 8 sıra içermeli: $fen');
+    final squares = List<ChessPiece?>.filled(64, null);
+    const letters = {
+      'k': PieceType.king,
+      'q': PieceType.queen,
+      'r': PieceType.rook,
+      'b': PieceType.bishop,
+      'n': PieceType.knight,
+      'p': PieceType.pawn,
+    };
+    for (var i = 0; i < 8; i++) {
+      final rank = 7 - i;
+      var file = 0;
+      for (final ch in rows[i].split('')) {
+        final skip = int.tryParse(ch);
+        if (skip != null) {
+          file += skip;
+          continue;
+        }
+        final type = letters[ch.toLowerCase()]!;
+        final color = ch == ch.toUpperCase()
+            ? PieceColor.white
+            : PieceColor.black;
+        squares[squareIndex(file, rank)] = ChessPiece(type, color);
+        file++;
+      }
+      assert(file == 8, 'FEN sırası 8 kare olmalı: ${rows[i]}');
+    }
+    final castling = parts.length > 2 ? parts[2] : '-';
+    final enPassant = parts.length > 3 ? parts[3] : '-';
+    return ChessBoard.custom(
+      squares: squares,
+      sideToMove: parts.length > 1 && parts[1] == 'b'
+          ? PieceColor.black
+          : PieceColor.white,
+      whiteKingsideRights: castling.contains('K'),
+      whiteQueensideRights: castling.contains('Q'),
+      blackKingsideRights: castling.contains('k'),
+      blackQueensideRights: castling.contains('q'),
+      enPassantTargetSquare: enPassant == '-'
+          ? null
+          : squareFromName(enPassant),
+      halfMoveClock: parts.length > 4 ? int.tryParse(parts[4]) ?? 0 : 0,
+    );
+  }
+
   /// Standart satranç başlangıç dizilimi.
   factory ChessBoard.initial() {
     final squares = List<ChessPiece?>.filled(64, null);

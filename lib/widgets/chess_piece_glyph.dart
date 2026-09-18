@@ -40,6 +40,19 @@ class ChessPieceGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWhite = piece.color == PieceColor.white;
+    if (piece.type == PieceType.pawn) {
+      // ♟ (U+265F) Android'de emoji fontuyla çizilir: boyamayı yok sayıp iki
+      // renk için de aynı 3B görünümü verir. Piyon bu yüzden vektör çizilir.
+      return SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _PawnPainter(
+            fill: isWhite ? _whiteFill : _blackFill,
+            outline: isWhite ? _whiteOutline : _blackOutline,
+          ),
+        ),
+      );
+    }
     const baseStyle = TextStyle(
       fontSize: _renderFontSize,
       height: _lineHeight,
@@ -57,7 +70,7 @@ class ChessPieceGlyph extends StatelessWidget {
               style: baseStyle.copyWith(
                 foreground: Paint()
                   ..style = PaintingStyle.stroke
-                  ..strokeWidth = _renderFontSize * 0.05
+                  ..strokeWidth = _renderFontSize * 0.005
                   ..strokeJoin = StrokeJoin.round
                   ..color = isWhite ? _whiteOutline : _blackOutline,
               ),
@@ -80,4 +93,56 @@ class ChessPieceGlyph extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Piyonun 2B siluetini 100×100'lük birim kutuda çizer; tek bir birleşik
+/// yol olduğu için konturda parçaların iç kenarları görünmez.
+class _PawnPainter extends CustomPainter {
+  const _PawnPainter({required this.fill, required this.outline});
+
+  final Color fill;
+  final Color outline;
+
+  static Path _shape() {
+    final head = Path()
+      ..addOval(Rect.fromCircle(center: const Offset(50, 27), radius: 13));
+    final collar = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          const Rect.fromLTRB(35, 39, 65, 48), const Radius.circular(4.5)));
+    final body = Path()
+      ..moveTo(42, 46)
+      ..lineTo(58, 46)
+      ..cubicTo(58, 62, 68, 68, 70, 80)
+      ..lineTo(30, 80)
+      ..cubicTo(32, 68, 42, 62, 42, 46)
+      ..close();
+    final base = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          const Rect.fromLTRB(24, 78, 76, 90), const Radius.circular(5)));
+    var result = head;
+    for (final part in [collar, body, base]) {
+      result = Path.combine(PathOperation.union, result, part);
+    }
+    return result;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 100, size.height / 100);
+    final path = _shape();
+    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.5), 1.5, false);
+    canvas.drawPath(path, Paint()..color = fill);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5
+        ..strokeJoin = StrokeJoin.round
+        ..color = outline,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PawnPainter old) =>
+      old.fill != fill || old.outline != outline;
 }

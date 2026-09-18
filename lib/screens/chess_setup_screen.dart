@@ -8,6 +8,7 @@ import '../models/chess_mode.dart';
 import '../models/chess_piece.dart';
 import '../models/chess_time_control.dart';
 import '../widgets/player_count_selector.dart';
+import 'chess_lesson_list_screen.dart';
 
 class ChessSetupScreen extends StatefulWidget {
   const ChessSetupScreen({super.key});
@@ -199,6 +200,17 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text('Oyunu Başlat'),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('chessLessonsButton'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ChessLessonListScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.school),
+                    label: const Text('Satranç Dersleri'),
                   ),
                 ],
               ),
