@@ -21,7 +21,17 @@ import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
 import 'package:bombali_sayilar/models/pattern_difficulty.dart';
+import 'package:bombali_sayilar/controllers/electricity_controller.dart';
 import 'package:bombali_sayilar/controllers/plant_lab_controller.dart';
+import 'package:bombali_sayilar/data/electric_materials.dart';
+import 'package:bombali_sayilar/data/safety_scenes.dart';
+import 'package:bombali_sayilar/models/circuit_simulation.dart';
+import 'package:bombali_sayilar/models/circuit_spec.dart';
+import 'package:bombali_sayilar/models/electric_task.dart';
+import 'package:bombali_sayilar/models/electric_task_factory.dart';
+import 'package:bombali_sayilar/models/electricity_phase.dart';
+import 'package:bombali_sayilar/models/energy_city.dart';
+import 'package:bombali_sayilar/models/wire_puzzle.dart';
 import 'package:bombali_sayilar/data/plant_catalog.dart';
 import 'package:bombali_sayilar/models/plant_conditions.dart';
 import 'package:bombali_sayilar/models/plant_growth.dart';
@@ -3277,7 +3287,15 @@ void main() {
       final trial = controller.currentTrial;
 
       expect(find.text(trial.sceneQuestion), findsOneWidget);
-      expect(find.textContaining(trial.context.title), findsOneWidget);
+      // Sahne başlığı ("🧁  Kek kalıbı") ayrı bir Text'tir; ama soru cümlesi de
+      // başlığı içerebilir ("Kek kalıbında 5 sıra…"), bu yüzden textContaining
+      // rastgele sahnelerde iki widget bulup testi kararsızlaştırıyordu.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Text && (w.data ?? '').endsWith(trial.context.title),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(ValueKey(trial.answer)));
       await tester.pumpAndSettle();
@@ -4094,6 +4112,482 @@ void main() {
       expect(find.byKey(const Key('plantLabContinue')), findsOneWidget);
     });
   });
+
+  group('Elektrik Atölyesi', () {
+    test('simülasyon: açık anahtar ya da yalıtkan malzeme ampulü söndürür', () {
+      const open = CircuitSpec(switchClosed: false);
+      expect(simulateCircuit(open).anyLit, isFalse);
+      expect(simulateCircuit(open).current, 0);
+
+      final insulator = electricMaterials.firstWhere((m) => !m.conductive);
+      final conductor = electricMaterials.firstWhere((m) => m.conductive);
+      expect(simulateCircuit(CircuitSpec(material: insulator)).anyLit, isFalse);
+      expect(simulateCircuit(CircuitSpec(material: conductor)).anyLit, isTrue);
+      expect(simulateCircuit(const CircuitSpec()).anyLit, isTrue);
+    });
+
+    test('simülasyon: her malzeme kendi iletkenliğine göre devreyi kapatır', () {
+      for (final material in electricMaterials) {
+        final result = simulateCircuit(CircuitSpec(material: material));
+        expect(result.anyLit, material.conductive, reason: material.id);
+      }
+    });
+
+    test('simülasyon: seri ampuller sönükleşir, paralel ampuller sönmez', () {
+      final one = simulateCircuit(const CircuitSpec(batteries: 2, lampCount: 1));
+      final seriesTwo = simulateCircuit(
+        const CircuitSpec(batteries: 2, lampCount: 2),
+      );
+      final seriesThree = simulateCircuit(
+        const CircuitSpec(batteries: 2, lampCount: 3),
+      );
+      final parallelTwo = simulateCircuit(
+        const CircuitSpec(
+          batteries: 2,
+          lampCount: 2,
+          layout: LampLayout.parallel,
+        ),
+      );
+      expect(seriesTwo.brightness.first, lessThan(one.brightness.first));
+      expect(seriesThree.brightness.first, lessThan(seriesTwo.brightness.first));
+      expect(parallelTwo.brightness.first, one.brightness.first);
+      // Paralel devre pili daha çok harcar.
+      expect(parallelTwo.current, greaterThan(seriesTwo.current));
+    });
+
+    test('simülasyon: fazla pil ampulü patlatır, çok pil daha parlak yakar', () {
+      final burn = simulateCircuit(const CircuitSpec(batteries: 3));
+      expect(burn.states.single, LampState.burnt);
+      expect(burn.anyLit, isFalse);
+
+      final two = simulateCircuit(const CircuitSpec(batteries: 2, lampCount: 2));
+      final three = simulateCircuit(const CircuitSpec(batteries: 3, lampCount: 2));
+      expect(three.brightness.first, greaterThan(two.brightness.first));
+    });
+
+    test('simülasyon: patlak ampul seride hepsini söndürür, paralelde söndürmez',
+        () {
+      final series = simulateCircuit(
+        const CircuitSpec(lampCount: 3, burntLamp: 0),
+      );
+      expect(series.anyLit, isFalse);
+
+      final parallel = simulateCircuit(
+        const CircuitSpec(
+          lampCount: 3,
+          layout: LampLayout.parallel,
+          burntLamp: 0,
+        ),
+      );
+      expect(parallel.states[0], LampState.burnt);
+      expect(parallel.states[1].isLit, isTrue);
+      expect(parallel.states[2].isLit, isTrue);
+    });
+
+    test('simülasyon: deterministik ve açıklama her durumda dolu', () {
+      for (var batteries = 1; batteries <= maxBatteries; batteries++) {
+        for (var lamps = 1; lamps <= maxLamps; lamps++) {
+          for (final layout in LampLayout.values) {
+            for (final closed in [true, false]) {
+              for (final burnt in <int?>[null, 0]) {
+                final spec = CircuitSpec(
+                  batteries: batteries,
+                  lampCount: lamps,
+                  layout: layout,
+                  switchClosed: closed,
+                  burntLamp: burnt,
+                );
+                final a = simulateCircuit(spec);
+                final b = simulateCircuit(spec);
+                expect(a.averageBrightness, b.averageBrightness);
+                expect(describeCircuit(spec, a), isNotEmpty);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    test('kablo bulmacası: her üretim çözülebilir, başta çözülmüş değil', () {
+      for (var size = 3; size <= 5; size++) {
+        for (var seed = 0; seed < 100; seed++) {
+          final puzzle = WirePuzzle.generate(size, Random(seed));
+          final where = 'boyut $size tohum $seed';
+          expect(puzzle.solved, isFalse, reason: where);
+          expect(puzzle.parMoves, greaterThanOrEqualTo(1), reason: where);
+
+          // Yol karolarını çözüm maskesine döndür: en az hamleyle çözülmeli.
+          puzzle.solutionMasks.forEach((index, mask) {
+            while (puzzle.tiles[index].mask != mask) {
+              expect(puzzle.rotate(index), isTrue, reason: where);
+            }
+          });
+          expect(puzzle.solved, isTrue, reason: where);
+          expect(puzzle.moves, puzzle.parMoves, reason: where);
+        }
+      }
+    });
+
+    test('kablo bulmacası: pil ve ampul sabit, boş karo dönmez', () {
+      final puzzle = WirePuzzle.generate(4, Random(1));
+      expect(puzzle.rotate(puzzle.batteryIndex), isFalse);
+      expect(puzzle.rotate(puzzle.bulbIndex), isFalse);
+      final empty = puzzle.tiles.indexWhere((t) => t.kind == WireKind.empty);
+      if (empty != -1) expect(puzzle.rotate(empty), isFalse);
+      expect(puzzle.moves, 0);
+    });
+
+    test('görev üretimi: iletken soruları malzemeyle tutarlı', () {
+      final rng = Random(4);
+      for (var i = 0; i < 40; i++) {
+        final task =
+            generateElectricTask(ElectricTaskKind.conductor, rng) as ChoiceTask;
+        final material = electricMaterials.firstWhere(
+          (m) => task.subject == '${m.emoji} ${m.name}',
+        );
+        expect(task.correctIndex, material.conductive ? 0 : 1);
+        expect(task.explanation, contains(material.note));
+      }
+    });
+
+    test('görev üretimi: devre soruları tahmin edilebilir ve tutarlı', () {
+      final rng = Random(7);
+      for (var i = 0; i < 200; i++) {
+        final task =
+            generateElectricTask(ElectricTaskKind.circuit, rng) as ChoiceTask;
+        expect(task.circuits, isNotEmpty);
+        if (task.circuits.length == 2) {
+          // Karşılaştırma: parlaklık farkı gözle ayırt edilebilir olmalı.
+          final a = simulateCircuit(task.circuits[0].spec).averageBrightness;
+          final b = simulateCircuit(task.circuits[1].spec).averageBrightness;
+          expect((a - b).abs(), greaterThanOrEqualTo(minBrightnessGap));
+          expect(task.correctIndex, a > b ? 0 : 1);
+        }
+        expect(task.correctIndex, inInclusiveRange(0, task.options.length - 1));
+        expect(task.explanation, isNotEmpty);
+      }
+    });
+
+    test('görev üretimi: enerji şehrinde tek doğru cevap vardır', () {
+      EnergySource? sourceIn(String text) {
+        for (final s in EnergySource.values) {
+          if (text.contains(s.name)) return s;
+        }
+        return null;
+      }
+
+      List<EnergySource> sourcesIn(String text) => [
+        for (final s in EnergySource.values)
+          if (text.contains(s.name)) s,
+      ];
+
+      final rng = Random(11);
+      var topCount = 0;
+      var mixCount = 0;
+      for (var i = 0; i < 300; i++) {
+        final task =
+            generateElectricTask(ElectricTaskKind.city, rng) as ChoiceTask;
+        final weather = EnergyWeather.values.firstWhere(
+          (w) => task.subject!.contains(w.label),
+        );
+        if (task.prompt.startsWith('Hangi kaynak')) {
+          topCount++;
+          final outputs = [
+            for (final o in task.options) energyOutput(sourceIn(o)!, weather),
+          ];
+          final top = outputs.reduce(max);
+          expect(outputs.where((o) => o == top).length, 1);
+          expect(task.correctIndex, outputs.indexOf(top));
+        } else {
+          mixCount++;
+          final demand = int.parse(
+            RegExp(r'\d+').firstMatch(task.prompt)!.group(0)!,
+          );
+          bool ok(String option) {
+            final mix = sourcesIn(option);
+            final total = mix.fold(0, (s, e) => s + energyOutput(e, weather));
+            return mix.every((e) => e.clean) && total >= demand;
+          }
+
+          expect(task.options.where(ok).length, 1, reason: task.prompt);
+          expect(ok(task.options[task.correctIndex]), isTrue);
+        }
+      }
+      expect(topCount, greaterThan(0));
+      expect(mixCount, greaterThan(0));
+    });
+
+    test('güvenlik verisi: güvenli ve tehlikeli sahneler, geçerli watt tablosu', () {
+      expect(safetyScenes.where((s) => s.safe).length, greaterThanOrEqualTo(4));
+      expect(safetyScenes.where((s) => !s.safe).length, greaterThanOrEqualTo(4));
+      for (final scene in safetyScenes) {
+        expect(scene.explanation, isNotEmpty);
+      }
+      for (final appliance in appliances) {
+        expect(appliance.watts, greaterThan(0));
+      }
+      final rng = Random(3);
+      for (var i = 0; i < 100; i++) {
+        final task =
+            generateElectricTask(ElectricTaskKind.safety, rng) as ChoiceTask;
+        expect(task.options.length, 2);
+        if (task.prompt.startsWith('Hangi cihaz')) {
+          final pair = [
+            for (final o in task.options)
+              appliances.firstWhere((a) => o == '${a.emoji} ${a.name}'),
+          ];
+          final high = max(pair[0].watts, pair[1].watts);
+          final low = min(pair[0].watts, pair[1].watts);
+          expect(high, greaterThanOrEqualTo(low * 1.5));
+          expect(task.correctIndex, pair[0].watts > pair[1].watts ? 0 : 1);
+        }
+      }
+    });
+
+    /// Görevin doğru cevabını verir (kablo bulmacasını çözerek).
+    void answerCorrectly(ElectricityController controller) {
+      final task = controller.currentTask;
+      if (task is ChoiceTask) {
+        controller.answerChoice(task.correctIndex);
+      } else if (task is WireTask) {
+        task.puzzle.solutionMasks.forEach((index, mask) {
+          while (task.puzzle.tiles[index].mask != mask) {
+            controller.rotateWireTile(index);
+          }
+        });
+      }
+    }
+
+    test('kontrolcü: tam oyun, tür dönüşümü ve sıra devri', () {
+      final controller = ElectricityController(random: Random(5));
+      controller.startGame(['A', 'B']);
+      expect(controller.phase, ElectricityPhase.playing);
+
+      for (var player = 0; player < 2; player++) {
+        final kinds = <ElectricTaskKind>[];
+        for (var round = 0; round < electricRoundsPerPlayer; round++) {
+          kinds.add(controller.currentTask.kind);
+          answerCorrectly(controller);
+          expect(controller.showingResult, isTrue);
+          expect(controller.lastAnswerCorrect, isTrue);
+          controller.continueAfterResult();
+        }
+        // Her oyuncu her türden tam iki tur oynar.
+        for (final kind in ElectricTaskKind.values) {
+          expect(kinds.where((k) => k == kind).length, 2, reason: '$kind');
+        }
+        if (player == 0) {
+          expect(controller.phase, ElectricityPhase.turnTransition);
+          expect(controller.currentPlayerIndex, 1);
+          controller.acknowledgeTurnTransition();
+        }
+      }
+      expect(controller.phase, ElectricityPhase.finished);
+      expect(
+        controller.rankedByCorrect.first.correctCount,
+        electricRoundsPerPlayer,
+      );
+      controller.restart();
+      expect(controller.phase, ElectricityPhase.setup);
+    });
+
+    test('kontrolcü: yanlış cevap puan vermez, açıkken ikinci cevap sayılmaz', () {
+      final controller = ElectricityController(random: Random(2));
+      controller.startGame(['A']);
+      final task = controller.currentTask as ChoiceTask;
+      final wrong = task.options.length > 1 && task.correctIndex == 0 ? 1 : 0;
+      controller.answerChoice(wrong);
+      expect(controller.lastAnswerCorrect, isFalse);
+      expect(controller.currentPlayer.correctCount, 0);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+
+      controller.answerChoice(task.correctIndex);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+      expect(controller.currentPlayer.correctCount, 0);
+
+      controller.continueAfterResult();
+      expect(controller.showingResult, isFalse);
+      expect(controller.currentTask.kind, ElectricTaskKind.conductor);
+    });
+
+    test('kontrolcü: fazla hamleyle çözülen kablo bulmacası doğru sayılmaz', () {
+      final controller = ElectricityController(random: Random(9));
+      controller.startGame(['A']);
+      // Wire turuna kadar ilerle (3. tur).
+      for (var i = 0; i < 2; i++) {
+        answerCorrectly(controller);
+        controller.continueAfterResult();
+      }
+      final task = controller.currentTask as WireTask;
+      expect(task.kind, ElectricTaskKind.wire);
+
+      // Önce gereksiz hamlelerle sayacı şişir: her rotatable karoyu 4 kez çevir
+      // (karo eski konumuna döner ama hamle sayılır), sonra çöz.
+      for (var i = 0; i < task.puzzle.tiles.length; i++) {
+        if (!task.puzzle.tiles[i].rotatable) continue;
+        for (var k = 0; k < 4 && task.puzzle.moves < task.puzzle.parMoves + 6; k++) {
+          controller.rotateWireTile(i);
+          if (controller.showingResult) break;
+        }
+        if (controller.showingResult) break;
+      }
+      if (!controller.showingResult) {
+        answerCorrectly(controller);
+      }
+      expect(controller.showingResult, isTrue);
+      expect(controller.lastAnswerCorrect, isFalse);
+    });
+
+    test('kontrolcü: serbest atölye ve kablo yolu seviyeleri', () {
+      final controller = ElectricityController(random: Random(1));
+      controller.startFreeCircuit();
+      expect(controller.phase, ElectricityPhase.freeCircuit);
+      controller.setFreeSpec(controller.freeSpec.copyWith(batteries: 3));
+      expect(simulateCircuit(controller.freeSpec).states.single, LampState.burnt);
+
+      controller.startWireLevels();
+      expect(controller.phase, ElectricityPhase.wireLevels);
+      expect(controller.wireLevel, 1);
+
+      // Aynı seviye her zaman aynı bulmacayı verir.
+      controller.selectWireLevel(6);
+      final first = [for (final t in controller.levelPuzzle.tiles) t.mask];
+      controller.selectWireLevel(6);
+      expect([for (final t in controller.levelPuzzle.tiles) t.mask], first);
+      expect(controller.levelPuzzle.size, 4);
+      controller.selectWireLevel(12);
+      expect(controller.levelPuzzle.size, 5);
+
+      controller.selectWireLevel(1);
+      controller.levelPuzzle.solutionMasks.forEach((index, mask) {
+        while (controller.levelPuzzle.tiles[index].mask != mask) {
+          controller.rotateLevelTile(index);
+        }
+      });
+      expect(controller.levelPuzzle.solved, isTrue);
+      expect(controller.solvedLevels, contains(1));
+      controller.nextWireLevel();
+      expect(controller.wireLevel, 2);
+    });
+
+    testWidgets('katalogda kart var; 1 kişilik oyun 10 turu oynatır',
+        (tester) async {
+      await _openElectricity(tester);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('electricityStart')));
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .element(find.byType(Scaffold).last)
+          .read<ElectricityController>();
+      expect(controller.phase, ElectricityPhase.playing);
+
+      for (var round = 0; round < electricRoundsPerPlayer; round++) {
+        final task = controller.currentTask;
+        if (task is ChoiceTask) {
+          expect(find.byKey(const Key('electricOption_0')), findsOneWidget);
+          await tester.tap(find.byKey(Key('electricOption_${task.correctIndex}')));
+        } else if (task is WireTask) {
+          expect(find.byKey(const Key('wireMoves')), findsOneWidget);
+          // Bir karoya gerçekten dokun, sonra kalanını çöz.
+          final rotatable = task.puzzle.solutionMasks.keys.first;
+          final movesBefore = task.puzzle.moves;
+          await tester.tap(find.byKey(Key('wireTile_$rotatable')));
+          await tester.pump();
+          // Dokunuş gerçekten karoyu döndürmeli (karo tıklanabilir boyutta olmalı).
+          expect(task.puzzle.moves, movesBefore + 1);
+          answerCorrectly(controller);
+        }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('electricExplanation')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('electricContinue')));
+        await tester.pumpAndSettle();
+      }
+
+      expect(controller.phase, ElectricityPhase.finished);
+      expect(find.text('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+    });
+
+    testWidgets('serbest devre atölyesi: 3 pil ampulü patlatır', (tester) async {
+      await _openElectricity(tester);
+      await tester.tap(find.byKey(const Key('electricityFreeCircuit')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('freeBatteries_3')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Ampule fazla pil bağlanınca'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('freeBatteries_2')));
+      await tester.tap(find.byKey(const Key('freeMaterial_plastik')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Yalıtkan malzeme devreyi kesti'), findsOneWidget);
+    });
+
+    testWidgets('kablo yolu seviyeleri: seviye seç ve çöz', (tester) async {
+      await _openElectricity(tester);
+      await tester.tap(find.byKey(const Key('electricityWireLevels')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('levelMoves')), findsOneWidget);
+
+      final controller = tester
+          .element(find.byType(Scaffold).last)
+          .read<ElectricityController>();
+      controller.levelPuzzle.solutionMasks.forEach((index, mask) {
+        while (controller.levelPuzzle.tiles[index].mask != mask) {
+          controller.rotateLevelTile(index);
+        }
+      });
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('levelSolved')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('nextWireLevel')));
+      await tester.pumpAndSettle();
+      expect(controller.wireLevel, 2);
+    });
+
+    testWidgets('dar ekranda (320 px) görev ve sonuç paneli taşmaz',
+        (tester) async {
+      await _openElectricity(tester);
+      tester.view.physicalSize = const Size(320, 3000);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('electricityStart')));
+      await tester.pumpAndSettle();
+
+      final controller = tester
+          .element(find.byType(Scaffold).last)
+          .read<ElectricityController>();
+      for (var round = 0; round < 5; round++) {
+        final task = controller.currentTask;
+        if (task is ChoiceTask) {
+          await tester.tap(find.byKey(const Key('electricOption_0')));
+        } else {
+          answerCorrectly(controller);
+        }
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'tur $round');
+        await tester.tap(find.byKey(const Key('electricContinue')));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'tur $round devam');
+      }
+    });
+  });
+}
+
+/// Platform ana menüsünden Elektrik Atölyesi'ne girer (katalogdaki 13. kart).
+Future<void> _openElectricity(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 7200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Elektrik Atölyesi'));
+  await tester.pumpAndSettle();
 }
 
 /// Platform ana menüsünden Bitki Laboratuvarı'na girer. Katalogdaki 12. kart;

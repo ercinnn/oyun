@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../controllers/profile_controller.dart';
 import '../games/bombali_sayilar_game.dart';
 import '../games/chess_game.dart';
+import '../games/electricity_game.dart';
 import '../games/memory_match_game.dart';
 import '../games/multiplication_game.dart';
 import '../games/pattern_game.dart';
@@ -144,6 +145,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.teal,
     routeName: PlantLabGame.routeName,
     skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 2, hafiza: 3, dikkat: 3),
+  ),
+  GameCatalogEntry(
+    title: 'Elektrik Atölyesi',
+    description:
+        'Pil, ampul ve kablolarla devre kur! Seri mi paralel mi, iletken mi '
+        'yalıtkan mı tahmin et; kablo yolunu bul, şehre enerji sağla.',
+    icon: Icons.bolt,
+    color: Colors.orange,
+    routeName: ElectricityGame.routeName,
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 3, hafiza: 2, dikkat: 3),
   ),
 ];
 

@@ -7,6 +7,7 @@ import 'controllers/auth_controller.dart';
 import 'controllers/profile_controller.dart';
 import 'games/bombali_sayilar_game.dart';
 import 'games/chess_game.dart';
+import 'games/electricity_game.dart';
 import 'games/memory_match_game.dart';
 import 'games/multiplication_game.dart';
 import 'games/pattern_game.dart';
@@ -100,6 +101,8 @@ class GamePlatformApp extends StatelessWidget {
                 const MultiplicationGame(),
             SudokuGame.routeName => (BuildContext _) => const SudokuGame(),
             PlantLabGame.routeName => (BuildContext _) => const PlantLabGame(),
+            ElectricityGame.routeName => (BuildContext _) =>
+                const ElectricityGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),
