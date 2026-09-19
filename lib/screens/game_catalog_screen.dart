@@ -7,6 +7,7 @@ import '../games/chess_game.dart';
 import '../games/memory_match_game.dart';
 import '../games/multiplication_game.dart';
 import '../games/pattern_game.dart';
+import '../games/plant_lab_game.dart';
 import '../games/puzzle_game.dart';
 import '../games/reflex_game.dart';
 import '../games/sequence_memory_game.dart';
@@ -133,6 +134,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.amber,
     routeName: SudokuGame.routeName,
     skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 5, hafiza: 1, dikkat: 4),
+  ),
+  GameCatalogEntry(
+    title: 'Bitki Laboratuvarı',
+    description:
+        'Fasulye, kaktüs, nane… Işık, su ve sıcaklığı değiştirip bitkilerin '
+        'nasıl büyüdüğünü tahmin et, deneyle gör, bilim insanı gibi öğren.',
+    icon: Icons.eco,
+    color: Colors.teal,
+    routeName: PlantLabGame.routeName,
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 2, hafiza: 3, dikkat: 3),
   ),
 ];
 

@@ -10,6 +10,7 @@ import 'games/chess_game.dart';
 import 'games/memory_match_game.dart';
 import 'games/multiplication_game.dart';
 import 'games/pattern_game.dart';
+import 'games/plant_lab_game.dart';
 import 'games/puzzle_game.dart';
 import 'games/reflex_game.dart';
 import 'games/sequence_memory_game.dart';
@@ -98,6 +99,7 @@ class GamePlatformApp extends StatelessWidget {
             MultiplicationGame.routeName => (BuildContext _) =>
                 const MultiplicationGame(),
             SudokuGame.routeName => (BuildContext _) => const SudokuGame(),
+            PlantLabGame.routeName => (BuildContext _) => const PlantLabGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),

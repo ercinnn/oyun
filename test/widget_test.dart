@@ -21,6 +21,12 @@ import 'package:bombali_sayilar/controllers/memory_match_controller.dart';
 import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
 import 'package:bombali_sayilar/models/pattern_difficulty.dart';
+import 'package:bombali_sayilar/controllers/plant_lab_controller.dart';
+import 'package:bombali_sayilar/data/plant_catalog.dart';
+import 'package:bombali_sayilar/models/plant_conditions.dart';
+import 'package:bombali_sayilar/models/plant_growth.dart';
+import 'package:bombali_sayilar/models/plant_lab_game_phase.dart';
+import 'package:bombali_sayilar/models/plant_lab_trial.dart';
 import 'package:bombali_sayilar/controllers/profile_controller.dart';
 import 'package:bombali_sayilar/controllers/puzzle_controller.dart';
 import 'package:bombali_sayilar/controllers/reflex_controller.dart';
@@ -3668,6 +3674,386 @@ void main() {
       expect(fake.disposed, isTrue);
     });
   });
+
+  group('Bitki Laboratuvarı', () {
+    test('bitki tablosu tutarlı: 3 kademe, 0-1 skor, tek en iyi kademe', () {
+      final ids = plantCatalog.map((s) => s.id).toList();
+      expect(ids.toSet().length, ids.length, reason: 'bitki kimlikleri tekil');
+      for (final species in plantCatalog) {
+        for (final factor in PlantFactor.values) {
+          final scores = species.scoresOf(factor);
+          final where = '${species.id} ${factor.name}';
+          expect(scores.length, plantLevelCount, reason: where);
+          for (final score in scores) {
+            expect(score, inInclusiveRange(0.0, 1.0), reason: where);
+          }
+          final best = scores.reduce(max);
+          expect(best, 1.0, reason: '$where: en iyi kademe 1.0 olmalı');
+          expect(
+            scores.where((s) => s == best).length,
+            1,
+            reason: '$where: tek bir en iyi kademe olmalı',
+          );
+          // Doktor turu her etken için en az bir "belirgin bozuk" kademe arar.
+          final ideal = species.idealLevelOf(factor);
+          expect(
+            [
+              for (var l = 0; l < plantLevelCount; l++)
+                if (l != ideal && scores[l] <= 0.5) l,
+            ],
+            isNotEmpty,
+            reason: '$where: bozuk kademe yok',
+          );
+        }
+        expect(species.overallScore(species.idealConditions), 1.0);
+      }
+    });
+
+    test('büyüme: ideal koşul her tek-etken bozulmasından daha uzun bitki verir',
+        () {
+      for (final species in plantCatalog) {
+        final ideal = species.idealConditions;
+        final idealHeight = simulatePlant(
+          species,
+          ideal,
+          plantExperimentDays.toDouble(),
+        ).heightCm;
+        expect(idealHeight, closeTo(species.maxHeightCm, 0.001));
+        for (final factor in PlantFactor.values) {
+          for (var level = 0; level < plantLevelCount; level++) {
+            if (level == species.idealLevelOf(factor)) continue;
+            final height = simulatePlant(
+              species,
+              ideal.withLevel(factor, level),
+              plantExperimentDays.toDouble(),
+            ).heightCm;
+            expect(
+              height,
+              lessThan(idealHeight),
+              reason: '${species.id} ${factor.name} $level',
+            );
+          }
+        }
+      }
+    });
+
+    test('büyüme: zamanla boy artar ve simülasyon deterministiktir', () {
+      final species = plantCatalog.first;
+      final ideal = species.idealConditions;
+      var previous = 0.0;
+      for (var day = 0; day <= plantExperimentDays; day++) {
+        final a = simulatePlant(species, ideal, day.toDouble());
+        final b = simulatePlant(species, ideal, day.toDouble());
+        expect(a.heightCm, b.heightCm);
+        expect(a.heightCm, greaterThanOrEqualTo(previous));
+        previous = a.heightCm;
+      }
+    });
+
+    test('gerçekçi sonuçlar: kaktüs az suda büyür, çok suda çürür', () {
+      final cactus = plantCatalog.firstWhere((s) => s.id == 'kaktus');
+      final ideal = cactus.idealConditions;
+      final dry = simulatePlant(
+        cactus,
+        ideal.withLevel(PlantFactor.water, 0),
+        10,
+      );
+      final wet = simulatePlant(
+        cactus,
+        ideal.withLevel(PlantFactor.water, 2),
+        10,
+      );
+      expect(dry.heightCm, greaterThan(wet.heightCm));
+      expect(dry.health, PlantHealth.healthy);
+      expect(wet.health, PlantHealth.rotting);
+    });
+
+    test('görünüm: ışıksız → soluk, susuz → solmuş, soğuk → yavaş', () {
+      final bean = plantCatalog.firstWhere((s) => s.id == 'fasulye');
+      final ideal = bean.idealConditions;
+      expect(
+        simulatePlant(bean, ideal.withLevel(PlantFactor.light, 0), 10).health,
+        PlantHealth.pale,
+      );
+      expect(
+        simulatePlant(bean, ideal.withLevel(PlantFactor.water, 0), 10).health,
+        PlantHealth.wilted,
+      );
+      expect(
+        simulatePlant(
+          bean,
+          ideal.withLevel(PlantFactor.temperature, 0),
+          10,
+        ).health,
+        PlantHealth.slow,
+      );
+      // İlk günlerde belirti yok: bitki henüz sağlıklı görünür.
+      expect(
+        simulatePlant(bean, ideal.withLevel(PlantFactor.light, 0), 1).health,
+        PlantHealth.healthy,
+      );
+    });
+
+    test('koşullar: differingFactors ve withLevel', () {
+      const a = PlantConditions(light: 2, water: 1, temperature: 1);
+      final b = a.withLevel(PlantFactor.water, 0);
+      expect(a.differingFactors(b), [PlantFactor.water]);
+      expect(a.differingFactors(a), isEmpty);
+      expect(a == a.withLevel(PlantFactor.light, 2), isTrue);
+    });
+
+    test('deney turları adil ve tahmin edilebilir, doktor turları tek nedenli',
+        () {
+      for (var seed = 0; seed < 30; seed++) {
+        final controller = PlantLabController(random: Random(seed));
+        controller.startGame(['A']);
+        for (var round = 0; round < plantLabRoundsPerPlayer; round++) {
+          final trial = controller.currentTrial;
+          final species = trial.species;
+          if (trial.kind == PlantLabTrialKind.experiment) {
+            expect(round.isEven, isTrue);
+            expect(
+              trial.potA.differingFactors(trial.potB),
+              [trial.factor],
+              reason: 'adil deney: yalnızca test edilen etken farklı',
+            );
+            final heightA = simulatePlant(species, trial.potA, 10).heightCm;
+            final heightB = simulatePlant(species, trial.potB, 10).heightCm;
+            expect(
+              (heightA - heightB).abs(),
+              greaterThanOrEqualTo(species.maxHeightCm * 0.12),
+              reason: 'tahmin gözle ayırt edilebilmeli',
+            );
+            expect(trial.outcome, isNot(PlantPrediction.same));
+            controller.answerPrediction(trial.outcome);
+          } else {
+            expect(round.isOdd, isTrue);
+            final ideal = species.idealConditions;
+            expect(trial.potB, ideal);
+            expect(trial.potA.differingFactors(ideal), [trial.factor]);
+            final sick = simulatePlant(species, trial.potA, 10);
+            expect(sick.health, isNot(PlantHealth.healthy));
+            controller.answerDoctor(trial.factor);
+          }
+          expect(controller.lastAnswerCorrect, isTrue);
+          controller.continueAfterResult();
+        }
+        expect(controller.phase, PlantLabPhase.finished);
+      }
+    });
+
+    test('bir oyuncu üç deneyde üç farklı etkeni görür', () {
+      final controller = PlantLabController(random: Random(3));
+      controller.startGame(['A']);
+      final factors = <PlantFactor>{};
+      for (var round = 0; round < plantLabRoundsPerPlayer; round++) {
+        final trial = controller.currentTrial;
+        if (trial.kind == PlantLabTrialKind.experiment) {
+          factors.add(trial.factor);
+          controller.answerPrediction(trial.outcome);
+        } else {
+          controller.answerDoctor(trial.factor);
+        }
+        controller.continueAfterResult();
+      }
+      expect(factors, PlantFactor.values.toSet());
+    });
+
+    test('yanlış cevap puan vermez ama turu ilerletir; tur tipi korunur', () {
+      final controller = PlantLabController(random: Random(1));
+      controller.startGame(['A']);
+      final trial = controller.currentTrial;
+      expect(trial.kind, PlantLabTrialKind.experiment);
+
+      // Yanlış tahmin: doğru olmayan bir seçenek.
+      final wrong = PlantPrediction.values.firstWhere((p) => p != trial.outcome);
+      controller.answerPrediction(wrong);
+      expect(controller.lastAnswerCorrect, isFalse);
+      expect(controller.currentPlayer.correctCount, 0);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+      expect(controller.showingResult, isTrue);
+
+      // Açıklama açıkken ikinci cevap sayılmaz.
+      controller.answerPrediction(trial.outcome);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+
+      controller.continueAfterResult();
+      expect(controller.showingResult, isFalse);
+      expect(controller.currentTrial.kind, PlantLabTrialKind.doctor);
+
+      // Doktor turunda deney cevabı yok sayılır.
+      controller.answerPrediction(PlantPrediction.a);
+      expect(controller.currentPlayer.roundsPlayed, 1);
+    });
+
+    test('iki oyunculu oyun: sıra devri ve sonuç sıralaması', () {
+      final controller = PlantLabController(random: Random(5));
+      controller.startGame(['A', 'B']);
+
+      void playRound({required bool correct}) {
+        final trial = controller.currentTrial;
+        if (trial.kind == PlantLabTrialKind.experiment) {
+          controller.answerPrediction(
+            correct
+                ? trial.outcome
+                : PlantPrediction.values.firstWhere((p) => p != trial.outcome),
+          );
+        } else {
+          controller.answerDoctor(
+            correct
+                ? trial.factor
+                : PlantFactor.values.firstWhere((f) => f != trial.factor),
+          );
+        }
+        controller.continueAfterResult();
+      }
+
+      for (var i = 0; i < plantLabRoundsPerPlayer; i++) {
+        playRound(correct: true);
+      }
+      expect(controller.phase, PlantLabPhase.turnTransition);
+      expect(controller.currentPlayerIndex, 1);
+      controller.acknowledgeTurnTransition();
+      expect(controller.phase, PlantLabPhase.playing);
+      // İkinci oyuncu yeniden deney turuyla başlar.
+      expect(controller.currentTrial.kind, PlantLabTrialKind.experiment);
+
+      for (var i = 0; i < plantLabRoundsPerPlayer; i++) {
+        playRound(correct: false);
+      }
+      expect(controller.phase, PlantLabPhase.finished);
+      final ranked = controller.rankedByCorrect;
+      expect(ranked.first.name, 'A');
+      expect(ranked.first.correctCount, plantLabRoundsPerPlayer);
+      expect(ranked.last.correctCount, 0);
+
+      controller.restart();
+      expect(controller.phase, PlantLabPhase.setup);
+    });
+
+    test('serbest laboratuvar: ayarla, adil deney kontrolü, çalıştır', () {
+      final controller = PlantLabController(random: Random(2));
+      controller.startFreeLab();
+      expect(controller.phase, PlantLabPhase.freeLab);
+      expect(controller.freeDifferingFactors, isEmpty);
+
+      controller.setFreeCondition(
+        potA: false,
+        factor: PlantFactor.light,
+        level: 0,
+      );
+      expect(controller.freeDifferingFactors, [PlantFactor.light]);
+
+      controller.setFreeCondition(
+        potA: false,
+        factor: PlantFactor.water,
+        level: 2,
+      );
+      expect(controller.freeDifferingFactors.length, 2);
+
+      controller.runFreeExperiment();
+      expect(controller.freeStarted, isTrue);
+      expect(controller.freeRunCount, 1);
+
+      // Ayar değişince gözlem kapanır; bitki değişince iki saksı da idealine döner.
+      controller.setFreeCondition(
+        potA: true,
+        factor: PlantFactor.temperature,
+        level: 2,
+      );
+      expect(controller.freeStarted, isFalse);
+      final other = plantCatalog.last;
+      controller.setFreeSpecies(other);
+      expect(controller.freePotA, other.idealConditions);
+      expect(controller.freePotB, other.idealConditions);
+
+      controller.restart();
+      expect(controller.phase, PlantLabPhase.setup);
+    });
+
+    testWidgets('katalogda kart var; 1 kişilik oyun deney + doktor turlarını oynatır',
+        (tester) async {
+      await _openPlantLab(tester);
+      expect(find.text('1 Kişi'), findsOneWidget);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('plantLabStart')));
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(Scaffold).last);
+      final controller = context.read<PlantLabController>();
+      expect(controller.phase, PlantLabPhase.playing);
+
+      for (var round = 0; round < plantLabRoundsPerPlayer; round++) {
+        if (round.isEven) {
+          expect(find.byKey(const Key('plantPredictA')), findsOneWidget);
+          await tester.tap(find.byKey(const Key('plantPredictA')));
+        } else {
+          expect(
+            find.byKey(const Key('plantDoctor_light')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(const Key('plantDoctor_light')));
+        }
+        // Sonuç paneli: zaman atlamalı animasyon biter, açıklama ve Devam görünür.
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('plantExplanation')), findsOneWidget);
+        expect(find.byKey(const Key('plantDaySlider')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('plantLabContinue')));
+        await tester.pumpAndSettle();
+      }
+
+      expect(controller.phase, PlantLabPhase.finished);
+      expect(find.text('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+    });
+
+    testWidgets('serbest laboratuvar: saksıyı ayarla ve deneyi başlat',
+        (tester) async {
+      await _openPlantLab(tester);
+      await tester.tap(find.byKey(const Key('plantLabFreeLab')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('plantDaySlider')), findsNothing);
+      await tester.tap(find.byKey(const Key('potB_light_0')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Adil deney!'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('plantFreeStart')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('plantDaySlider')), findsOneWidget);
+      expect(find.textContaining('Boy:'), findsNWidgets(2));
+    });
+
+    testWidgets('dar ekranda (320 px) sonuç paneli taşmaz', (tester) async {
+      // Katalog ekranı bu testte ilgilendiğimiz şey değil; oyuna geniş ekranda
+      // girip yalnızca oyun ekranlarını dar genişlikte sınıyoruz.
+      await _openPlantLab(tester);
+      tester.view.physicalSize = const Size(320, 3000);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('plantLabStart')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('plantPredictB')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('plantLabContinue')), findsOneWidget);
+    });
+  });
+}
+
+/// Platform ana menüsünden Bitki Laboratuvarı'na girer. Katalogdaki 12. kart;
+/// görünümü uzatıyoruz ki kart ve oyun ekranındaki her düğme kaydırmadan
+/// dokunulabilir olsun (bkz. _openMultiplication).
+Future<void> _openPlantLab(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(800, 6600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(const GamePlatformApp());
+  await tester.tap(find.text('Bitki Laboratuvarı'));
+  await tester.pumpAndSettle();
 }
 
 class _FakeMoveSounds implements ChessMoveSounds {
