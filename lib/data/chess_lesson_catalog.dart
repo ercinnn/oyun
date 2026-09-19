@@ -370,6 +370,400 @@ const List<ChessLesson> chessLessons = [
     ],
   ),
 
+  ChessLesson(
+    id: 'b7',
+    level: ChessLessonLevel.baslangic,
+    title: 'Notasyon okumayı öğren',
+    summary: 'Hamle yazımı: e4, Af3, x, +, # ve rok',
+    steps: [
+      LessonInfoStep(
+        fen: _start,
+        text:
+            'Satranç hamleleri kısa bir yazıyla kaydedilir; buna notasyon denir. Oyundaki hamle '
+            'geçmişi paneli de bu yazıyı kullanır. Piyon hamlesinde yalnızca varış karesi yazılır: '
+            '"e4" demek piyon e4 karesine gitti demektir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Diğer taşlar harfle başlar: Ş = şah, V = vezir, K = kale, F = fil, A = at. '
+            '"Af3" at f3 karesine gitti, "Fc4" fil c4 karesine gitti demektir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Özel işaretler: x = taş aldı ("Axd5" at d5\'teki taşı aldı), + = şah, # = mat, '
+            '0-0 = kısa rok, 0-0-0 = uzun rok, =V = piyon vezire terfi etti ("e8=V").',
+      ),
+      LessonQuizStep(
+        question: '"Af3" hamlesinde hangi taş oynadı?',
+        options: ['At', 'Fil', 'Kale'],
+        correctIndex: 0,
+        explanation: 'A harfi attır. f3 de gittiği karedir.',
+      ),
+      LessonQuizStep(
+        question: '"Fxc6+" ne anlama gelir?',
+        options: [
+          'Fil c6\'daki taşı aldı ve şah çekti',
+          'Fil c6\'ya gitti ve mat etti',
+          'Fil c6\'ya gitti, hiçbir şey olmadı',
+        ],
+        correctIndex: 0,
+        explanation: 'x yeme, + şah demektir. Mat olsaydı # yazılırdı.',
+      ),
+      LessonMoveStep(
+        fen: _afterE4E5,
+        prompt: 'Notasyondaki "Af3" hamlesini yap.',
+        accepted: ['g1f3'],
+        highlights: ['g1'],
+        success: 'Doğru. A = at, f3 = hedef kare.',
+        wrong: 'Af3 demek g1\'deki atı f3 karesine oynamak demektir.',
+      ),
+      LessonMoveStep(
+        fen: _afterE4E5,
+        prompt: 'Şimdi "Fc4" hamlesini yap.',
+        accepted: ['f1c4'],
+        highlights: ['f1'],
+        success: 'Güzel. F = fil, c4 = hedef kare.',
+        wrong: 'Fc4 demek f1\'deki fili c4 karesine oynamak demektir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b8',
+    level: ChessLessonLevel.baslangic,
+    title: 'Vezir ve kale ile mat',
+    summary: 'Tek taşın şahla birlikte mat etmesi ve pattan kaçınma',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Vezir ya da kale, kendi şahının yardımıyla rakip şahı mat edebilir. Fikir şudur: '
+            'kendi şahın rakip şahın kaçış karelerini kapatır, taşın ise şah çeker.',
+      ),
+      LessonInfoStep(
+        fen: '7k/8/6K1/8/8/8/Q7/8 w - - 0 1',
+        highlights: ['g6', 'a2'],
+        text:
+            'Beyaz şah g6\'da h7 ve g7 karelerini kapatıyor. Geriye g8 kaçış karesi kalıyor; '
+            'vezir son sıraya gelirse hem şah çeker hem g8\'i kapatır.',
+      ),
+      LessonMoveStep(
+        fen: '7k/8/6K1/8/8/8/Q7/8 w - - 0 1',
+        prompt: 'Vezirle mat yap.',
+        anyMate: true,
+        success: 'Va8 mat! Şah çekiliyor, g7 ve h7 beyaz şah tarafından kapalı.',
+        wrong: 'Bu mat değil. Vezir son sıraya (8. sıra) gitmeli.',
+      ),
+      LessonInfoStep(
+        fen: 'k7/8/1K6/8/8/8/8/7R w - - 0 1',
+        highlights: ['b6', 'h1'],
+        text:
+            'Kale de aynı işi yapar. Beyaz şah b6\'da a7 ve b7 karelerini kapatıyor. Kale son sıraya '
+            'giderse b8 de kapanır.',
+      ),
+      LessonMoveStep(
+        fen: 'k7/8/1K6/8/8/8/8/7R w - - 0 1',
+        prompt: 'Kaleyle mat yap.',
+        anyMate: true,
+        success: 'Kh8 mat! Kale son sırayı, şah da diğer kareleri kapattı.',
+        wrong: 'Kale h1\'den h8\'e gidince son sıradaki şahı mat eder.',
+      ),
+      LessonMoveStep(
+        fen: 'k7/8/1K6/8/8/8/8/6Q1 w - - 0 1',
+        prompt: 'Dikkat: rakip şaha hiç hamle bırakmadan (pat) beraberlik olur. Pat olmadan mat yap.',
+        anyMate: true,
+        success: 'Vg8 mat. Şah çekildi, kaçış karesi kalmadığı için mat oldu, pat değil.',
+        wrong: 'Bu mat değil. Vezir g8\'e giderse son sırayı kapatıp şah çeker.',
+      ),
+      LessonQuizStep(
+        question: 'Şah çekilmiyor ama rakibin hiç yasal hamlesi de yoksa sonuç ne olur?',
+        options: ['Mat, sen kazanırsın', 'Pat, oyun berabere biter', 'Oyun devam eder'],
+        correctIndex: 1,
+        explanation:
+            'Buna pat denir ve beraberliktir. Üstün olduğunda rakip şaha bir kaçış karesi bırakmayı unutma.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b9',
+    level: ChessLessonLevel.baslangic,
+    title: 'Şahı korumak',
+    summary: 'Şah çekilince üç savunma: kaç, araya gir, yakala',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Şahın tehdit altındaysa (şah çekildiyse) hemen bir şey yapmak zorundasın. '
+            'Üç yol var: 1) Şahı kaçırmak, 2) Araya bir taş koymak, 3) Şah çeken taşı almak. '
+            'Hiçbiri mümkün değilse oyun mattır.',
+      ),
+      LessonMoveStep(
+        fen: '4r2k/8/8/8/8/8/8/4K3 w - - 0 1',
+        prompt: 'Siyah kale şah çekiyor. Şahını güvenli bir kareye kaçır.',
+        accepted: ['e1d1', 'e1f1', 'e1d2', 'e1f2'],
+        highlights: ['e8'],
+        success: 'Şah e-sütunundan çıktı, artık kale onu vuramaz.',
+        wrong: 'Şahı e-sütunundan çıkar: d ya da f sütunundaki bir kareye git.',
+      ),
+      LessonMoveStep(
+        fen: '4r2k/8/8/8/8/8/2B5/4K3 w - - 0 1',
+        prompt: 'Şahı kaçırmak yerine, filini kale ile şahın arasına koy.',
+        accepted: ['c2e4'],
+        highlights: ['e8', 'e1'],
+        success: 'Fil e4\'e girdi ve şah çekmeyi kesti. Buna araya girme denir.',
+        wrong: 'Fil c2\'den e4\'e gidebilir: e4, kale ile şahın arasında kalır.',
+      ),
+      LessonMoveStep(
+        fen: '4r2k/8/8/1B6/8/8/8/4K3 w - - 0 1',
+        prompt: 'Bu sefer şah çeken kaleyi filinle al.',
+        accepted: ['b5e8'],
+        highlights: ['e8', 'b5'],
+        success: 'Fil e8\'i aldı. Tehdit ortadan kalktı, üstelik bir kale kazandın.',
+        wrong: 'Fil b5\'ten e8\'e uzanıyor (c6, d7 boş). Kaleyi almak için o kareye git.',
+      ),
+      LessonQuizStep(
+        question: 'İki taş aynı anda şah çekerse (çifte şah) hangi savunma işe yarar?',
+        options: [
+          'Yalnızca şahı kaçırmak',
+          'Araya taş koymak',
+          'Şah çeken taşlardan birini almak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'İki taşı aynı anda durduramazsın, bu yüzden şahı kaçırmaktan başka çare yoktur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b10',
+    level: ChessLessonLevel.baslangic,
+    title: 'Bir maçın akışı',
+    summary: 'Açılış, oyun ortası ve son oyun',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Bir satranç oyunu üç bölümden oluşur: açılış, oyun ortası ve son oyun. '
+            'Bölümler arasında keskin bir çizgi yoktur, ama her birinin farklı bir hedefi vardır.',
+      ),
+      LessonInfoStep(
+        fen: _afterE4E5,
+        text:
+            'Açılış: taşlarını çıkar, merkezi tut, şahını rok ile güvenceye al. '
+            'Bu aşamada hedef, taşlarını hızla ve uyumlu şekilde geliştirmektir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Oyun ortası: taşlar aktif olduğunda plan kurma zamanı. Taktikler yakala, rakibin zayıf '
+            'noktalarına saldır, kendi şahını güvende tut. Çoğu oyun burada karar verilir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Son oyun: tahtada az taş kalır. Şah artık güvenli değil, aksine güçlü bir savaşçıdır. '
+            'Geçer piyonlar önem kazanır ve piyonun vezire terfi etmesi için yarış başlar.',
+      ),
+      LessonQuizStep(
+        question: 'Açılışın temel hedefi hangisidir?',
+        options: [
+          'Vezirle erken saldırmak',
+          'Taşları geliştirip şahı güvenceye almak',
+          'Bütün piyonları ilerletmek',
+        ],
+        correctIndex: 1,
+        explanation: 'Geliştirilmiş taşlar ve güvenli bir şah, sonraki bölümler için temeldir.',
+      ),
+      LessonQuizStep(
+        question: 'Şah hangi bölümde aktif bir savaşçıya dönüşür?',
+        options: ['Açılış', 'Oyun ortası', 'Son oyun'],
+        correctIndex: 2,
+        explanation:
+            'Vezirler gidince tehlike azalır; şah merkeze çıkıp piyonları desteklemelidir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b11',
+    level: ChessLessonLevel.baslangic,
+    title: 'Piyon hamleleri ayrıntılı',
+    summary: 'İlk hamlede iki kare, çapraz yeme ve terfi',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Piyon en küçük taştır ama kuralları en çoktur. İleri gider, geri gidemez. Normalde bir kare '
+            'ilerler; yalnızca başlangıç karesindeyse iki kare ilerleyebilir. Taş alırken ise düz '
+            'değil çapraz (bir kare ileri ve yan) gider.',
+      ),
+      LessonMarkStep(
+        fen: _start,
+        prompt: 'e2 piyonunun gidebileceği tüm kareleri işaretle.',
+        pieceSquare: 'e2',
+        success: 'Doğru: başlangıç karesindeki piyon e3 ve e4\'e gidebilir.',
+      ),
+      LessonMarkStep(
+        fen: '4k3/8/8/3p1p2/4P3/8/8/4K3 w - - 0 1',
+        prompt: 'e4 piyonunun tüm hamlelerini işaretle (ileri gitme ve taş alma dahil).',
+        pieceSquare: 'e4',
+        success: 'Piyon e5\'e ilerleyebilir, d5 ve f5\'teki taşları da çapraz alabilir.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/3p1p2/4P3/8/8/4K3 w - - 0 1',
+        prompt: 'Piyonunla d5\'teki siyah piyonu al.',
+        accepted: ['e4d5'],
+        highlights: ['d5'],
+        success: 'Piyon çapraz giderek taşı aldı. Piyon yalnızca çapraz alır, düz almaz.',
+        wrong: 'e4 piyonu bir kare çapraz ileri, d5\'e gidince taşı alır.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/4P3/8/8/8/8/8/4K3 w - - 0 1',
+        prompt: 'Piyonunu son sıraya ulaştırıp terfi ettir.',
+        accepted: ['e7e8'],
+        highlights: ['e8'],
+        success:
+            'Piyon son sıraya ulaşınca vezir, kale, fil ya da ata dönüşür; çoğunlukla vezir seçilir. Burada '
+            'yeni vezir şah da çekiyor!',
+        wrong: 'e7 piyonunu bir kare ilerlet: e8 son sıradır.',
+      ),
+      LessonQuizStep(
+        question: 'Piyon taş alırken nasıl hareket eder?',
+        options: ['Çapraz, bir kare ileri', 'Düz ileri', 'Yandan'],
+        correctIndex: 0,
+        explanation: 'Piyon düz ilerler ama çapraz alır; bu, onu diğer taşlardan ayıran özelliktir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b12',
+    level: ChessLessonLevel.baslangic,
+    title: 'Merkezi kontrol',
+    summary: 'd4, e4, d5, e5 neden önemli',
+    steps: [
+      LessonInfoStep(
+        fen: _start,
+        highlights: ['d4', 'e4', 'd5', 'e5'],
+        text:
+            'Tahtanın ortasındaki dört kare (d4, e4, d5, e5) merkezdir. Merkezdeki taş daha çok kareye '
+            'ulaşır; ayrıca iki kanada da hızla yardıma koşabilir.',
+      ),
+      LessonMoveStep(
+        fen: _start,
+        prompt: 'Merkez karesine bir piyon sür (e4 ya da d4).',
+        accepted: ['e2e4', 'd2d4'],
+        success: 'Merkeze bir piyon koydun. Piyonlar merkezde durunca taşlarını da geliştirmek kolaylaşır.',
+        wrong: 'e2 ya da d2 piyonunu iki kare ilerlet.',
+      ),
+      LessonMoveStep(
+        fen: _afterE4E5,
+        prompt: 'Şimdi bir atını geliştir ve merkeze baskı yap (Af3 ya da Ac3).',
+        accepted: ['g1f3', 'b1c3'],
+        success: 'Atlar merkeze bakınca en güçlüdür. Kenarda bir at ise az kareyi kontrol eder.',
+        wrong: 'g1 atını f3\'e ya da b1 atını c3\'e oynayabilirsin.',
+      ),
+      LessonQuizStep(
+        question: 'Aşağıdakilerden hangisi merkez karesi değildir?',
+        options: ['e4', 'd5', 'a3'],
+        correctIndex: 2,
+        explanation: 'a3 bir kenar karesidir. Merkez kareleri d4, e4, d5 ve e5\'tir.',
+      ),
+      LessonQuizStep(
+        question: 'Kenardaki at neden zayıftır?',
+        options: [
+          'Merkezdekine göre daha az kareyi kontrol eder',
+          'Kurallara göre hareket edemez',
+          'Kolayca alınır',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Merkezdeki at 8 kareye, köşedeki at yalnızca 2 kareye gidebilir. Bu yüzden "kenardaki at kederdir" denir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b13',
+    level: ChessLessonLevel.baslangic,
+    title: 'Taşları korumak',
+    summary: 'Korumasız taş ve savunmayı kurmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Bir taşın yanında onu koruyan başka bir taş yoksa o taş asılıdır: rakip onu alırsa '
+            'karşılığında bir şey alamazsın. Korunan taşı alan kişi ise kendi taşını kaybeder.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/8/3q4/2N5/8/R3K3 w - - 0 1',
+        prompt: 'Siyah vezir c3 atına saldırıyor ve at korunmuyor. Atı koru (kaleyle).',
+        accepted: ['a1a3', 'a1c1'],
+        highlights: ['c3'],
+        success:
+            'Kale atı koruyor. Artık Vxc3 dese de Kxc3 ile veziri alırsın, bu yüzden siyah almaz.',
+        wrong: 'Kaleyi c3\'ü koruyacak bir kareye götür: a3 (yatay) ya da c1 (dikey).',
+      ),
+      LessonQuizStep(
+        question: 'Korunan bir taşı almak neden çoğunlukla kötüdür?',
+        options: [
+          'Alan taş karşılıkta yenir',
+          'Kurallara aykırıdır',
+          'Sıra kaybedilir',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Alan taş, koruyan taş tarafından hemen alınır. Böylece yalnızca değer kaybedilir (takas hesabı önemlidir).',
+      ),
+      LessonQuizStep(
+        question: 'Hamleden önce kendine sorman gereken soru hangisidir?',
+        options: [
+          'Taşlarımın hangisi korumasız?',
+          'Rakip ne kadar hızlı oynuyor?',
+          'Hangi renk daha iyi?',
+        ],
+        correctIndex: 0,
+        explanation: 'Korumasız taşlarını düzenli kontrol etmek, sık yapılan en büyük hatadan seni korur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'b14',
+    level: ChessLessonLevel.baslangic,
+    title: 'Rok adım adım',
+    summary: 'Kısa rok, uzun rok ve rok yasakları',
+    steps: [
+      LessonInfoStep(
+        fen: 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
+        text:
+            'Rok, şahı güvene alıp kaleyi oyuna sokan tek hamledir. Şah iki kare kaleye doğru gider, '
+            'kale de şahın diğer yanına atlar. Kısa rok (0-0) h kalesiyle, uzun rok (0-0-0) a kalesiyle yapılır.',
+      ),
+      LessonMoveStep(
+        fen: 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
+        prompt: 'Kısa rok yap: şahı e1\'den g1\'e götür.',
+        accepted: ['e1g1'],
+        highlights: ['e1', 'h1'],
+        success: 'Kısa rok tamam: şah g1\'de, kale f1\'e geçti.',
+        wrong: 'Şahı e1\'den iki kare sağa, g1\'e götür.',
+      ),
+      LessonMoveStep(
+        fen: 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
+        prompt: 'Bu sefer uzun rok yap: şahı e1\'den c1\'e götür.',
+        accepted: ['e1c1'],
+        highlights: ['e1', 'a1'],
+        success: 'Uzun rok tamam: şah c1\'de, kale d1\'e geçti.',
+        wrong: 'Şahı e1\'den iki kare sola, c1\'e götür.',
+      ),
+      LessonInfoStep(
+        text:
+            'Rok için şartlar: şah ve o kale daha önce hiç oynamamış olmalı; ikisinin arasında taş '
+            'olmamalı; şah şu anda şah altında olmamalı; şahın geçtiği ve indiği kareler rakip tarafından '
+            'saldırı altında olmamalı.',
+      ),
+      LessonQuizStep(
+        fen: '4k3/8/8/8/8/8/5r2/R3K2R w KQ - 0 1',
+        question: 'Siyah kale f2\'de. Beyaz kısa rok yapabilir mi?',
+        options: [
+          'Hayır, şahın geçeceği f1 karesi saldırı altında',
+          'Evet, şah şu an şah altında değil',
+          'Evet, kaleler yerinde',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şah f1\'den geçerken saldırı altında kalır. Bu yüzden kısa rok yasaktır. (Uzun rok hâlâ mümkündür.)',
+      ),
+    ],
+  ),
   // ───────────────────────── ORTA ─────────────────────────
   ChessLesson(
     id: 'o1',
@@ -641,6 +1035,461 @@ const List<ChessLesson> chessLessons = [
     ],
   ),
 
+  ChessLesson(
+    id: 'o6',
+    level: ChessLessonLevel.orta,
+    title: 'Çatal ve çivileme ayrıntıları',
+    summary: 'Piyon çatalı, çivilenmiş taşa saldırmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Çatalı yalnızca at yapmaz; piyon, fil, kale ve vezir de yapabilir. Piyon çatalı özellikle '
+            'tatlıdır, çünkü en ucuz taşla iki değerli taşa birden saldırırsın.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/2r1r3/8/3P4/8/6K1 w - - 0 1',
+        prompt: 'Piyonunu öyle bir kareye it ki iki kaleye birden saldırsın.',
+        accepted: ['d3d4'],
+        highlights: ['c5', 'e5'],
+        success: 'd4 piyonu hem c5 hem e5 kalesine saldırıyor. Biri kurtulsa da diğerini alırsın.',
+        wrong: 'd3 piyonunu bir kare ilerlet: d4\'ten c5 ve e5 karelerini vurur.',
+      ),
+      LessonInfoStep(
+        text:
+            'Çivilenmiş bir taş hareket edemez (ya da edemeyecek kadar tehlikelidir). Bu yüzden '
+            'çivilenmiş taşa saldırmak çok etkilidir: kaçamaz, ancak korunabilir.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/2n5/1B6/3P4/8/8/6K1 w - - 0 1',
+        prompt: 'c6\'daki at, şahına karşı çivili. Piyonla ona saldır.',
+        accepted: ['d4d5'],
+        highlights: ['c6', 'b5'],
+        success:
+            'd5 piyonu atı vuruyor. At çivili olduğu için kaçamaz; siyah şahı kaçırsa bile at alınır.',
+        wrong: 'd4 piyonunu d5\'e it: oradan c6 atına saldırır.',
+      ),
+      LessonQuizStep(
+        question: 'Çivilenmiş bir taşa saldırmanın avantajı nedir?',
+        options: [
+          'Taş kaçamaz, korunması gerekir',
+          'Taş otomatik olarak silinir',
+          'Rakip bir hamle atlamak zorunda kalır',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Taş yerinden oynayamadığı için yalnızca korunabilir; korunmuyorsa kaybedilir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o7',
+    level: ChessLessonLevel.orta,
+    title: 'Keşif atağı ve çifte şah',
+    summary: 'Bir hamlede iki tehdit yaratmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Keşif atağında bir taşı yerinden oynatınca arkasındaki uzun menzilli taşın (kale, fil, '
+            'vezir) hattı açılır. Açılan hat şah çekiyorsa buna keşif şahı denir.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/1q6/8/8/4B3/8/8/4RK2 w - - 0 1',
+        prompt: 'Filinle veziri al: kale de keşifle şah çeker.',
+        accepted: ['e4b7'],
+        highlights: ['e4', 'e1', 'e8'],
+        success: 'Fil vezirin yerinde ve kale şah çekiyor. Siyah vezirini kurtaramadı.',
+        wrong: 'Fil e4\'ten b7\'deki veziri alabilir; kale de şahı vurur.',
+      ),
+      LessonInfoStep(
+        text:
+            'Çifte şah: hareket eden taş şah çekerken, açılan hat da şah çeker. Aynı anda iki taş şah çektiği için '
+            'rakibin tek çaresi şahı kaçırmaktır.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/8/4N3/8/8/4RK2 w - - 0 1',
+        prompt: 'Atı öyle oyna ki hem at hem kale şah çeksin (çifte şah).',
+        accepted: ['e4f6', 'e4d6'],
+        highlights: ['e8'],
+        success: 'Çifte şah! At e8\'i vuruyor, e-sütunu da kale için açıldı.',
+        wrong: 'At f6 ya da d6 karesine gitsin: oradan e8\'e saldırır ve kale de açılır.',
+      ),
+      LessonQuizStep(
+        question: 'Çifte şahta rakip nasıl kurtulabilir?',
+        options: [
+          'Yalnızca şahını kaçırarak',
+          'Araya taş koyarak',
+          'Şah çeken taşlardan birini alarak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'İki taşı aynı anda etkisiz hale getiremezsin; tek çare şahı kaçırmaktır.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o8',
+    level: ChessLessonLevel.orta,
+    title: 'Kale ve piyon son oyunu',
+    summary: 'Kaleyi geçer piyonun arkasına koymak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Kale son oyunları en sık görülen son oyunlardır. Tek bir ilkeyi öğrensen çok işine yarar: '
+            '"Kaleler geçer piyonun arkasında durur." Kendi piyonunun arkasında kale onu iter, '
+            'rakip piyonun arkasında ise onu durdurur.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/P7/8/8/3K4/7R w - - 0 1',
+        prompt: 'Kaleni a-sütununda, piyonunun arkasına yerleştir.',
+        accepted: ['h1a1'],
+        highlights: ['a5'],
+        success: 'Kale a1\'de. Piyon ilerledikçe kale onu arkadan destekler.',
+        wrong: 'Kaleyi h1\'den a1\'e götür: piyonun (a5) tam arkası.',
+      ),
+      LessonQuizStep(
+        question: 'Rakibin geçer piyonunu durdurmak için kaleni nereye koyarsın?',
+        options: [
+          'Piyonun arkasına',
+          'Piyonun önüne',
+          'Şahının yanına',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Arkadan piyona saldırırsın; piyon ilerledikçe kaleden uzaklaşmaz, sen ise hep saldırıda kalırsın.',
+      ),
+      LessonInfoStep(
+        text:
+            'Bu konunun ünlü konumları var: Lucena (kazanan kurulum, "köprü kurmak") ve Philidor '
+            '(beraberlik savunması, üçüncü sıra). İkisi de kale ve piyon son oyunlarının temelidir; '
+            'Usta seviyesine çıktığında bunları ayrıca çalışırsın.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o9',
+    level: ChessLessonLevel.orta,
+    title: 'Açık hatlar ve 7. sıra',
+    summary: 'Kaleleri aktif hatlara yerleştirmek',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Kale kapalı sütunda hareketsizdir. Açık sütun (üzerinde hiç piyon olmayan sütun) '
+            'kale için otoyoldur. Kalelerini açık sütunlara, hatta açık sütunları ele geçirmeye götür.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/pp3ppp/8/8/8/8/PP3PPP/R5K1 w - - 0 1',
+        prompt: 'Kaleni açık bir sütuna (c, d ya da e) taşı.',
+        accepted: ['a1c1', 'a1d1', 'a1e1'],
+        success: 'Kale artık açık sütunda; oradan tahtanın derinliklerine inebilir.',
+        wrong: 'c, d ve e sütunlarında hiç piyon yok. Kaleni oraya götür.',
+      ),
+      LessonInfoStep(
+        text:
+            '7. sıra: kalen rakibin 7. sırasına ulaşırsa (siyah için 2. sıra) orada çoğunlukla '
+            'piyonlar ve şah sıkışmıştır. Kale hem piyonlara saldırır hem şahı hapseder.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/pp3ppp/8/8/8/8/PP3PPP/3R2K1 w - - 0 1',
+        prompt: 'Kaleni rakibin 7. sırasına çıkar.',
+        accepted: ['d1d7'],
+        highlights: ['b7', 'f7'],
+        success: 'Kale d7\'de b7 ve f7 piyonlarına birden saldırıyor. Rakip hepsini koruyamaz.',
+        wrong: 'Açık d-sütununda ilerle ve 7. sıraya çık.',
+      ),
+      LessonQuizStep(
+        question: 'Açık sütun nedir?',
+        options: [
+          'Üzerinde hiç piyon olmayan sütun',
+          'Kalenin durduğu sütun',
+          'Şahın önündeki sütun',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Piyonsuz sütunda kale engelsiz ilerler; bu yüzden onları ele geçirmek önemlidir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o10',
+    level: ChessLessonLevel.orta,
+    title: 'Tehdit fark etme rutini',
+    summary: 'Her hamleden önce rakibin niyetini kontrol et',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Çoğu oyun, "Rakibim ne yapmak istiyor?" sorusunu sormadığı için kaybedilir. Hamle yapmadan '
+            'önce şu kısa listeyi uygula: 1) Rakip son hamlesiyle neyi tehdit ediyor? '
+            '2) Taşlarımdan biri saldırı altında mı ya da korumasız mı? 3) Benim hamlem yeni bir '
+            'açık yaratıyor mu?',
+      ),
+      LessonQuizStep(
+        fen: '4k3/8/8/8/2n5/8/3Q4/4K3 w - - 0 1',
+        question: 'Siyah at c4\'e geldi. Ne tehdit ediyor?',
+        options: [
+          'Beyaz vezire saldırıyor',
+          'Beyaz şaha şah çekiyor',
+          'Hiçbir şeye saldırmıyor',
+        ],
+        correctIndex: 0,
+        explanation: 'c4 atı d2\'yi vurur. Bunu görmeden başka bir hamle yaparsan veziri kaybedersin.',
+      ),
+      LessonQuizStep(
+        fen: '3r2k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 1',
+        question: 'Siyah kale d8\'de. Beyaz hamle yapmazsa siyahın tehdidi nedir?',
+        options: [
+          'Kd1 ile son sıra matı',
+          'Piyon almak',
+          'Şahı kovalamak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şahın önü kendi piyonlarıyla kapalı olduğu için d1\'e inen kale mat eder. '
+            'Şahına bir kaçış karesi (h2 ya da g2 piyonunu ilerleterek) açman gerekir.',
+      ),
+      LessonQuizStep(
+        question: 'Hamle yapmadan önce sormanız gereken ilk soru nedir?',
+        options: [
+          'Rakip ne tehdit ediyor?',
+          'Hangi piyonu ilerleteyim?',
+          'Vezirimi nereye çıkarayım?',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Tehdidi görmek, en iyi hamleyi aramaktan önce gelir; çünkü kaybettiğin materyal geri gelmez.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o11',
+    level: ChessLessonLevel.orta,
+    title: 'Popüler açılışlar',
+    summary: 'İtalyan, İspanyol, Sicilya ve Vezir gambiti',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Açılışların isimleri vardır; bunlar yüzlerce yıllık deneyimin kısa özetleridir. '
+            'Ezber yapmana gerek yok, fikirlerini anlaman yeter. Dört yaygın açılışa bakalım.',
+      ),
+      LessonInfoStep(
+        fen: _afterE4E5,
+        text:
+            'İtalyan oyunu: 1.e4 e5 2.Af3 Ac6 3.Fc4. Fil c4\'e çıkıp f7 karesine baskı kurar; '
+            'merkez ve hızlı gelişme hedeflenir.',
+      ),
+      LessonMoveStep(
+        fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
+        prompt: 'İtalyan oyunu: filini c4\'e çıkar.',
+        accepted: ['f1c4'],
+        success: 'İşte İtalyan oyunu. Fil f7 karesini hedef alıyor.',
+        wrong: 'Fili f1\'den c4\'e çıkar.',
+      ),
+      LessonMoveStep(
+        fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3',
+        prompt: 'İspanyol oyunu: filini bu sefer b5\'e çıkar.',
+        accepted: ['f1b5'],
+        success: 'İspanyol (Ruy Lopez): fil c6 atına baskı yapıyor. Yüzlerce yıldır oynanan bir klasik.',
+        wrong: 'Fili f1\'den b5\'e çıkar: c6 atına saldırır.',
+      ),
+      LessonMoveStep(
+        fen: 'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+        prompt: 'Sicilya savunması: siyah 1...c5 oynadı. Atını f3\'e çıkar.',
+        accepted: ['g1f3'],
+        success:
+            'Sicilya, siyahın en sert karşılıklarından biri; c5 ile merkezde asimetri yaratır.',
+        wrong: 'Atı g1\'den f3\'e çıkar.',
+      ),
+      LessonMoveStep(
+        fen: 'rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2',
+        prompt: 'Vezir gambiti: c-piyonunu c4\'e oynayıp merkez piyonuna baskı yap.',
+        accepted: ['c2c4'],
+        success:
+            'Vezir gambiti: beyaz bir piyon önerir, ama siyah alırsa genelde beyaz merkezi ele geçirir.',
+        wrong: 'c2 piyonunu c4\'e götür.',
+      ),
+      LessonQuizStep(
+        question: 'İtalyan oyununda fil hangi kareyi hedef alır?',
+        options: ['f7', 'a7', 'h8'],
+        correctIndex: 0,
+        explanation:
+            'c4 fili f7 piyonuna doğru çaprazı izler; başlangıçta o kare yalnızca şahla korunur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o12',
+    level: ChessLessonLevel.orta,
+    title: 'Vezir taktikleri',
+    summary: 'Vezir çatalı ve vezirle mat',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Vezir en güçlü taştır (9 puan) ve düz ile çapraz aynı anda saldırır. Bu yüzden çatal için '
+            'en uygun taşlardan biridir. Ama veziri erken oynatırsan rakibin gelişen taşlarıyla kovalanırsın.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/8/8/n7/8/8/8/3Q2K1 w - - 0 1',
+        prompt: 'Veziri öyle bir kareye oyna ki hem şah çeksin hem a5 atına saldırsın.',
+        accepted: ['d1d5'],
+        highlights: ['a5', 'g8'],
+        success:
+            'Vd5: çaprazda şah çekiyor, yatayda a5 atına saldırıyor. Şah kaçınca atı alırsın.',
+        wrong: 'd5 karesine bak: g8 ile a5 oradan görünüyor.',
+      ),
+      LessonMoveStep(
+        fen: '7k/8/5K2/8/8/8/8/6Q1 w - - 0 1',
+        prompt: 'Şahının desteğiyle vezirle mat et.',
+        anyMate: true,
+        success:
+            'Vg7 mat! Vezir şahın (f6) koruması altında; h8 şahının h7 ve g8 kaçış karesi yok.',
+        wrong: 'Vezir g7\'ye gitmeli: şahın onu koruyor.',
+      ),
+      LessonQuizStep(
+        question: 'Vezirle çatal yaparken hangi tehlikeye dikkat edersin?',
+        options: [
+          'Vezirin saldırdığı taş vezire karşılık verebilir mi?',
+          'Vezir yavaş hareket eder',
+          'Vezir geri gidemez',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Vezir bir kaleye kendi hattında saldırırsa kale de vezire saldırır. O yüzden çatal, karşılık veremeyen taşlara yapılır.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o13',
+    level: ChessLessonLevel.orta,
+    title: 'Fil ve at son oyunları',
+    summary: 'Hangi az taşla mat edilir, hangisiyle edilmez',
+    steps: [
+      LessonInfoStep(
+        fen: '4k3/8/8/8/8/8/8/2B1K3 w - - 0 1',
+        text:
+            'Yalnızca bir fil (ya da bir at) ile şah, rakibin çıplak şahını mat edemez: bu beraberliktir. '
+            'Oyun da bunu otomatik olarak beraberlik sayar. Mat için daha fazla materyal gerekir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Yeterli olanlar: iki fil (zıt renkli karelerde) ile mat mümkündür. Fil ile at birlikte de '
+            'mümkündür ama daha zordur. İki at ise rakip hata yapmadıkça mat edemez. Bu yüzden '
+            'materyal değişimlerini bilerek yap.',
+      ),
+      LessonQuizStep(
+        question: 'Şah + tek fil, çıplak şaha karşı ne sonuç verir?',
+        options: ['Beraberlik', 'Mat', 'Pat'],
+        correctIndex: 0,
+        explanation: 'Tek hafif taş mat için yetmez; oyun yetersiz materyalden berabere biter.',
+      ),
+      LessonQuizStep(
+        question: 'Hangi ikili tek başına şahla mat edebilir?',
+        options: ['İki fil', 'İki at', 'Bir at'],
+        correctIndex: 0,
+        explanation:
+            'İki fil birbirini tamamlar. İki at ise zorunlu mat yapamaz; ancak rakip hata yaparsa olur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o14',
+    level: ChessLessonLevel.orta,
+    title: 'Terfi ve geçer piyon',
+    summary: 'Geçer piyon, kare kuralı ve terfi',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Geçer piyon: önünde ve yan sütunlarında rakip piyon olmayan piyondur. Son sıraya kimse '
+            'engel olamaz, bu yüzden çok değerlidir. "Geçer piyon kaçmalı" sözü buradan gelir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Kare kuralı: piyonun terfi karesine kadar olan mesafeyi bir kenar kabul eden bir kare düşün. '
+            'Rakip şah sırası ona gelince bu karenin içindeyse piyona yetişir, dışındaysa yetişemez.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/4P3/8/8/8/8/8/4K3 w - - 0 1',
+        prompt: 'Geçer piyonu terfi ettir.',
+        accepted: ['e7e8'],
+        success: 'Yeni vezir e8\'de. Bir geçer piyon çoğu zaman oyunu bitirir.',
+        wrong: 'Piyonu e8\'e it.',
+      ),
+      LessonQuizStep(
+        question: 'Geçer piyon hangisidir?',
+        options: [
+          'Önünde ve yan sütunlarında rakip piyonu olmayan',
+          'En çok ilerlemiş piyon',
+          'Şahın önündeki piyon',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Rakip piyonlar onu durduramaz; yalnızca taşlar ya da şah durdurabilir.',
+      ),
+      LessonQuizStep(
+        question: 'Kare kuralı ne için kullanılır?',
+        options: [
+          'Rakip şahın piyona yetişip yetişemeyeceğini görmek için',
+          'Filin çaprazını hesaplamak için',
+          'Kaleyi terfi ettirmek için',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şah kareye sıra ona gelirken girebiliyorsa piyonu durdurur; giremiyorsa piyon terfi eder.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'o15',
+    level: ChessLessonLevel.orta,
+    title: 'Açılış tuzakları',
+    summary: 'Çoban matı ve aptal matı',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Bazı açılış hataları çok çabuk mata yol açar. Bunları tanırsan hem tuzağa düşmezsin hem de '
+            'rakip acemiyse ilk hamlelerden avantaj alabilirsin. Ama sağlam oyuncuya karşı işe yaramaz; '
+            'karşı taraf f7 karesini korursa saldırı boşa gider.',
+      ),
+      LessonInfoStep(
+        fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',
+        highlights: ['f7'],
+        text:
+            'Çoban matı: 1.e4 e5 2.Fc4 Ac6 3.Vh5?! Af6?? Vezir ve fil f7\'yi birlikte hedef alıyor; siyah '
+            'f7\'yi korumadı.',
+      ),
+      LessonMoveStep(
+        fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',
+        prompt: 'Çoban matını tamamla.',
+        anyMate: true,
+        success: 'Vxf7 mat! Vezir fil tarafından korunuyor ve şahın kaçış karesi kalmadı.',
+        wrong: 'f7 karesine bak: vezir orada fil desteğiyle mat eder.',
+      ),
+      LessonInfoStep(
+        fen: 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2',
+        highlights: ['g4', 'f3'],
+        text:
+            'Aptal matı: 1.f3 e5 2.g4 ve beyazın şah tarafı açıldı (f3, g4 piyonları e1-h4 çaprazını '
+            'açtı). Siyah bu çaprazdan bir hamleyle mat eder. Şah tarafındaki piyonları gereksiz ilerletme.',
+      ),
+      LessonMoveStep(
+        fen: 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2',
+        prompt: 'Siyah olarak veziri h4\'e oynayıp mat et.',
+        accepted: ['d8h4'],
+        highlights: ['h4'],
+        success: 'Vh4 mat! e1-h4 çaprazı açıktı ve beyazın hiçbir savunması yok.',
+        wrong: 'Vezir d8\'den h4\'e çaprazda gider.',
+      ),
+      LessonQuizStep(
+        question: 'Çoban matına karşı en basit savunma nedir?',
+        options: [
+          'f7 karesini korumak (örneğin Af6 yerine g6 ya da Vf6/Ah6)',
+          'Şahı hemen kaçırmak',
+          'Vezirle saldırmak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Tuzağın tamamı f7\'ye dayanır. Orayı korur ya da vezire tempoyla saldırırsan tehlike biter.',
+      ),
+    ],
+  ),
   // ───────────────────────── İLERİ ─────────────────────────
   ChessLesson(
     id: 'a1',
@@ -890,6 +1739,455 @@ const List<ChessLesson> chessLessons = [
         success:
             'İşte plan: at kalıcı bir üste oturdu ve merkezdeki piyonların onu koruyor.',
         wrong: 'At c3\'ten d5\'e gidebilir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a6',
+    level: ChessLessonLevel.ileri,
+    title: 'Feda taktikleri',
+    summary: 'Materyali verip karşılığında daha fazlasını almak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Feda, materyal vererek daha değerli bir şey karşılığında kazanmaktır: mat, daha çok materyal, '
+            'saldırı ya da üstün bir konum. Her feda kendine şu soruyu sordurmalı: "Karşılığında ne alıyorum?"',
+      ),
+      LessonInfoStep(
+        text:
+            'Yaygın fedalar: mat için vezir ya da kale fedası, şahın önündeki savunmayı kırmak için '
+            'fil/at fedası, kalite fedası (kaleyi bir hafif taşla değiştirmek). Kalite fedası daha çok '
+            'konumsal bir yatırımdır.',
+      ),
+      LessonMoveStep(
+        fen: '3r2k1/5ppp/8/8/8/8/4QPPP/4R1K1 w - - 0 1',
+        prompt: 'Veziri feda et: şah çekerek rakibi kaleyle almaya zorla, sonra kale mat eder.',
+        accepted: ['e2e8'],
+        highlights: ['e8'],
+        success:
+            'Ve8+! Siyahın tek cevabı Kxe8. Ardından Kxe8 mat: şahın önündeki piyonlar kaçışı kapatıyor.',
+        wrong: 'Vezir e2\'den e8\'e gitsin ve şah çeksin; arkasındaki kale devam edecek.',
+      ),
+      LessonQuizStep(
+        question: 'Bir fedayı yapmadan önce ilk sormanız gereken soru nedir?',
+        options: [
+          'Karşılığında ne alıyorum?',
+          'Rakip kızar mı?',
+          'Hangi taş daha güzel?',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Feda ancak mat, daha çok materyal ya da net bir üstünlük getiriyorsa mantıklıdır.',
+      ),
+      LessonQuizStep(
+        question: 'Kalite fedası nedir?',
+        options: [
+          'Kaleyi bir at ya da fille değiştirmek',
+          'Veziri feda etmek',
+          'Piyon vermek',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Kalite (kale ile hafif taş farkı) verilir; karşılığında konum, piyon ya da saldırı beklenir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a7',
+    level: ChessLessonLevel.ileri,
+    title: 'Zayıf kareler ve ileri karakol',
+    summary: 'Piyonla vurulamayan kareleri atlar için kullanmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Piyonlar geri gidemez. Bir piyon ilerleyince arkasında bıraktığı kareleri artık koruyamaz; '
+            'bu karelere zayıf kare denir. Hiçbir piyonla vurulamayan zayıf kareye yerleşen taşa '
+            'ileri karakol (outpost) denir.',
+      ),
+      LessonInfoStep(
+        fen: '6k1/pp3ppp/2p5/8/3P4/5N2/PP3PPP/6K1 w - - 0 1',
+        highlights: ['e5', 'd4'],
+        text:
+            'Örnek: Siyahın d ve e sütununda piyonu yok, yani hiçbir siyah piyon e5\'i vuramaz. '
+            'Beyazın d4 piyonu ise e5\'i destekler. Atın için harika bir karakol.',
+      ),
+      LessonMoveStep(
+        fen: '6k1/pp3ppp/2p5/8/3P4/5N2/PP3PPP/6K1 w - - 0 1',
+        prompt: 'Atı e5 karakoluna yerleştir.',
+        accepted: ['f3e5'],
+        success: 'At e5\'te, d4 piyonu tarafından korunuyor ve hiçbir siyah piyon onu kovamaz.',
+        wrong: 'At f3\'ten e5\'e gidebilir.',
+      ),
+      LessonQuizStep(
+        question: 'İyi bir ileri karakolun iki şartı nedir?',
+        options: [
+          'Rakip piyonlarla vurulamaz ve kendi piyonunla korunur',
+          'Tahtanın kenarındadır',
+          'Şahın yanındadır',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Piyonla atılamayan ve korunan bir taş, sonsuza dek rakibi rahatsız eder.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a8',
+    level: ChessLessonLevel.ileri,
+    title: 'Fil çifti ve at-fil dengesi',
+    summary: 'Hangi hafif taş hangi pozisyonda daha iyi',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Fil ve at yaklaşık aynı değerdedir (3 puan), ama farklı türde pozisyonlarda üstün gelir. '
+            'Fil uzun çaprazlarda, at ise kapalı pozisyonlarda ve karakollarda güçlüdür.',
+      ),
+      LessonInfoStep(
+        text:
+            'Fil çifti: iki fili birlikte tutmak, birlikte iki rengi de kapsadığı için çoğunlukla bir '
+            'avantajdır. Özellikle açık pozisyonlarda iki fil birbirini tamamlar.',
+      ),
+      LessonQuizStep(
+        question: 'Pozisyon açık ve kalabalık değilse hangi taş genellikle daha güçlüdür?',
+        options: ['Fil', 'At', 'İkisi de aynı'],
+        correctIndex: 0,
+        explanation:
+            'Fil uzun menzilli olduğu için açık tahtada tüm çaprazlara hâkim olur; at ise yavaş kalır.',
+      ),
+      LessonQuizStep(
+        question: 'Kapalı, piyonların kilitlendiği pozisyonda hangi taş genellikle daha uygundur?',
+        options: ['At', 'Fil', 'Vezir'],
+        correctIndex: 0,
+        explanation:
+            'At piyonların üstünden atlar; fil kendi piyonlarının arkasında hapsolabilir.',
+      ),
+      LessonQuizStep(
+        question: 'Fil çiftinin avantajı ne zaman en çok işe yarar?',
+        options: [
+          'Pozisyon açıldığında',
+          'Tahta kilitlendiğinde',
+          'Vezirler kalmadığında',
+        ],
+        correctIndex: 0,
+        explanation: 'Açık hatlarda iki fil, iki rengin karelerini birlikte kontrol eder.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a9',
+    level: ChessLessonLevel.ileri,
+    title: 'Savunma teknikleri',
+    summary: 'Pat, sürekli şah ve kaybedilmiş pozisyonu kurtarmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Kötü durumda pes etmek yerine kurtuluş yollarını ara. İki klasik resurs vardır: '
+            'pat (rakip şaha hiç yasal hamle kalmaması) ve sürekli şah (rakibi aynı şahları tekrar '
+            'etmeye zorlamak).',
+      ),
+      LessonInfoStep(
+        fen: '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1',
+        text:
+            'Bu pozisyon patın klasik örneği: siyah şahın hiç yasal hamlesi yok, ama şah çekilmiyor. '
+            'Oyun berabere biter. Üstün taraf, bu tuzağa düşmemeye dikkat etmeli.',
+      ),
+      LessonMoveStep(
+        fen: 'k7/8/1K6/8/8/8/8/6Q1 w - - 0 1',
+        prompt: 'Üstün taraf olarak pattan kaçın ve mat et.',
+        anyMate: true,
+        success: 'Vg8 mat. Kaçış karesi bırakmadan şah çektin.',
+        wrong: 'Mat değil. Vezir g8\'e giderse son sırayı kapatıp şah çeker.',
+      ),
+      LessonQuizStep(
+        question: 'Sürekli şah nedir?',
+        options: [
+          'Rakibi sürekli şah çekerek aynı konumları tekrarlamaya zorlamak',
+          'Şahı tahtanın ortasına götürmek',
+          'Hep aynı taşla oynamak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şahtan kaçamayan taraf aynı konumları tekrarlar ve üç kere tekrar olunca oyun berabere biter.',
+      ),
+      LessonQuizStep(
+        question: 'Kötü durumdayken pat seni nasıl kurtarabilir?',
+        options: [
+          'Rakibin şahını hamlesiz bırakıp beraberlik almak',
+          'Şahını kaçırmak',
+          'Vezirle mat etmek',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Üstün taraf dikkatsiz olursa patla oyun berabere biter; savunan taraf bunu hedefleyebilir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a10',
+    level: ChessLessonLevel.ileri,
+    title: 'Zaman ve tempo',
+    summary: 'Gelişme önceliği, tempo kazanmak ve saat yönetimi',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Tempo, satrançta bir hamlelik zaman demektir. Hamleyi boşa harcamak (aynı taşı iki kez '
+            'oynatmak, gereksiz piyon hamlesi) tempo kaybıdır; rakibi bir tehdide yanıt vermeye '
+            'zorlayarak gelişmek ise tempo kazandırır.',
+      ),
+      LessonMoveStep(
+        fen: '4k3/8/8/3q4/8/8/8/1N2K3 w - - 0 1',
+        prompt: 'Atını geliştirirken aynı anda vezire de saldır.',
+        accepted: ['b1c3'],
+        highlights: ['d5'],
+        success: 'At c3 hem gelişti hem vezire saldırdı: siyah vezirini oynatmak zorunda, sen tempo kazandın.',
+        wrong: 'At b1\'den c3\'e gidebilir: oradan d5\'e saldırır.',
+      ),
+      LessonInfoStep(
+        text:
+            'Saat de bir kaynaktır. Oyunda 5, 10 ya da 30 dakikalık süreli seçeneklerini kullanabilirsin. '
+            'Kolay hamlelere hızlı, kritik pozisyonlara uzun düşün; her hamleye eşit süre harcama.',
+      ),
+      LessonQuizStep(
+        question: 'Açılışta aynı taşı iki kez oynatmak neden çoğunlukla kötüdür?',
+        options: [
+          'Tempo kaybettirir, geliştirme gecikir',
+          'Kural dışıdır',
+          'Rakibi kızdırır',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Açılışta her hamle yeni bir taşı geliştirmeli; aynı taşı tekrar oynatmak rakibe bir hamle hediye eder.',
+      ),
+      LessonQuizStep(
+        question: 'Süreli oyunda zaman yönetimi için en iyi ilke hangisidir?',
+        options: [
+          'Basit hamlelere hızlı, kritik anlara uzun düşünmek',
+          'Her hamleye aynı süre harcamak',
+          'Hep çok hızlı oynamak',
+        ],
+        correctIndex: 0,
+        explanation: 'Süreni önemli kararlara sakla; rutin hamlelerde vakit kaybetme.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a11',
+    level: ChessLessonLevel.ileri,
+    title: 'Ünlü oyundan ders: Opera Oyunu',
+    summary: 'Morphy\'nin 1858\'deki gelişme ve saldırı klasiği',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Paul Morphy, 1858\'de Paris Operası\'nda oynanan bir gösteri oyununda Dük Karl ve Kont Isouard '
+            'ile oynadı. Oyun, "hızlı gelişme + açık hatlar + doğrudan saldırı" ilkesinin sahne örneği '
+            'olarak bilinir. Morphy siyah taşlarla değil beyazla oynadı.',
+      ),
+      LessonInfoStep(
+        text:
+            'Hamleler: 1.e4 e5 2.Af3 d6 3.d4 Fg4 4.dxe5 Fxf3 5.Vxf3 dxe5 6.Fc4 Af6 7.Vb3 Ve7 8.Ac3 c6 '
+            '9.Fg5 b5 10.Axb5 cxb5 11.Fxb5+ Abd7 12.0-0-0 Kd8 13.Kxd7 Kxd7 14.Kd1 Ve6 15.Fxd7+ Axd7 '
+            '16.Vb8+ Axb8 17.Kd8#. Son bölümü tahtada birlikte oynayalım.',
+      ),
+      LessonMoveStep(
+        fen: '4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w - - 0 16',
+        prompt: 'Morphy\'nin şaşırtıcı vezir fedasını oyna: veziri b8\'e sür.',
+        accepted: ['b3b8'],
+        highlights: ['b8'],
+        success: 'Vb8+! Siyah vezirini alan atı b8\'e çekmek zorunda; bu, mat için son kareyi boşaltıyor.',
+        wrong: 'Vezir b3\'ten b8\'e gitsin ve şah çeksin.',
+      ),
+      LessonMoveStep(
+        fen: '1n2kb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 w - - 0 17',
+        prompt: 'Şimdi kaleyle oyunu bitir.',
+        anyMate: true,
+        success: 'Kd8 mat! d8\'deki kale g5 filiyle korunuyor, siyah şahın kaçacağı yer yok.',
+        wrong: 'd-sütunu artık açık. Kaleyi d8\'e götür.',
+      ),
+      LessonQuizStep(
+        question: 'Morphy\'nin bu oyundan en çok öğrettiği ilke hangisidir?',
+        options: [
+          'Hızlı gelişme ve açık hatlar üstünlük getirir',
+          'Vezir erken çıkarılmalıdır',
+          'Piyonlar asla ilerlememelidir',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Morphy taşlarını hızla geliştirdi, rakibin gelişmemiş taşlarına karşı açık hatlardan saldırdı.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a12',
+    level: ChessLessonLevel.ileri,
+    title: 'Geri kalmış piyon ve piyon zinciri',
+    summary: 'Piyon yapısının ikinci bölümü',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Geri kalmış piyon: yanındaki piyonlar ilerlemiş, kendisi ise rakip piyon tarafından '
+            'vurulduğu için ilerleyemeyen ve arkadan korunamayan piyondur. Önündeki kare de genellikle '
+            'rakibin ileri karakolu olur.',
+      ),
+      LessonInfoStep(
+        fen: '4k3/8/4p3/3pP3/3P4/8/8/4K3 w - - 0 1',
+        highlights: ['d4', 'e5', 'd5', 'e6'],
+        text:
+            'Piyon zinciri: çapraz dizilmiş piyonlar birbirini korur. Burada beyazın zinciri d4-e5, '
+            'siyahınki d5-e6. Zincire saldırmak için tabanı (en arkadaki piyonu) hedef alırsın; taban '
+            'düşerse diğerleri de düşer.',
+      ),
+      LessonQuizStep(
+        question: 'Piyon zincirine hangi noktadan saldırmak en etkilidir?',
+        options: ['Tabanından', 'Uç piyondan', 'Ortasından'],
+        correctIndex: 0,
+        explanation:
+            'Tabandaki piyon başkalarını korur ama kendisi korunmaz. Onu almak tüm zinciri zayıflatır.',
+      ),
+      LessonQuizStep(
+        question: 'Geri kalmış piyon neden bir zayıflıktır?',
+        options: [
+          'Korunması zor ve önü rakip taşlara açık kalır',
+          'Geri gidebilir',
+          'Vezire terfi edemez',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Yanındaki piyonlar önde olduğu için ona destek kalmaz. Rakip onu hedef alır ve önüne taş yerleştirir.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a13',
+    level: ChessLessonLevel.ileri,
+    title: 'Karşı oyun ve inisiyatif',
+    summary: 'Savunmadan saldırıya geçmek',
+    steps: [
+      LessonInfoStep(
+        text:
+            'İnisiyatif, tehdit yaratan ve rakibi cevap vermeye zorlayan tarafın elindedir. İnisiyatifi '
+            'kaybedince yalnızca savunma yaparsın; ama bazen en iyi savunma, rakibin planını durdurmak '
+            'yerine kendi karşı oyununu başlatmaktır.',
+      ),
+      LessonInfoStep(
+        text:
+            'Karşı oyun için rakibin zayıf noktasına hızlı bir tehdit bulman gerekir: açılmış bir sütun, '
+            'korumasız bir taş ya da rakibin şahına açılan bir hat. Farklı kanatlara rok yapıldıysa '
+            'iki taraf da piyon hücumuyla birbirinin şahına yönelir; burada hız her şeydir.',
+      ),
+      LessonQuizStep(
+        question: 'Rakip şah tarafına saldırıyorsa ve sen savunmada zorlanıyorsan en iyi plan hangisi olabilir?',
+        options: [
+          'Karşı oyunla rakibin zayıf noktasında tehdit yaratmak',
+          'Sadece piyon hamleleri yapmak',
+          'Vezirini kaçırmak',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Rakibi kendi savunmasıyla uğraştırırsan hücumu yavaşlar. Yine de kendi şahını ihmal etme.',
+      ),
+      LessonQuizStep(
+        question: 'İnisiyatif nedir?',
+        options: [
+          'Tehdit yaratıp rakibi cevap vermeye zorlamak',
+          'İlk hamleyi yapmak',
+          'En çok taşa sahip olmak',
+        ],
+        correctIndex: 0,
+        explanation: 'İnisiyatifi elinde tutan oyunun akışını belirler.',
+      ),
+      LessonQuizStep(
+        question: 'Zıt kanatlara rok yapıldığında genel olarak ne olur?',
+        options: [
+          'İki taraf da piyonlarla birbirinin şahına saldırır ve hız önem kazanır',
+          'Oyun otomatik berabere biter',
+          'Vezirler alınır',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şahlar farklı yönlerde olduğu için piyonlar ilerleyebilir; kazanan çoğunlukla daha hızlı saldıran olur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a14',
+    level: ChessLessonLevel.ileri,
+    title: 'Vezir son oyunları',
+    summary: 'Vezir ve piyon, sürekli şah',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Vezirli son oyunlar tehlikelidir çünkü vezir hem saldırı hem de sürekli şah için çok güçlüdür. '
+            'Vezirin üstünlüğü olsa bile rakip şahın etrafında dolaşan bir vezir, sürekli şahla beraberlik '
+            'alabilir. Bu yüzden önde olan taraf, kendi şahını rakip vezirin şahlarından korumalıdır.',
+      ),
+      LessonInfoStep(
+        text:
+            'Vezir, 7. sıradaki tek piyona karşı genellikle kazanır; ancak kenar piyonlarında (a ve h) '
+            'rakip şahın konumuna göre pat tuzakları beraberlik getirebilir. Bu ayrıntı, ileri seviyede '
+            'ayrıca çalışılır.',
+      ),
+      LessonQuizStep(
+        question: 'Vezirli son oyunlarda üstün taraf en çok neyden korkmalıdır?',
+        options: [
+          'Sürekli şahtan beraberlik almaktan',
+          'Piyonların terfi etmesinden',
+          'Kale takasından',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Şahı korumasız kalan taraf, rakip vezirin sonsuz şahlarıyla kazanmış oyunu beraberliğe çevirebilir.',
+      ),
+      LessonQuizStep(
+        question: 'Şahını rakip vezirin şahlarından korumak için ne yapabilirsin?',
+        options: [
+          'Şahı piyonların ya da kendi taşlarının arkasına saklamak',
+          'Şahı tahtanın ortasına çıkarmak',
+          'Hiçbir şey yapmamak',
+        ],
+        correctIndex: 0,
+        explanation: 'Şah çeken vezire karşı araya girebilecek taşların ve piyonların arkasında güvende olur.',
+      ),
+    ],
+  ),
+  ChessLesson(
+    id: 'a15',
+    level: ChessLessonLevel.ileri,
+    title: 'Kendi oyununu analiz etme',
+    summary: 'Hataları bulmak ve ders çıkarmak',
+    steps: [
+      LessonInfoStep(
+        text:
+            'Gelişmenin en hızlı yolu oynadığın oyunları incelemektir. Oyun bittikten sonra hamle geçmişine '
+            'bak ve şu soruyu sor: "Nerede oyunun yönü değişti?" Çoğu zaman tek bir hamle ya da kaçırılmış '
+            'bir tehdit karar verir.',
+      ),
+      LessonInfoStep(
+        text:
+            'Hata türleri: 1) Taktik gözden kaçırma (asılı taş, çatal), 2) Plansızlık, 3) Açılış '
+            'ilkelerini unutmak, 4) Son oyun bilgisi eksikliği, 5) Süre yönetimi. Hangi türü sık '
+            'yaptığını bul ve o konuya çalış.',
+      ),
+      LessonQuizStep(
+        question: 'Oyun sonrası analizde ilk sorulması gereken soru hangisidir?',
+        options: [
+          'Oyunun yönü nerede değişti?',
+          'Rakip kaç yaşında?',
+          'Hangi açılışı en çok seviyorum?',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Kritik anı bulmak, aynı hatayı tekrar etmemeni sağlar; her hamleyi incelemek zorunda değilsin.',
+      ),
+      LessonQuizStep(
+        question: 'Hataları sınıflandırmanın faydası nedir?',
+        options: [
+          'Sık yaptığın hata türüne odaklanıp o konuya çalışabilirsin',
+          'Rakibi suçlayabilirsin',
+          'Oyun daha çabuk biter',
+        ],
+        correctIndex: 0,
+        explanation:
+            'Aynı türden hatalar tekrar ediyorsa, çalışmanı ona göre planlaman en verimli yoldur.',
       ),
     ],
   ),
