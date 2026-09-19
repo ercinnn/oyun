@@ -1,9 +1,10 @@
-/// Bitki Laboratuvarı'nda deneyin değiştirilebilen üç etkeni. Her etkenin üç
+/// Bitki Laboratuvarı'nda deneyin değiştirilebilen dört etkeni. Her etkenin üç
 /// kademesi vardır (0, 1, 2); kademe adları [levelLabels]'ta durur.
 enum PlantFactor {
   light('Işık', 'ışık'),
   water('Su', 'su'),
-  temperature('Sıcaklık', 'sıcaklık');
+  temperature('Sıcaklık', 'sıcaklık'),
+  altitude('Yükseklik', 'yükseklik');
 
   const PlantFactor(this.label, this.lowerLabel);
 
@@ -20,28 +21,36 @@ enum PlantFactor {
     PlantFactor.light => const ['Karanlık', 'Gölge', 'Güneş'],
     PlantFactor.water => const ['Az', 'Orta', 'Çok'],
     PlantFactor.temperature => const ['Soğuk (5°)', 'Ilık (20°)', 'Sıcak (35°)'],
+    PlantFactor.altitude => const [
+      'Alçak (deniz kenarı)',
+      'Orta (800 m)',
+      'Yüksek (2000 m)',
+    ],
   };
 }
 
 /// Her etkenin kademe sayısı.
 const int plantLevelCount = 3;
 
-/// Bir saksının koşulları: ışık, su ve sıcaklık kademeleri (0-2).
+/// Bir saksının koşulları: ışık, su, sıcaklık ve yükseklik kademeleri (0-2).
 class PlantConditions {
   const PlantConditions({
     required this.light,
     required this.water,
     required this.temperature,
+    required this.altitude,
   });
 
   final int light;
   final int water;
   final int temperature;
+  final int altitude;
 
   int levelOf(PlantFactor factor) => switch (factor) {
     PlantFactor.light => light,
     PlantFactor.water => water,
     PlantFactor.temperature => temperature,
+    PlantFactor.altitude => altitude,
   };
 
   /// [factor]'ün kademesi değiştirilmiş yeni koşullar.
@@ -49,6 +58,7 @@ class PlantConditions {
     light: factor == PlantFactor.light ? level : light,
     water: factor == PlantFactor.water ? level : water,
     temperature: factor == PlantFactor.temperature ? level : temperature,
+    altitude: factor == PlantFactor.altitude ? level : altitude,
   );
 
   /// [other]'dan farklı olan etkenler ("adil deney" kontrolü için).
@@ -68,8 +78,9 @@ class PlantConditions {
       other is PlantConditions &&
       other.light == light &&
       other.water == water &&
-      other.temperature == temperature;
+      other.temperature == temperature &&
+      other.altitude == altitude;
 
   @override
-  int get hashCode => Object.hash(light, water, temperature);
+  int get hashCode => Object.hash(light, water, temperature, altitude);
 }

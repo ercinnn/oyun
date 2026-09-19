@@ -18,9 +18,11 @@ class PlantSpecies {
     required this.lightScores,
     required this.waterScores,
     required this.temperatureScores,
+    required this.altitudeScores,
     required this.lightNote,
     required this.waterNote,
     required this.temperatureNote,
+    required this.altitudeNote,
     required this.funFact,
   });
 
@@ -29,19 +31,21 @@ class PlantSpecies {
   final String emoji;
   final PlantShape shape;
 
-  /// İdeal koşullarda 10. günde ulaşılan boy.
+  /// İdeal koşullarda 10. haftada ulaşılan boy (zaman atlamalı deney).
   final double maxHeightCm;
 
   final List<double> lightScores;
   final List<double> waterScores;
   final List<double> temperatureScores;
+  final List<double> altitudeScores;
 
-  /// Her etken için elle yazılmış açıklama cümlesi. Değişken bir kelimeye ek
+  /// Her etken için elle yazılmış açıklama cümlesi (yükseklik dahil). Değişken bir kelimeye ek
   /// getirilmez (bkz. CLAUDE.md, Simon/Çarpım Bahçesi cümle kuralı): cümleler
   /// bitkinin adıyla başlar ya da adsız yazılır.
   final String lightNote;
   final String waterNote;
   final String temperatureNote;
+  final String altitudeNote;
 
   final String funFact;
 
@@ -49,6 +53,7 @@ class PlantSpecies {
     PlantFactor.light => lightScores,
     PlantFactor.water => waterScores,
     PlantFactor.temperature => temperatureScores,
+    PlantFactor.altitude => altitudeScores,
   };
 
   double scoreOf(PlantFactor factor, int level) => scoresOf(factor)[level];
@@ -57,6 +62,7 @@ class PlantSpecies {
     PlantFactor.light => lightNote,
     PlantFactor.water => waterNote,
     PlantFactor.temperature => temperatureNote,
+    PlantFactor.altitude => altitudeNote,
   };
 
   /// Bu etken için en yüksek skorlu kademe.
@@ -69,16 +75,18 @@ class PlantSpecies {
     return best;
   }
 
-  /// Üç etkenin de en uygun olduğu koşullar.
+  /// Dört etkenin de en uygun olduğu koşullar.
   PlantConditions get idealConditions => PlantConditions(
     light: idealLevelOf(PlantFactor.light),
     water: idealLevelOf(PlantFactor.water),
     temperature: idealLevelOf(PlantFactor.temperature),
+    altitude: idealLevelOf(PlantFactor.altitude),
   );
 
-  /// Üç skorun çarpımı: herhangi bir etken kötüyse bitki toplamda zorlanır.
+  /// Dört skorun çarpımı: herhangi bir etken kötüyse bitki toplamda zorlanır.
   double overallScore(PlantConditions conditions) =>
       scoreOf(PlantFactor.light, conditions.light) *
       scoreOf(PlantFactor.water, conditions.water) *
-      scoreOf(PlantFactor.temperature, conditions.temperature);
+      scoreOf(PlantFactor.temperature, conditions.temperature) *
+      scoreOf(PlantFactor.altitude, conditions.altitude);
 }

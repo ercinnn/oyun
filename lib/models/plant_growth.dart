@@ -3,8 +3,11 @@ import 'dart:math';
 import 'plant_conditions.dart';
 import 'plant_species.dart';
 
-/// Bir deneyin süresi (gün).
-const int plantExperimentDays = 10;
+/// Bir deneyin süresi (hafta). Zaman atlamalıdır: çocuk 0-10. haftayı
+/// kaydırıcıyla gezer. "Gün" değil "hafta" denir ki ayçiçeğinin 100 cm'ye
+/// ulaşması gerçekçi dursun. [PlantSnapshot.day] ve `day` parametreleri de
+/// bu birimde (hafta) tutulur.
+const int plantExperimentWeeks = 10;
 
 /// Bitkinin görünen sağlık durumu.
 enum PlantHealth {
@@ -13,7 +16,8 @@ enum PlantHealth {
   pale('Soluk ve cılız'),
   wilted('Solmuş'),
   rotting('Yaprakları sararmış'),
-  scorched('Yaprakları yanmış');
+  scorched('Yaprakları yanmış'),
+  weak('Cılız');
 
   const PlantHealth(this.label);
   final String label;
@@ -29,10 +33,12 @@ enum PlantHealth {
     PlantHealth.rotting =>
       'Çok su köklerin nefes almasını engeller; yapraklar sararır.',
     PlantHealth.scorched => 'Fazla ışık ya da sıcak yaprak uçlarını yakar.',
+    PlantHealth.weak =>
+      'Bulunduğu yükseklik bitkiye uygun değil; büyümesi cılız kalır.',
   };
 }
 
-/// Deneyin belli bir gündeki görüntüsü.
+/// Deneyin belli bir haftadaki görüntüsü.
 class PlantSnapshot {
   const PlantSnapshot({
     required this.day,
@@ -54,22 +60,22 @@ class PlantSnapshot {
 /// Tahmin sorusunun olası cevapları.
 enum PlantPrediction { a, b, same }
 
-/// [conditions] altındaki [species]'ın [day]. gündeki durumu.
+/// [conditions] altındaki [species]'ın [day]. haftadaki durumu.
 ///
 /// Saf ve deterministiktir: rastgelelik yok, aynı girdi hep aynı sonucu verir
 /// (testler ve "aynı deney tekrar edilirse aynı sonuç çıkar" fikri için).
-/// Büyüme, üç uygunluk skorunun çarpımından ([PlantSpecies.overallScore])
+/// Büyüme, dört uygunluk skorunun çarpımından ([PlantSpecies.overallScore])
 /// türetilir; görünüm ise en zayıf etkene bakılarak seçilir.
 PlantSnapshot simulatePlant(
   PlantSpecies species,
   PlantConditions conditions,
   double day,
 ) {
-  final d = day.clamp(0.0, plantExperimentDays.toDouble()).toDouble();
+  final d = day.clamp(0.0, plantExperimentWeeks.toDouble()).toDouble();
   final overall = species.overallScore(conditions);
   const rate = 0.3;
   final progress =
-      (1 - exp(-rate * d)) / (1 - exp(-rate * plantExperimentDays));
+      (1 - exp(-rate * d)) / (1 - exp(-rate * plantExperimentWeeks));
   final growth = pow(overall, 0.6).toDouble();
 
   final heightCm = 1 + (species.maxHeightCm - 1) * growth * progress;
@@ -81,7 +87,7 @@ PlantSnapshot simulatePlant(
     heightCm: heightCm,
     leafCount: leafCount,
     vigor: 1 - stress,
-    // İlk günlerde bitki henüz "sorunlu" görünmez; belirtiler birkaç günde çıkar.
+    // İlk haftalarda bitki henüz "sorunlu" görünmez; belirtiler birkaç haftada çıkar.
     health: d >= 3 ? _healthOf(species, conditions, overall) : PlantHealth.healthy,
   );
 }
@@ -109,10 +115,11 @@ PlantHealth _healthOf(
     PlantFactor.light => tooLow ? PlantHealth.pale : PlantHealth.scorched,
     PlantFactor.water => tooLow ? PlantHealth.wilted : PlantHealth.rotting,
     PlantFactor.temperature => tooLow ? PlantHealth.slow : PlantHealth.wilted,
+    PlantFactor.altitude => PlantHealth.weak,
   };
 }
 
-/// İki saksının [plantExperimentDays]. gündeki boylarına göre hangisi daha
+/// İki saksının [plantExperimentWeeks]. haftadaki boylarına göre hangisi daha
 /// çok büyüdü. Fark yarım santimetreden azsa "aynı" sayılır.
 PlantPrediction plantOutcome(
   PlantSpecies species,
@@ -122,12 +129,12 @@ PlantPrediction plantOutcome(
   final heightA = simulatePlant(
     species,
     a,
-    plantExperimentDays.toDouble(),
+    plantExperimentWeeks.toDouble(),
   ).heightCm;
   final heightB = simulatePlant(
     species,
     b,
-    plantExperimentDays.toDouble(),
+    plantExperimentWeeks.toDouble(),
   ).heightCm;
   if ((heightA - heightB).abs() < 0.5) return PlantPrediction.same;
   return heightA > heightB ? PlantPrediction.a : PlantPrediction.b;

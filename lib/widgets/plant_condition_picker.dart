@@ -6,6 +6,7 @@ IconData plantFactorIcon(PlantFactor factor) => switch (factor) {
   PlantFactor.light => Icons.wb_sunny,
   PlantFactor.water => Icons.water_drop,
   PlantFactor.temperature => Icons.thermostat,
+  PlantFactor.altitude => Icons.terrain,
 };
 
 /// Bir saksının üç etkenini seçtiren küçük form: her etken için üç

@@ -149,7 +149,7 @@ class _ExperimentQuestion extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Sence $plantExperimentDays gün sonra hangisi daha çok büyür?',
+          'Sence $plantExperimentWeeks hafta sonra hangisi daha çok büyür?',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleSmall,
         ),
@@ -264,7 +264,7 @@ class _DoctorQuestion extends StatelessWidget {
           snapshot: simulatePlant(
             trial.species,
             trial.potA,
-            plantExperimentDays.toDouble(),
+            plantExperimentWeeks.toDouble(),
           ),
           height: 190,
         ),

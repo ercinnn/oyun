@@ -3716,7 +3716,7 @@ void main() {
         final idealHeight = simulatePlant(
           species,
           ideal,
-          plantExperimentDays.toDouble(),
+          plantExperimentWeeks.toDouble(),
         ).heightCm;
         expect(idealHeight, closeTo(species.maxHeightCm, 0.001));
         for (final factor in PlantFactor.values) {
@@ -3725,7 +3725,7 @@ void main() {
             final height = simulatePlant(
               species,
               ideal.withLevel(factor, level),
-              plantExperimentDays.toDouble(),
+              plantExperimentWeeks.toDouble(),
             ).heightCm;
             expect(
               height,
@@ -3741,7 +3741,7 @@ void main() {
       final species = plantCatalog.first;
       final ideal = species.idealConditions;
       var previous = 0.0;
-      for (var day = 0; day <= plantExperimentDays; day++) {
+      for (var day = 0; day <= plantExperimentWeeks; day++) {
         final a = simulatePlant(species, ideal, day.toDouble());
         final b = simulatePlant(species, ideal, day.toDouble());
         expect(a.heightCm, b.heightCm);
@@ -3795,7 +3795,12 @@ void main() {
     });
 
     test('koşullar: differingFactors ve withLevel', () {
-      const a = PlantConditions(light: 2, water: 1, temperature: 1);
+      const a = PlantConditions(
+        light: 2,
+        water: 1,
+        temperature: 1,
+        altitude: 0,
+      );
       final b = a.withLevel(PlantFactor.water, 0);
       expect(a.differingFactors(b), [PlantFactor.water]);
       expect(a.differingFactors(a), isEmpty);
@@ -3842,7 +3847,7 @@ void main() {
       }
     });
 
-    test('bir oyuncu üç deneyde üç farklı etkeni görür', () {
+    test('bir oyuncu dört deneyde dört etkeni de birer kez görür', () {
       final controller = PlantLabController(random: Random(3));
       controller.startGame(['A']);
       final factors = <PlantFactor>{};
@@ -3857,6 +3862,55 @@ void main() {
         controller.continueAfterResult();
       }
       expect(factors, PlantFactor.values.toSet());
+    });
+
+    test('istenen bitkiler katalogda var ve en az 25 bitki bulunur', () {
+      final ids = plantCatalog.map((s) => s.id).toSet();
+      for (final id in [
+        'cilek',
+        'limon',
+        'karpuz',
+        'seftali',
+        'muz',
+        'cay',
+        'kahve',
+        'bugday',
+        'pirinc',
+      ]) {
+        expect(ids, contains(id));
+      }
+      expect(plantCatalog.length, greaterThanOrEqualTo(25));
+    });
+
+    test('yükseklik etkeni: kahve yüksekte, muz ve pirinç alçakta iyi büyür', () {
+      double heightAt(String id, int level) {
+        final species = plantCatalog.firstWhere((s) => s.id == id);
+        return simulatePlant(
+          species,
+          species.idealConditions.withLevel(PlantFactor.altitude, level),
+          plantExperimentWeeks.toDouble(),
+        ).heightCm;
+      }
+
+      // Kahve: yüksek > orta > alçak.
+      expect(heightAt('kahve', 2), greaterThan(heightAt('kahve', 1)));
+      expect(heightAt('kahve', 1), greaterThan(heightAt('kahve', 0)));
+      // Muz, pirinç ve limon: alçak > yüksek.
+      for (final id in ['muz', 'pirinc', 'limon']) {
+        expect(heightAt(id, 0), greaterThan(heightAt(id, 2)), reason: id);
+      }
+      // Çay: en iyisi orta yükseklik.
+      final tea = plantCatalog.firstWhere((s) => s.id == 'cay');
+      expect(tea.idealLevelOf(PlantFactor.altitude), 1);
+
+      // Yanlış yükseklikte bitki "cılız" görünür.
+      final coffee = plantCatalog.firstWhere((s) => s.id == 'kahve');
+      final lowland = simulatePlant(
+        coffee,
+        coffee.idealConditions.withLevel(PlantFactor.altitude, 0),
+        plantExperimentWeeks.toDouble(),
+      );
+      expect(lowland.health, PlantHealth.weak);
     });
 
     test('yanlış cevap puan vermez ama turu ilerletir; tur tipi korunur', () {

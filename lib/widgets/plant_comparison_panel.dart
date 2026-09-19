@@ -35,11 +35,11 @@ class _PlantComparisonPanelState extends State<PlantComparisonPanel>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  /// Çocuk kaydırıcıyı tuttuysa seçtiği gün; null ise animasyon günü belirler.
+  /// Çocuk kaydırıcıyı tuttuysa seçtiği hafta; null ise animasyon haftayı belirler.
   double? _manualDay;
 
   double get _day =>
-      _manualDay ?? _controller.value * plantExperimentDays.toDouble();
+      _manualDay ?? _controller.value * plantExperimentWeeks.toDouble();
 
   @override
   void initState() {
@@ -105,7 +105,7 @@ class _PlantComparisonPanelState extends State<PlantComparisonPanel>
         ),
         const SizedBox(height: 8),
         Text(
-          'Gün: ${day.round()} / $plantExperimentDays',
+          'Hafta: ${day.round()} / $plantExperimentWeeks',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleSmall,
         ),
@@ -113,8 +113,8 @@ class _PlantComparisonPanelState extends State<PlantComparisonPanel>
           key: const Key('plantDaySlider'),
           value: day,
           min: 0,
-          max: plantExperimentDays.toDouble(),
-          divisions: plantExperimentDays,
+          max: plantExperimentWeeks.toDouble(),
+          divisions: plantExperimentWeeks,
           onChanged: (value) {
             _controller.stop();
             setState(() => _manualDay = value);
@@ -128,7 +128,7 @@ class _PlantComparisonPanelState extends State<PlantComparisonPanel>
         ),
         const SizedBox(height: 4),
         Text(
-          'Grafik: bitkilerin boyu günlere göre. Mavi ${widget.labelA}, turuncu ${widget.labelB}.',
+          'Grafik: bitkilerin boyu haftalara göre. Mavi ${widget.labelA}, turuncu ${widget.labelB}.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),

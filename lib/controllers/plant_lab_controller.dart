@@ -13,9 +13,9 @@ import '../models/plant_species.dart';
 /// Her oyuncunun oynadığı tur sayısı. Diğer tur tabanlı oyunların sabitleriyle
 /// aynı adı kullanmıyoruz (test/widget_test.dart hepsini birlikte import eder;
 /// aynı ad "ambiguous import" hatası verir).
-const int plantLabRoundsPerPlayer = 6;
+const int plantLabRoundsPerPlayer = 8;
 
-/// Bir deney turunda iki bitkinin 10. gündeki boy farkının, bitkinin ideal
+/// Bir deney turunda iki bitkinin 10. haftadaki boy farkının, bitkinin ideal
 /// boyuna oranla en az ne kadar olacağı. Fark bundan küçükse çocuğun tahmini
 /// gözle ayırt edilemez; böyle çiftler üretilmez.
 const double _minHeightGapRatio = 0.12;
@@ -198,7 +198,7 @@ class PlantLabController extends ChangeNotifier {
   }
 
   PlantLabTrial _generateTrial() {
-    // Tur tipi dönüşümlü: 1./3./5. tur deney, 2./4./6. tur doktor.
+    // Tur tipi dönüşümlü: 1./3./5./7. tur deney, 2./4./6./8. tur doktor.
     final round = currentPlayer.roundsPlayed;
     final species = plantCatalog[_rng.nextInt(plantCatalog.length)];
     return round.isEven
@@ -207,8 +207,8 @@ class PlantLabController extends ChangeNotifier {
   }
 
   /// Deney turu: iki saksı yalnızca test edilen etkende farklıdır. Etken
-  /// dönüşümlü seçilir (`pairIndex + _factorOffset`), böylece bir oyuncu üç
-  /// deneyde ışığı, suyu ve sıcaklığı birer kez görür.
+  /// dönüşümlü seçilir (`pairIndex + _factorOffset`), böylece bir oyuncu dört
+  /// deneyde ışığı, suyu, sıcaklığı ve yüksekliği birer kez görür.
   PlantLabTrial _experimentTrial(PlantSpecies species, int pairIndex) {
     final factor =
         PlantFactor.values[(pairIndex + _factorOffset) %
@@ -217,7 +217,7 @@ class PlantLabController extends ChangeNotifier {
     final minGap = species.maxHeightCm * _minHeightGapRatio;
 
     double finalHeight(PlantConditions c) =>
-        simulatePlant(species, c, plantExperimentDays.toDouble()).heightCm;
+        simulatePlant(species, c, plantExperimentWeeks.toDouble()).heightCm;
 
     for (var attempt = 0; attempt < 50; attempt++) {
       final levelA = _rng.nextInt(plantLevelCount);

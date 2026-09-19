@@ -52,6 +52,12 @@ class PlantLabTrial {
         tooLow
             ? 'Neredeyse hiç büyümemiş, yaprakları küçük kalmış.'
             : 'Yaprakları buruşmuş ve kıvrılmış.',
+      PlantFactor.altitude =>
+        tooLow
+            ? 'Bitki bir ovada, deniz kenarına yakın bir yerde duruyor ama orası '
+                  'ona uygun değil; cılız kalmış.'
+            : 'Bitki yüksek bir dağ yamacında duruyor ama orası ona uygun '
+                  'değil; cılız kalmış.',
     };
   }
 
@@ -69,12 +75,12 @@ class PlantLabTrial {
     final healthA = simulatePlant(
       species,
       potA,
-      plantExperimentDays.toDouble(),
+      plantExperimentWeeks.toDouble(),
     ).health;
     final healthB = simulatePlant(
       species,
       potB,
-      plantExperimentDays.toDouble(),
+      plantExperimentWeeks.toDouble(),
     ).health;
     return '$winner ${species.noteOf(factor)} '
         'A: ${healthA.label}. B: ${healthB.label}. '

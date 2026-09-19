@@ -49,6 +49,8 @@ Color plantLeafColor(PlantSnapshot snapshot) {
       return const Color(0xFFE3C43B);
     case PlantHealth.scorched:
       return const Color(0xFF9C7A5B);
+    case PlantHealth.weak:
+      return const Color(0xFFA5C48A);
   }
 }
 
@@ -144,7 +146,9 @@ class _PlantPainter extends CustomPainter {
 
     final leafLength =
         min(size.width * 0.22, 12 + fraction * 22) *
-        (snapshot.health == PlantHealth.slow ? 0.7 : 1.0);
+        (snapshot.health == PlantHealth.slow || snapshot.health == PlantHealth.weak
+            ? 0.7
+            : 1.0);
     final paint = Paint()..color = leafColor;
     final count = snapshot.leafCount;
 

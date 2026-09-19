@@ -82,13 +82,13 @@ class _ChartPainter extends CustomPainter {
     }
 
     Offset point(double d, double heightCm) => Offset(
-      plot.left + plot.width * d / plantExperimentDays,
+      plot.left + plot.width * d / plantExperimentWeeks,
       plot.bottom - plot.height * (heightCm / species.maxHeightCm).clamp(0, 1),
     );
 
     void drawSeries(PlantConditions conditions, Color color) {
       final path = Path();
-      for (var d = 0; d <= plantExperimentDays; d++) {
+      for (var d = 0; d <= plantExperimentWeeks; d++) {
         final p = point(
           d.toDouble(),
           simulatePlant(species, conditions, d.toDouble()).heightCm,
@@ -115,8 +115,8 @@ class _ChartPainter extends CustomPainter {
       );
     }
 
-    // O anki günü gösteren dikey çizgi.
-    final x = plot.left + plot.width * day / plantExperimentDays;
+    // O anki haftayı gösteren dikey çizgi.
+    final x = plot.left + plot.width * day / plantExperimentWeeks;
     canvas.drawLine(
       Offset(x, plot.top),
       Offset(x, plot.bottom),
