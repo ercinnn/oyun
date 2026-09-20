@@ -6,6 +6,7 @@ import 'package:three_js/three_js.dart' as three;
 import '../models/town/avatar_spec.dart';
 import '../models/town/town_map.dart';
 import '../models/town/town_world.dart';
+import 'avatar_3d.dart';
 import 'world_input_layer.dart';
 
 /// Kasabanın gerçek 3D görünümü (three_js). `IsoWorldView` ile aynı sözleşmeyi
@@ -55,6 +56,8 @@ class _Town3DViewState extends State<Town3DView> {
   static const _camHeight = 8.5;
 
   three.Group? _avatar;
+  Avatar3D? _playerRig;
+  final List<Avatar3D> _npcRigs = [];
   three.DirectionalLight? _sun;
   double _heading = 0;
   double _lastX = 0;
@@ -90,8 +93,6 @@ class _Town3DViewState extends State<Town3DView> {
     three.loading.clear();
     super.dispose();
   }
-
-  static int _hex(Color c) => c.toARGB32() & 0xFFFFFF;
 
   static int _tileColor(TileKind kind) => switch (kind) {
     TileKind.road => 0xB0BEC5,
@@ -377,59 +378,24 @@ class _Town3DViewState extends State<Town3DView> {
         );
       }
       node.rotation.y = _npcHeading[i];
+      if (i < _npcRigs.length) {
+        _npcRigs[i].update(world.time, npc.moving, phase: i * 1.7);
+      }
       _npcLast[i] = Offset(npc.x, npc.y);
     }
   }
 
-  /// Basit yer tutucu karakter: gövde + kafa + saç. `AvatarSpec` renkleri
-  /// kullanılır; şapka/aksesuar/yüz sonraki adımlarda.
+  /// Karakteri kurar ([Avatar3D]: `AvatarSpec`'teki saç/kıyafet/şapka/aksesuar
+  /// dahil) ve animasyon için kaydeder. [forSpec] null ise oyuncudur.
   three.Group _buildAvatar([AvatarSpec? forSpec]) {
-    final spec = forSpec ?? widget.avatar;
-    final group = three.Group();
-
-    three.Mesh part(three.BufferGeometry g, Color c, double y) {
-      final mesh = three.Mesh(
-        g,
-        three.MeshStandardMaterial.fromMap({'color': _hex(c)}),
-      );
-      mesh.position.y = y;
-      mesh.castShadow = true;
-      return mesh;
+    final rig = Avatar3D.build(forSpec ?? widget.avatar);
+    if (forSpec == null) {
+      _playerRig = rig;
+      _avatar = rig.root;
+    } else {
+      _npcRigs.add(rig);
     }
-
-    group.add(
-      part(
-        three.BoxGeometry(0.42, 0.5, 0.26),
-        outfitPalette[spec.outfitColor % outfitPalette.length],
-        0.5,
-      ),
-    );
-    group.add(
-      part(
-        three.SphereGeometry(0.19, 16, 12),
-        skinPalette[spec.skin % skinPalette.length],
-        0.95,
-      ),
-    );
-    group.add(
-      part(
-        three.BoxGeometry(0.4, 0.09, 0.36),
-        hairPalette[spec.hairColor % hairPalette.length],
-        1.13,
-      ),
-    );
-    // Ayaklar.
-    for (final side in [-1.0, 1.0]) {
-      final foot = part(
-        three.BoxGeometry(0.16, 0.22, 0.2),
-        const Color(0xFF37474F),
-        0.11,
-      );
-      foot.position.x = side * 0.11;
-      group.add(foot);
-    }
-    if (forSpec == null) _avatar = group;
-    return group;
+    return rig.root;
   }
 
   void _placeCamera(
@@ -472,6 +438,7 @@ class _Town3DViewState extends State<Town3DView> {
         _heading = _turn(_heading, atan2(mx, my), min(1.0, dt * 14));
       }
       avatar.rotation.y = _heading;
+      _playerRig?.update(world.time, world.moving);
       // Yürürken hafif zıplama.
       avatar.position.y = world.moving
           ? (sin(world.time * 14).abs() * 0.07)
