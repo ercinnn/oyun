@@ -23,6 +23,10 @@ class _Drawable {
 double buildingDepth(TownBuilding building) =>
     building.x + building.y + building.h.toDouble();
 
+/// Bina duvar ve çatı yükseklikleri (piksel, dünya birimi).
+const double buildingWallHeight = 58;
+const double buildingRoofHeight = 34;
+
 /// Tek karelik nesnenin (ağaç, lamba, altın…) derinlik anahtarı.
 double tileObjectDepth(double x, double y) => x + y;
 
@@ -110,7 +114,8 @@ class IsoWorldPainter extends CustomPainter {
     for (final b in world.map.buildings) {
       final left = IsoProjection.toScreen(b.x.toDouble(), (b.y + b.h).toDouble()).dx;
       final right = IsoProjection.toScreen((b.x + b.w).toDouble(), b.y.toDouble()).dx;
-      final top = IsoProjection.toScreen(b.x.toDouble(), b.y.toDouble()).dy - 78;
+      final top = IsoProjection.toScreen(b.x.toDouble(), b.y.toDouble()).dy -
+          (buildingWallHeight + buildingRoofHeight + 8);
       final bottom =
           IsoProjection.toScreen((b.x + b.w).toDouble(), (b.y + b.h).toDouble()).dy;
       if (Rect.fromLTRB(left, top, right, bottom).contains(p)) {
@@ -331,72 +336,422 @@ class IsoWorldPainter extends CustomPainter {
 
   // Binalar ────────────────────────────────────────────────
 
-  void _paintBuilding(Canvas canvas, TownBuilding b) {
-    const heightPx = 78.0;
-    final up = const Offset(0, -heightPx);
-    final p00 = IsoProjection.toScreen(b.x.toDouble(), b.y.toDouble());
-    final p10 = IsoProjection.toScreen((b.x + b.w).toDouble(), b.y.toDouble());
-    final p11 = IsoProjection.toScreen((b.x + b.w).toDouble(), (b.y + b.h).toDouble());
-    final p01 = IsoProjection.toScreen(b.x.toDouble(), (b.y + b.h).toDouble());
+  static Color _shade(Color c, double t) => t >= 0
+      ? Color.lerp(c, const Color(0xFF000000), t)!
+      : Color.lerp(c, const Color(0xFFFFFFFF), -t)!;
 
-    final (wall, roof) = switch (b.kind) {
-      DoorKind.wardrobe => (const Color(0xFFF48FB1), const Color(0xFFAD1457)),
-      DoorKind.market => (const Color(0xFFFFB74D), const Color(0xFFE65100)),
-      DoorKind.home => (const Color(0xFF64B5F6), const Color(0xFF1565C0)),
-      DoorKind.arcade => (const Color(0xFFB39DDB), const Color(0xFF4527A0)),
+  /// Üç boyutlu (duvarlı, kirişli çatılı, kapılı, pencereli) bina. Işık sol
+  /// üstten gelir: sol-ön yüz aydınlık, sağ-ön yüz gölgede; çatı, saçak,
+  /// pervaz, denizlik, gölge ve zemin kararması gradyan/alfa ile verilir.
+  /// Hepsi `Canvas` ile çizilir (resim yok).
+  void _paintBuilding(Canvas canvas, TownBuilding b) {
+    const wallH = buildingWallHeight;
+    const roofH = buildingRoofHeight;
+    final x0 = b.x.toDouble(), y0 = b.y.toDouble();
+    final x1 = x0 + b.w, y1 = y0 + b.h;
+    final cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+
+    Offset pt(double x, double y, [double z = 0]) =>
+        IsoProjection.toScreen(x, y) + Offset(0, -z);
+
+    final (wall, roof, trim) = switch (b.kind) {
+      DoorKind.wardrobe => (
+        const Color(0xFFF8BBD0),
+        const Color(0xFFC2185B),
+        const Color(0xFFFFF3F8),
+      ),
+      DoorKind.market => (
+        const Color(0xFFFFE0B2),
+        const Color(0xFFE65100),
+        const Color(0xFFFFF8E1),
+      ),
+      DoorKind.home => (
+        const Color(0xFFBBDEFB),
+        const Color(0xFF8D3B2E),
+        const Color(0xFFFFFFFF),
+      ),
+      DoorKind.arcade => (
+        const Color(0xFFB39DDB),
+        const Color(0xFF311B92),
+        const Color(0xFFEDE7F6),
+      ),
     };
 
-    Path quad(Offset a, Offset bb, Offset c, Offset d) => Path()
-      ..moveTo(a.dx, a.dy)
-      ..lineTo(bb.dx, bb.dy)
-      ..lineTo(c.dx, c.dy)
-      ..lineTo(d.dx, d.dy)
-      ..close();
+    Path poly(List<Offset> pts) {
+      final p = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (final o in pts.skip(1)) {
+        p.lineTo(o.dx, o.dy);
+      }
+      return p..close();
+    }
 
-    final paint = Paint();
-    // Yer gölgesi.
-    paint.color = const Color(0x22000000);
-    canvas.drawPath(quad(p00 + const Offset(6, 4), p10 + const Offset(6, 4), p11 + const Offset(6, 4), p01 + const Offset(6, 4)), paint);
+    void fill(Path p, Color c) => canvas.drawPath(p, Paint()..color = c);
 
-    // Sol-ön (güneybatı) yüz ve sağ-ön (güneydoğu) yüz.
-    paint.color = Color.lerp(wall, const Color(0xFF000000), 0.06)!;
-    canvas.drawPath(quad(p01, p11, p11 + up, p01 + up), paint);
-    paint.color = Color.lerp(wall, const Color(0xFF000000), 0.24)!;
-    canvas.drawPath(quad(p11, p10, p10 + up, p11 + up), paint);
-
-    // Çatı: hafif taşan üst yüz.
-    final center = (p00 + p11) / 2 + up;
-    Offset grow(Offset p) => center + (p + up - center) * 1.07;
-    paint.color = Color.lerp(roof, const Color(0xFF000000), 0.2)!;
-    canvas.drawPath(quad(grow(p00), grow(p10), grow(p11), grow(p01)), paint);
-    paint.color = roof;
-    canvas.drawPath(quad(p00 + up, p10 + up, p11 + up, p01 + up), paint);
-
-    // Pencereler (güneybatı yüzü).
-    Offset onFace(double t, double h) => p01 + (p11 - p01) * t + Offset(0, -h);
-    paint.color = const Color(0xFFE3F2FD);
-    for (final t in [0.18, 0.72]) {
+    void gradient(Path p, Color top, Color bottom) {
+      final r = p.getBounds();
       canvas.drawPath(
-        quad(onFace(t, 38), onFace(t + 0.1, 38), onFace(t + 0.1, 58), onFace(t, 58)),
-        paint,
+        p,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [top, bottom],
+          ).createShader(r),
       );
     }
-    // Kapı.
-    final doorT = ((b.doorX + 0.5 - b.x) / b.w).clamp(0.1, 0.9);
-    paint.color = const Color(0xFF6D4C41);
-    canvas.drawPath(
-      quad(
-        onFace(doorT - 0.07, 0),
-        onFace(doorT + 0.07, 0),
-        onFace(doorT + 0.07, 30),
-        onFace(doorT - 0.07, 30),
-      ),
-      paint,
+
+    void line(Offset a, Offset c, Color color, double width) {
+      canvas.drawLine(
+        a,
+        c,
+        Paint()
+          ..color = color
+          ..strokeWidth = width
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
+    // Bir yüzün (A→B, yerden z0..z1 arası, t0..t1 aralığı) dörtgeni.
+    Path faceQuad(Offset a, Offset c, double t0, double t1, double z0, double z1) {
+      Offset at(double t, double z) => a + (c - a) * t + Offset(0, -z);
+      return poly([at(t0, z0), at(t1, z0), at(t1, z1), at(t0, z1)]);
+    }
+
+    // ── Gölge: ışık sol üstten, gölge sağ-alta düşer (iki katman = yumuşak).
+    final p00 = pt(x0, y0), p10 = pt(x1, y0), p11 = pt(x1, y1), p01 = pt(x0, y1);
+    for (final (shift, alpha) in [
+      (const Offset(34, 15), 0x14),
+      (const Offset(22, 10), 0x1A),
+      (const Offset(10, 5), 0x22),
+    ]) {
+      fill(
+        poly([p00 + shift, p10 + shift, p11 + shift, p01 + shift, p01, p11]),
+        Color.fromARGB(alpha, 0, 0, 0),
+      );
+    }
+
+    // Kapı basamağı (yerde, kapının önünde).
+    final doorFrac = ((b.doorX + 0.5 - b.x) / b.w).clamp(0.1, 0.9);
+    final doorX = x0 + b.w * doorFrac;
+    fill(
+      poly([
+        pt(doorX - 0.36, y1),
+        pt(doorX + 0.36, y1),
+        pt(doorX + 0.36, y1 + 0.16),
+        pt(doorX - 0.36, y1 + 0.16),
+      ]),
+      const Color(0xFFCFD8DC),
     );
 
-    // Çatı tabelası: yazı tipine bağlı emoji yerine paketli ikon fontu (emoji
-    // yazı tipi geç yüklenirse önbellekteki çizim kutucuk gösterirdi).
-    _paintIcon(canvas, _signIcon(b.kind), center + const Offset(0, 2), 30);
+    // ── Duvarlar.
+    final frontA = p01, frontB = p11; // sol-ön yüz (y1 kenarı), t: x boyunca
+    final sideA = p11, sideB = p10; // sağ-ön yüz (x1 kenarı), t: y boyunca
+    final frontW = b.w.toDouble(), sideW = b.h.toDouble();
+
+    gradient(
+      faceQuad(frontA, frontB, 0, 1, 0, wallH),
+      _shade(wall, -0.10),
+      _shade(wall, 0.06),
+    );
+    gradient(
+      faceQuad(sideA, sideB, 0, 1, 0, wallH),
+      _shade(wall, 0.16),
+      _shade(wall, 0.32),
+    );
+
+    // Yatay kaplama çizgileri.
+    for (var z = 12.0; z < wallH - 6; z += 9) {
+      line(
+        frontA + Offset(0, -z),
+        frontB + Offset(0, -z),
+        const Color(0x14000000),
+        1,
+      );
+      line(
+        sideA + Offset(0, -z),
+        sideB + Offset(0, -z),
+        const Color(0x18000000),
+        1,
+      );
+    }
+
+    // Taş temel.
+    fill(faceQuad(frontA, frontB, 0, 1, 0, 7), const Color(0xFF90A4AE));
+    fill(faceQuad(sideA, sideB, 0, 1, 0, 7), const Color(0xFF607D8B));
+    line(frontA + const Offset(0, -7), frontB + const Offset(0, -7),
+        const Color(0x55FFFFFF), 1);
+
+    // Köşe pervazları.
+    final cornerFront = 0.09 / frontW, cornerSide = 0.09 / sideW;
+    fill(faceQuad(frontA, frontB, 0, cornerFront, 0, wallH), _shade(trim, 0.04));
+    fill(faceQuad(frontA, frontB, 1 - cornerFront, 1, 0, wallH), _shade(trim, 0.12));
+    fill(faceQuad(sideA, sideB, 0, cornerSide, 0, wallH), _shade(trim, 0.16));
+    fill(faceQuad(sideA, sideB, 1 - cornerSide, 1, 0, wallH), _shade(trim, 0.26));
+
+    // Saçak altı gölgesi ve silme.
+    gradient(
+      faceQuad(frontA, frontB, 0, 1, wallH - 18, wallH - 6),
+      const Color(0x00000000),
+      const Color(0x44000000),
+    );
+    gradient(
+      faceQuad(sideA, sideB, 0, 1, wallH - 18, wallH - 6),
+      const Color(0x00000000),
+      const Color(0x4D000000),
+    );
+    fill(faceQuad(frontA, frontB, 0, 1, wallH - 6, wallH), trim);
+    fill(faceQuad(sideA, sideB, 0, 1, wallH - 6, wallH), _shade(trim, 0.2));
+
+    // Zemin teması karartması.
+    gradient(
+      faceQuad(frontA, frontB, 0, 1, 7, 16),
+      const Color(0x00000000),
+      const Color(0x18000000),
+    );
+
+    // ── Pencereler.
+    void window(Offset a, Offset c, double n, int i, {required bool lit}) {
+      final mid = (i + 0.5) / n;
+      final half = 0.22 / n;
+      const z0 = 28.0, z1 = 47.0;
+      final sh = 0.05 / n;
+      // Çerçeve.
+      fill(faceQuad(a, c, mid - half - sh, mid + half + sh, z0 - 2.5, z1 + 2.5), trim);
+      // Cam.
+      final glass = faceQuad(a, c, mid - half, mid + half, z0, z1);
+      if (lit) {
+        gradient(glass, const Color(0xFFFF80AB), const Color(0xFF7C4DFF));
+      } else {
+        gradient(glass, const Color(0xFFE1F5FE), const Color(0xFF4FC3F7));
+        // Yansıma.
+        fill(
+          faceQuad(a, c, mid - half, mid - half * 0.2, z0 + (z1 - z0) * 0.55, z1),
+          const Color(0x55FFFFFF),
+        );
+      }
+      // Ara çıtalar.
+      final zm = (z0 + z1) / 2;
+      final left = a + (c - a) * (mid - half);
+      final right = a + (c - a) * (mid + half);
+      final top = a + (c - a) * mid;
+      line(left + Offset(0, -zm), right + Offset(0, -zm), trim, 1.4);
+      line(top + const Offset(0, -z0), top + const Offset(0, -z1), trim, 1.4);
+      // Denizlik.
+      fill(
+        faceQuad(a, c, mid - half - sh * 1.6, mid + half + sh * 1.6, z0 - 5, z0 - 2.5),
+        _shade(trim, 0.18),
+      );
+      if (b.kind == DoorKind.home) {
+        // Panjur + çiçek kasası.
+        const shutter = Color(0xFF2E7D32);
+        fill(faceQuad(a, c, mid - half - sh * 4.2, mid - half - sh, z0 - 2.5, z1 + 2.5), shutter);
+        fill(faceQuad(a, c, mid + half + sh, mid + half + sh * 4.2, z0 - 2.5, z1 + 2.5), shutter);
+        fill(faceQuad(a, c, mid - half, mid + half, z0 - 11, z0 - 5), const Color(0xFF6D4C41));
+        for (var k = 0; k < 4; k++) {
+          final t = mid - half + (2 * half) * (k + 0.5) / 4;
+          final p = a + (c - a) * t + Offset(0, -(z0 - 11));
+          canvas.drawCircle(p, 2.1, Paint()..color = k.isEven ? const Color(0xFFFF5252) : const Color(0xFFFFEB3B));
+        }
+      }
+    }
+
+    final doorCol = (b.doorX - b.x).clamp(0, b.w - 1);
+    for (var i = 0; i < b.w; i++) {
+      if (i == doorCol) continue;
+      window(frontA, frontB, frontW, i, lit: b.kind == DoorKind.arcade);
+    }
+    for (var i = 0; i < b.h; i++) {
+      window(sideA, sideB, sideW, i, lit: b.kind == DoorKind.arcade);
+    }
+
+    // ── Kapı.
+    {
+      final tc = doorFrac;
+      final half = 0.3 / frontW;
+      const dz = 37.0;
+      fill(faceQuad(frontA, frontB, tc - half - 0.05 / frontW, tc + half + 0.05 / frontW, 0, dz + 4), trim);
+      final body = faceQuad(frontA, frontB, tc - half, tc + half, 0, dz);
+      gradient(body, const Color(0xFF8D6E63), const Color(0xFF4E342E));
+      // İç panolar.
+      for (final z in [3.0, 21.0]) {
+        fill(
+          faceQuad(frontA, frontB, tc - half * 0.7, tc + half * 0.7, z, z + 13),
+          const Color(0x33000000),
+        );
+      }
+      final knob = frontA + (frontB - frontA) * (tc + half * 0.68) + const Offset(0, -18);
+      canvas.drawCircle(knob, 1.9, Paint()..color = const Color(0xFFFFCA28));
+      if (b.kind == DoorKind.arcade) {
+        // Neon çerçeve.
+        final glow = 0.6 + sin(world.time * 5) * 0.25;
+        final edge = Paint()
+          ..color = Color.fromRGBO(0, 229, 255, glow)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2;
+        canvas.drawPath(
+          faceQuad(frontA, frontB, tc - half, tc + half, 0, dz),
+          edge,
+        );
+      }
+    }
+
+    // Tente (giyim ve market): çizgili, kapının üstünde öne uzanır.
+    if (b.kind == DoorKind.wardrobe || b.kind == DoorKind.market) {
+      final tc = doorFrac;
+      final half = 0.62 / frontW;
+      const out = Offset(-13, 7);
+      final stripeA = b.kind == DoorKind.wardrobe
+          ? const Color(0xFFEC407A)
+          : const Color(0xFFEF6C00);
+      const stripeB = Color(0xFFFFFFFF);
+      const n = 7;
+      Offset wallPt(double t, double z) =>
+          frontA + (frontB - frontA) * t + Offset(0, -z);
+      // Tente altı gölgesi (duvarda).
+      fill(
+        poly([
+          wallPt(tc - half, 40),
+          wallPt(tc + half, 40),
+          wallPt(tc + half, 26),
+          wallPt(tc - half, 26),
+        ]),
+        const Color(0x22000000),
+      );
+      for (var k = 0; k < n; k++) {
+        final ta = tc - half + 2 * half * k / n;
+        final tb = tc - half + 2 * half * (k + 1) / n;
+        final path = poly([
+          wallPt(ta, 46),
+          wallPt(tb, 46),
+          wallPt(tb, 37) + out,
+          wallPt(ta, 37) + out,
+        ]);
+        gradient(
+          path,
+          k.isEven ? stripeA : stripeB,
+          _shade(k.isEven ? stripeA : stripeB, 0.14),
+        );
+      }
+      // Kenar pervazı.
+      line(wallPt(tc - half, 37) + out, wallPt(tc + half, 37) + out,
+          _shade(stripeA, 0.25), 2);
+    }
+
+    // Arcade: cephe boyunca yanıp sönen ampuller.
+    if (b.kind == DoorKind.arcade) {
+      final count = b.w * 4;
+      for (var k = 0; k < count; k++) {
+        final t = (k + 0.5) / count;
+        final on = ((world.time * 3).floor() + k).isEven;
+        canvas.drawCircle(
+          frontA + (frontB - frontA) * t + const Offset(0, -wallH + 3),
+          1.9,
+          Paint()..color = on ? const Color(0xFFFFEE58) : const Color(0xFFFF4081),
+        );
+      }
+    }
+
+    // ── Çatı (kirişli, saçak taşmalı).
+    const o = 0.16;
+    final e00 = pt(x0 - o, y0 - o, wallH);
+    final e10 = pt(x1 + o, y0 - o, wallH);
+    final e11 = pt(x1 + o, y1 + o, wallH);
+    final e01 = pt(x0 - o, y1 + o, wallH);
+    const top = wallH + roofH;
+    final alongX = b.w >= b.h;
+    final d = (alongX ? b.w - b.h : b.h - b.w) / 2;
+    final r1 = alongX ? pt(cx - d, cy, top) : pt(cx, cy - d, top);
+    final r2 = alongX ? pt(cx + d, cy, top) : pt(cx, cy + d, top);
+
+    // Saçak kalınlığı.
+    const fascia = Offset(0, 5);
+    fill(poly([e01, e11, e11 + fascia, e01 + fascia]), _shade(roof, 0.42));
+    fill(poly([e11, e10, e10 + fascia, e11 + fascia]), _shade(roof, 0.55));
+
+    final left = alongX ? [e01, e00, r1] : [e00, e01, r2, r1];
+    final back = alongX ? [e00, e10, r2, r1] : [e00, e10, r1];
+    final right = alongX ? [e10, e11, r2] : [e10, e11, r2, r1];
+    final front = alongX ? [e11, e01, r1, r2] : [e01, e11, r2];
+    fill(poly(left), _shade(roof, 0.5));
+    fill(poly(back), _shade(roof, 0.55));
+    gradient(poly(right), _shade(roof, 0.22), _shade(roof, 0.42));
+    gradient(poly(front), _shade(roof, -0.02), _shade(roof, 0.2));
+
+    // Kiremit sıraları ve sırt.
+    void courses(Offset ea, Offset eb, Offset ra, Offset rb, double alpha) {
+      final paint = Paint()
+        ..color = Color.fromRGBO(0, 0, 0, alpha)
+        ..strokeWidth = 1;
+      for (var k = 1; k <= 4; k++) {
+        final t = k / 5;
+        canvas.drawLine(Offset.lerp(ea, ra, t)!, Offset.lerp(eb, rb, t)!, paint);
+      }
+    }
+
+    if (alongX) {
+      courses(e11, e01, r2, r1, 0.16);
+      courses(e10, e11, r2, r2, 0.2);
+    } else {
+      courses(e01, e11, r2, r2, 0.16);
+      courses(e10, e11, r1, r2, 0.2);
+    }
+    // Ön saçak parlak kenar çizgisi.
+    line(e01, e11, _shade(roof, -0.3), 1.6);
+    line(e11, e10, _shade(roof, -0.1), 1.4);
+    if ((r1 - r2).distance > 1) {
+      line(r1, r2, _shade(roof, 0.35), 3);
+      line(r1, r2, _shade(roof, -0.25), 1);
+    }
+
+    // Baca (ev).
+    if (b.kind == DoorKind.home) {
+      final bx = x0 + b.w * 0.28, by = cy - 0.05;
+      const bw = 0.34, z0 = wallH + roofH * 0.5, z1 = z0 + 28;
+      final base = [
+        pt(bx, by + bw, z0),
+        pt(bx + bw, by + bw, z0),
+        pt(bx + bw, by, z0),
+      ];
+      fill(poly([base[0], base[1], base[1] + const Offset(0, -28), base[0] + const Offset(0, -28)]),
+          const Color(0xFFB0574A));
+      fill(poly([base[1], base[2], base[2] + const Offset(0, -28), base[1] + const Offset(0, -28)]),
+          const Color(0xFF8A3F35));
+      fill(
+        poly([
+          pt(bx - 0.04, by + bw + 0.04, z1),
+          pt(bx + bw + 0.04, by + bw + 0.04, z1),
+          pt(bx + bw + 0.04, by - 0.04, z1),
+          pt(bx - 0.04, by - 0.04, z1),
+        ]),
+        const Color(0xFF6D2F27),
+      );
+      // Duman.
+      for (var k = 0; k < 3; k++) {
+        final phase = (world.time * 0.7 + k / 3) % 1;
+        canvas.drawCircle(
+          pt(bx + bw / 2, by + bw / 2, z1) + Offset(sin(phase * 5 + k) * 4, -phase * 26),
+          3 + phase * 5,
+          Paint()..color = Color.fromRGBO(255, 255, 255, 0.5 * (1 - phase)),
+        );
+      }
+    }
+
+    // Çatı tabelası: yuvarlak levha (yazı tipine bağlı emoji yerine paketli ikon
+    // fontu; emoji yazı tipi geç yüklenirse önbellekteki çizim kutucuk gösterirdi).
+    final signAt = alongX
+        ? Offset.lerp((e11 + e01) / 2, (r1 + r2) / 2, 0.5)!
+        : Offset.lerp((e01 + e11) / 2, r2, 0.5)!;
+    canvas.drawCircle(signAt + const Offset(0, 1.5), 17, Paint()..color = const Color(0x44000000));
+    canvas.drawCircle(signAt, 16, Paint()..color = _shade(roof, -0.05));
+    canvas.drawCircle(
+      signAt,
+      16,
+      Paint()
+        ..color = const Color(0xFFFFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    _paintIcon(canvas, _signIcon(b.kind), signAt, 22);
   }
 
   // Ağaç, çeşme, lamba ─────────────────────────────────────
