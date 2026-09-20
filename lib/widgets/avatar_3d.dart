@@ -5,6 +5,17 @@ import 'package:three_js/three_js.dart' as three;
 
 import '../models/town/avatar_spec.dart';
 
+/// Sahnede duran, animasyonlu bir karakter: ilkel şekillerden kurulan
+/// [Avatar3D] ya da Blender modeli (`AvatarModel`) bunu uygular.
+abstract class AvatarRig {
+  /// Sahneye eklenecek kök.
+  three.Object3D get root;
+
+  /// Her karede çağrılır: [time] dünya zamanı (saniye), [moving] yürüyor mu,
+  /// [phase] karakterlerin senkron sallanmaması için kişisel kaydırma.
+  void update(double time, bool moving, {double phase = 0});
+}
+
 /// `AvatarSpec`'ten kurulan 3B karakter (three_js ilkel şekilleriyle; model
 /// dosyası yok). Mağazadaki tüm saç/kıyafet/şapka/aksesuar kimlikleri
 /// gösterilir; renkler paletten gelir. Karakter **+z'ye bakar**, ayakları
@@ -12,7 +23,7 @@ import '../models/town/avatar_spec.dart';
 ///
 /// Kol ve bacaklar pivot gruplarıdır: [update] yürürken bunları sallar,
 /// dururken hafifçe nefes aldırır; kanatlar (varsa) çırpar.
-class Avatar3D {
+class Avatar3D implements AvatarRig {
   Avatar3D._(
     this.root, {
     required three.Group legL,
@@ -32,7 +43,7 @@ class Avatar3D {
        _wingL = wingL,
        _wingR = wingR;
 
-  /// Sahneye eklenecek kök.
+  @override
   final three.Group root;
   final three.Group _legL, _legR, _armL, _armR, _body, _head;
   final three.Group? _wingL, _wingR;
@@ -708,8 +719,7 @@ class Avatar3D {
     return (r << 16) | (g << 8) | b;
   }
 
-  /// Her karede çağrılır: [time] dünya zamanı (saniye), [moving] yürüyor mu,
-  /// [phase] karakterlerin senkron sallanmaması için kişisel kaydırma.
+  @override
   void update(double time, bool moving, {double phase = 0}) {
     final swing = moving ? sin(time * 11 + phase) : 0.0;
     _legL.rotation.x = swing * 0.75;

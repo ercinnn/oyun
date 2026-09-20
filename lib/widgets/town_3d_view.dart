@@ -7,6 +7,7 @@ import '../models/town/avatar_spec.dart';
 import '../models/town/town_map.dart';
 import '../models/town/town_world.dart';
 import 'avatar_3d.dart';
+import 'avatar_model.dart';
 import 'world_input_layer.dart';
 
 /// Kasabanın gerçek 3D görünümü (three_js). `IsoWorldView` ile aynı sözleşmeyi
@@ -55,9 +56,9 @@ class _Town3DViewState extends State<Town3DView> {
   static const _camBack = 5.5;
   static const _camHeight = 8.5;
 
-  three.Group? _avatar;
-  Avatar3D? _playerRig;
-  final List<Avatar3D> _npcRigs = [];
+  three.Object3D? _avatar;
+  AvatarRig? _playerRig;
+  final List<AvatarRig> _npcRigs = [];
   three.DirectionalLight? _sun;
   double _heading = 0;
   double _lastX = 0;
@@ -69,7 +70,7 @@ class _Town3DViewState extends State<Town3DView> {
 
   /// `world.coins[i]` <-> `_coinNodes[i]` (aynı sıra); NPC'ler için de öyle.
   final List<three.Object3D> _coinNodes = [];
-  final List<three.Group> _npcNodes = [];
+  final List<three.Object3D> _npcNodes = [];
   final List<double> _npcHeading = [];
   final List<Offset> _npcLast = [];
 
@@ -162,6 +163,7 @@ class _Town3DViewState extends State<Town3DView> {
     }
 
     _buildScenery(scene);
+    await AvatarModel.preload();
     await _loadBuildings(scene);
     scene.add(_buildAvatar());
     _buildActors(scene);
@@ -387,8 +389,10 @@ class _Town3DViewState extends State<Town3DView> {
 
   /// Karakteri kurar ([Avatar3D]: `AvatarSpec`'teki saç/kıyafet/şapka/aksesuar
   /// dahil) ve animasyon için kaydeder. [forSpec] null ise oyuncudur.
-  three.Group _buildAvatar([AvatarSpec? forSpec]) {
-    final rig = Avatar3D.build(forSpec ?? widget.avatar);
+  three.Object3D _buildAvatar([AvatarSpec? forSpec]) {
+    final spec = forSpec ?? widget.avatar;
+    // Önce Blender modeli; yüklenemediyse ilkel şekillerden kurulan karakter.
+    final rig = AvatarModel.tryBuild(spec) ?? Avatar3D.build(spec);
     if (forSpec == null) {
       _playerRig = rig;
       _avatar = rig.root;
