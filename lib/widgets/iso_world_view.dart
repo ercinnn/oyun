@@ -8,6 +8,7 @@ import '../models/town/avatar_spec.dart';
 import '../models/town/town_world.dart';
 import 'iso_world_painter.dart';
 import 'virtual_joystick.dart';
+import 'world_input_layer.dart' show worldInputFromKeys;
 
 /// Dünyayı gösteren, sürekli kare döngüsü olan görünüm: [Ticker] her karede
 /// [onTick]'i çağırır, çizim [frame] bildirimiyle yenilenir (widget ağacı
@@ -82,31 +83,9 @@ class _IsoWorldViewState extends State<IsoWorldView>
   }
 
   /// Klavye ve joystick girdisini birleştirip iletir (klavye önceliklidir).
+  /// Tuşlar harita eksenlerine hizalıdır (bkz. [worldInputFromKeys]).
   void _publishInput() {
-    var dx = 0.0;
-    var dy = 0.0;
-    if (_keys.contains(LogicalKeyboardKey.arrowRight) ||
-        _keys.contains(LogicalKeyboardKey.keyD)) {
-      dx += 1;
-    }
-    if (_keys.contains(LogicalKeyboardKey.arrowLeft) ||
-        _keys.contains(LogicalKeyboardKey.keyA)) {
-      dx -= 1;
-    }
-    if (_keys.contains(LogicalKeyboardKey.arrowDown) ||
-        _keys.contains(LogicalKeyboardKey.keyS)) {
-      dy += 1;
-    }
-    if (_keys.contains(LogicalKeyboardKey.arrowUp) ||
-        _keys.contains(LogicalKeyboardKey.keyW)) {
-      dy -= 1;
-    }
-    if (dx != 0 || dy != 0) {
-      final length = sqrt(dx * dx + dy * dy);
-      widget.onInput(WorldInput(dx / length, dy / length));
-    } else {
-      widget.onInput(_joystick);
-    }
+    widget.onInput(worldInputFromKeys(_keys) ?? _joystick);
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
