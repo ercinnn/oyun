@@ -18,6 +18,7 @@ import 'games/sequence_memory_game.dart';
 import 'games/simon_game.dart';
 import 'games/stroop_game.dart';
 import 'games/sudoku_game.dart';
+import 'games/town_game.dart';
 import 'screens/auth_gate.dart';
 import 'screens/game_catalog_screen.dart';
 import 'screens/profile_screen.dart';
@@ -103,6 +104,7 @@ class GamePlatformApp extends StatelessWidget {
             PlantLabGame.routeName => (BuildContext _) => const PlantLabGame(),
             ElectricityGame.routeName => (BuildContext _) =>
                 const ElectricityGame(),
+            TownGame.routeName => (BuildContext _) => const TownGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),

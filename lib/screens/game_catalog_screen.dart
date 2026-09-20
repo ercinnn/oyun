@@ -15,6 +15,7 @@ import '../games/sequence_memory_game.dart';
 import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
 import '../games/sudoku_game.dart';
+import '../games/town_game.dart';
 import '../models/game_catalog_entry.dart';
 import '../theme/home_palette.dart';
 import '../widgets/game_card.dart';
@@ -155,6 +156,16 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.orange,
     routeName: ElectricityGame.routeName,
     skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 3, hafiza: 2, dikkat: 3),
+  ),
+  GameCatalogEntry(
+    title: 'Renkli Kasaba',
+    description:
+        'Üç boyutlu görünümlü kasabanda gez, altın topla! Avatarını giydir, '
+        'odanı döşe, parkur ve hazine avı gibi mini oyunlar oyna.',
+    icon: Icons.location_city,
+    color: Colors.lightBlue,
+    routeName: TownGame.routeName,
+    skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 1, hafiza: 2, dikkat: 4),
   ),
 ];
 

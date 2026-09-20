@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,21 @@ import 'package:bombali_sayilar/controllers/multiplication_controller.dart';
 import 'package:bombali_sayilar/controllers/pattern_controller.dart';
 import 'package:bombali_sayilar/models/pattern_difficulty.dart';
 import 'package:bombali_sayilar/controllers/electricity_controller.dart';
+import 'package:bombali_sayilar/controllers/town_controller.dart';
+import 'package:bombali_sayilar/data/town_map_data.dart';
+import 'package:bombali_sayilar/models/town/avatar_spec.dart';
+import 'package:bombali_sayilar/models/town/iso_projection.dart';
+import 'package:bombali_sayilar/models/town/mini_game_session.dart';
+import 'package:bombali_sayilar/models/town/room_layout.dart';
+import 'package:bombali_sayilar/models/town/shop_catalog.dart';
+import 'package:bombali_sayilar/models/town/town_map.dart';
+import 'package:bombali_sayilar/models/town/town_phase.dart';
+import 'package:bombali_sayilar/models/town/town_profile.dart';
+import 'package:bombali_sayilar/models/town/town_world.dart';
+import 'package:bombali_sayilar/services/town_progress_repository.dart';
+import 'package:bombali_sayilar/widgets/iso_room_view.dart';
+import 'package:bombali_sayilar/widgets/iso_world_painter.dart';
+import 'package:bombali_sayilar/widgets/iso_world_view.dart';
 import 'package:bombali_sayilar/controllers/plant_lab_controller.dart';
 import 'package:bombali_sayilar/data/electric_materials.dart';
 import 'package:bombali_sayilar/data/safety_scenes.dart';
@@ -4574,6 +4590,1014 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: 'tur $round devam');
       }
+    });
+  });
+
+  group('Renkli Kasaba', () {
+    TownWorld townWorld({int npcs = 0, List<(int, int)> spots = const []}) =>
+        TownWorld(
+          map: buildTownMap(),
+          random: Random(1),
+          npcCount: npcs,
+          coinSpots: spots,
+        );
+
+    test('izometrik dönüşüm gidiş-dönüş ve joystick yönü ekranda doğru', () {
+      for (final (x, y) in [(0.0, 0.0), (3.5, 7.25), (19.0, 2.0)]) {
+        final s = IsoProjection.toScreen(x, y);
+        final back = IsoProjection.toTile(s.dx, s.dy);
+        expect(back.dx, closeTo(x, 1e-9));
+        expect(back.dy, closeTo(y, 1e-9));
+      }
+      // Ekranda "sağa" gitmek karede (+x, -y) yönündedir ve ekran dy ≈ 0.
+      final dir = IsoProjection.screenDirToTile(1, 0);
+      final screen = IsoProjection.toScreen(dir.dx, dir.dy);
+      expect(screen.dx, greaterThan(0));
+      expect(screen.dy.abs(), lessThan(1e-9));
+      expect(IsoProjection.screenDirToTile(0, 0), Offset.zero);
+    });
+
+    test('haritalar: tutarlı boyut, 4 bina ve her kapı/altın noktası erişilebilir',
+        () {
+      for (final row in townRows) {
+        expect(row.length, townRows.first.length);
+      }
+      final world = townWorld();
+      final map = world.map;
+      expect(map.buildings.map((b) => b.kind).toSet(), DoorKind.values.toSet());
+
+      final sx = map.startX.floor();
+      final sy = map.startY.floor();
+      for (final b in map.buildings) {
+        expect(map.kindAt(b.doorX, b.doorY), TileKind.door);
+        expect(
+          world.findPath(sx, sy, b.doorX, b.doorY),
+          isNotNull,
+          reason: '${b.kind} kapısına yol yok',
+        );
+      }
+      for (final (x, y) in townCoinSpots) {
+        expect(map.isWalkable(x, y), isTrue, reason: 'altın ($x,$y) yürünemez');
+        expect(world.findPath(sx, sy, x, y), isNotNull, reason: 'altın ($x,$y)');
+      }
+      // Kasabadaki her yürünebilir kare başlangıçtan erişilebilir.
+      for (var y = 0; y < map.height; y++) {
+        for (var x = 0; x < map.width; x++) {
+          if (map.isWalkable(x, y)) {
+            expect(world.findPath(sx, sy, x, y), isNotNull, reason: '($x,$y)');
+          }
+        }
+      }
+
+      // Parkur: başlangıçtan bayrağa tehlikesiz yol var.
+      final parkour = ParkourSession().world;
+      expect(
+        parkour.findPath(
+          parkour.map.startX.floor(),
+          parkour.map.startY.floor(),
+          parkour.map.goalX,
+          parkour.map.goalY,
+        ),
+        isNotNull,
+      );
+    });
+
+    test('hareket: rastgele girdiyle karakter asla engelin içine girmez', () {
+      final world = townWorld();
+      final rng = Random(7);
+      for (var i = 0; i < 4000; i++) {
+        final angle = rng.nextDouble() * 2 * pi;
+        final strength = rng.nextDouble();
+        world.step(
+          0.016,
+          rng.nextInt(10) == 0
+              ? WorldInput.none
+              : WorldInput(cos(angle) * strength, sin(angle) * strength),
+        );
+        expect(world.canStand(world.x, world.y), isTrue, reason: 'adım $i');
+      }
+    });
+
+    test('hareket: dev bir dt duvardan geçirmez (parçalara bölünür)', () {
+      final world = townWorld();
+      // Kuzey kenardaki ağaç duvarına doğru (ekranda yukarı) 5 saniye bas.
+      world.step(5, const WorldInput(0, -1));
+      expect(world.canStand(world.x, world.y), isTrue);
+      expect(world.y, greaterThan(0.9)); // y=0 sırası ağaç
+    });
+
+    test('hareket: çapraz girdi düz girdiyle aynı hızda gider', () {
+      final a = TownWorld(map: TownMap.parse(['.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........']), random: Random(1), startX: 4.5, startY: 4.5);
+      final b = TownWorld(map: TownMap.parse(['.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........']), random: Random(1), startX: 4.5, startY: 4.5);
+      a.step(0.4, const WorldInput(1, 0));
+      final d = 1 / sqrt(2);
+      b.step(0.4, WorldInput(d, d));
+      double dist(TownWorld w) =>
+          sqrt(pow(w.x - 4.5, 2) + pow(w.y - 4.5, 2)).toDouble();
+      expect(dist(a), closeTo(dist(b), 1e-6));
+      expect(dist(a), closeTo(TownWorld.speed * 0.4, 0.05));
+    });
+
+    test('yarım eğik joystick daha yavaş yürütür', () {
+      final rows = List.filled(9, '.........');
+      final full = TownWorld(map: TownMap.parse(rows), random: Random(1), startX: 4.5, startY: 4.5);
+      final half = TownWorld(map: TownMap.parse(rows), random: Random(1), startX: 4.5, startY: 4.5);
+      full.step(0.3, const WorldInput(1, 0));
+      half.step(0.3, const WorldInput(0.5, 0));
+      double dist(TownWorld w) =>
+          sqrt(pow(w.x - 4.5, 2) + pow(w.y - 4.5, 2)).toDouble();
+      expect(dist(half), closeTo(dist(full) / 2, 0.02));
+    });
+
+    test('dokun-yürü: engelden dolanarak kapıya varır', () {
+      final world = townWorld();
+      final door = world.map.buildings.firstWhere((b) => b.kind == DoorKind.arcade);
+      expect(world.walkTo(door.doorX, door.doorY), isTrue);
+      var steps = 0;
+      while (world.hasPath && steps < 3000) {
+        world.step(0.016, WorldInput.none);
+        steps++;
+        expect(world.canStand(world.x, world.y), isTrue);
+      }
+      expect(world.hasPath, isFalse, reason: 'yol bitmeli');
+      expect(world.nearbyDoor?.kind, DoorKind.arcade);
+      // Engelin (ağaç) üstüne yürünemez.
+      expect(world.walkTo(0, 0), isFalse);
+    });
+
+    test('altın: toplanınca kaybolur, süre sonunda yeniden doğar; yıldız 5 değer',
+        () {
+      final world = TownWorld(
+        map: buildTownMap(),
+        random: Random(1),
+        startX: 2.5,
+        startY: 6.5,
+        coinSpots: const [(2, 6), (5, 6), (8, 6), (12, 6), (15, 6), (17, 6)],
+      );
+      world.step(0.016, WorldInput.none);
+      // (2,6) sıradan altın: 1 değer.
+      expect(world.takeCollectedValue(), 1);
+      expect(world.coins.first.active, isFalse);
+      expect(world.takeCollectedValue(), 0);
+
+      // Yıldız (6. nokta) 5 değerindedir.
+      expect(world.coins.last.isStar, isTrue);
+      expect(world.coins.last.value, 5);
+
+      // 25 saniye sonra yeniden doğar (avatar uzakta).
+      world.teleport(10.5, 14.5);
+      world.step(26, WorldInput.none);
+      expect(world.coins.first.active, isTrue);
+    });
+
+    test('NPC\'ler bir dakika boyunca yürünebilir karelerde kalır ve hareket eder',
+        () {
+      final world = townWorld(npcs: 4);
+      final starts = [for (final n in world.npcs) (n.x, n.y)];
+      for (var i = 0; i < 60 * 60; i++) {
+        world.step(1 / 60, WorldInput.none);
+        for (final npc in world.npcs) {
+          expect(world.canStand(npc.x, npc.y), isTrue);
+        }
+      }
+      var moved = 0;
+      for (var i = 0; i < world.npcs.length; i++) {
+        if ((world.npcs[i].x - starts[i].$1).abs() > 0.5 ||
+            (world.npcs[i].y - starts[i].$2).abs() > 0.5) {
+          moved++;
+        }
+      }
+      expect(moved, greaterThan(0));
+    });
+
+    test('kapı: yanına gelince tanınır, uzaktayken yok', () {
+      final world = townWorld();
+      expect(world.nearbyDoor, isNull);
+      for (final b in world.map.buildings) {
+        world.teleport(b.doorX + 0.5, b.doorY + 0.5);
+        expect(world.nearbyDoor?.kind, b.kind);
+      }
+      world.teleport(10.5, 14.5);
+      expect(world.nearbyDoor, isNull);
+    });
+
+    test('derinlik: kapı önündeki karakter binanın önüne, kuzeydeki arkasına çizilir',
+        () {
+      final world = townWorld();
+      for (final b in world.map.buildings) {
+        final front = (b.doorX + 0.5) + (b.doorY + 0.5);
+        expect(front, greaterThan(buildingDepth(b)), reason: '${b.kind} önü');
+        final north = (b.x + 0.5) + (b.y - 0.5);
+        expect(north, lessThan(buildingDepth(b)), reason: '${b.kind} kuzeyi');
+      }
+    });
+
+    test('avatar: JSON gidiş-dönüş ve bozuk veri güvenli varsayılana düşer', () {
+      const spec = AvatarSpec(
+        skin: 3,
+        hairStyle: 'hair_curly',
+        hairColor: 5,
+        outfit: 'outfit_space',
+        outfitColor: 2,
+        hat: 'hat_crown',
+        accessory: 'acc_wings',
+      );
+      expect(AvatarSpec.fromJson(spec.toJson()), spec);
+      final broken = AvatarSpec.fromJson({'skin': 99, 'hairColor': 'x', 'outfit': ''});
+      expect(broken, const AvatarSpec());
+    });
+
+    test('profil: satın alma, adetli mobilya ve JSON gidiş-dönüş', () {
+      final profile = TownProfile(coins: 60);
+      final cap = shopItemById('hat_cap')!;
+      expect(profile.buy(cap), isTrue);
+      expect(profile.coins, 40);
+      expect(profile.buy(cap), isFalse, reason: 'avatar eşyası tekrar alınmaz');
+      expect(profile.buy(shopItemById('hat_crown')!), isFalse, reason: 'altın yetmez');
+      expect(profile.coins, 40);
+
+      final plant = shopItemById('furn_plant')!;
+      expect(profile.buy(plant), isTrue);
+      expect(profile.buy(plant), isTrue, reason: 'mobilya birden çok alınır');
+      expect(profile.owned['furn_plant'], 2);
+
+      final copy = TownProfile.fromJson(profile.toJson());
+      expect(copy.coins, profile.coins);
+      expect(copy.owned, profile.owned);
+      expect(TownProfile.fromJson('bozuk').coins, 50);
+      // Başlangıç eşyaları her zaman vardır.
+      expect(TownProfile().owns('hair_short'), isTrue);
+      expect(TownProfile().owns('furn_bed'), isTrue);
+    });
+
+    test('oda: sınır, çakışma, döndürünce ayak izi ve halı altına girilebilir', () {
+      const layout = RoomLayout();
+      final bed = shopItemById('furn_bed')!; // 2×1
+      final lamp = shopItemById('furn_lamp')!; // 1×1
+      final rug = shopItemById('furn_rug')!; // 2×2 zemin
+
+      expect(layout.canPlace(bed, 0, 0, 0), isTrue);
+      expect(layout.canPlace(bed, 7, 0, 0), isFalse, reason: 'sağ sınır');
+      expect(layout.canPlace(bed, 0, 7, 1), isFalse, reason: 'döndürünce 1×2 taşar');
+      expect(layout.canPlace(bed, 0, 6, 1), isTrue);
+      expect(layout.canPlace(bed, -1, 0, 0), isFalse);
+
+      final withBed = layout.copyWith(
+        items: [const PlacedItem(itemId: 'furn_bed', x: 2, y: 2)],
+      );
+      expect(withBed.canPlace(lamp, 2, 2, 0), isFalse);
+      expect(withBed.canPlace(lamp, 3, 2, 0), isFalse, reason: 'yatak 2 geniş');
+      expect(withBed.canPlace(lamp, 4, 2, 0), isTrue);
+      expect(withBed.canPlace(rug, 2, 2, 0), isTrue, reason: 'halı zemin eşyasıdır');
+      expect(withBed.canPlace(bed, 2, 2, 0, ignoreIndex: 0), isTrue);
+
+      final both = withBed.copyWith(
+        items: [
+          ...withBed.items,
+          const PlacedItem(itemId: 'furn_rug', x: 2, y: 2),
+        ],
+      );
+      expect(both.itemIndexAt(2, 2), 0, reason: 'kutu, halıdan önce seçilir');
+      expect(both.itemIndexAt(3, 3), 1, reason: 'yalnız halı');
+      expect(both.itemIndexAt(7, 7), -1);
+
+      final copy = RoomLayout.fromJson(both.toJson());
+      expect(copy.items.length, 2);
+      expect(copy.items.first.itemId, 'furn_bed');
+    });
+
+    test('kayıt: bellek içi ve SharedPreferences depoları gidiş-dönüş yapar',
+        () async {
+      final profile = TownProfile(coins: 123)
+        ..avatar = const AvatarSpec(hat: 'hat_party', skin: 4);
+
+      final memory = InMemoryTownProgressRepository();
+      expect(await memory.load(), isNull);
+      await memory.save(profile);
+      final loaded = await memory.load();
+      expect(loaded!.coins, 123);
+      expect(loaded.avatar.hat, 'hat_party');
+
+      SharedPreferences.setMockInitialValues({});
+      final prefs = SharedPrefsTownProgressRepository();
+      expect(await prefs.load(), isNull);
+      await prefs.save(profile);
+      final fromPrefs = await prefs.load();
+      expect(fromPrefs!.coins, 123);
+      expect(fromPrefs.avatar.skin, 4);
+
+      // Bozuk kayıt oyunu çökertmez.
+      SharedPreferences.setMockInitialValues({'town_profile_v1': 'not json'});
+      expect(await SharedPrefsTownProgressRepository().load(), isNull);
+    });
+
+    test('parkur: varil deseni deterministik, suya düşmek başa döndürür', () {
+      const barrel = ParkourSession.barrels;
+      expect(barrel.first.yAt(0), barrel.first.yAt(0));
+      for (final b in barrel) {
+        for (var t = 0.0; t < 10; t += 0.13) {
+          expect(b.yAt(t), inInclusiveRange(b.y0, b.y1));
+        }
+      }
+
+      final session = ParkourSession();
+      final world = session.world;
+      // Suya (kuzey kenar) doğru yürü: hazard kareye girince başa döner.
+      world.teleport(2.5, 2.5);
+      session.step(1.0, const WorldInput(1, -1)); // yukarı-sağ değil; yukarı için:
+      var guard = 0;
+      while (session.hits == 0 && guard++ < 600) {
+        session.step(0.016, const WorldInput(-1, -1)); // ekranda sola-yukarı ≈ kuzey
+      }
+      expect(session.hits, greaterThan(0));
+      expect((world.x - world.spawnX).abs() < 0.5, isTrue);
+      expect(session.finished, isFalse);
+    });
+
+    test('parkur: bayrağa ulaşınca biter ve süreye göre puan verir; süre biterse 0',
+        () {
+      final win = ParkourSession();
+      // Bayrağın hemen önüne ışınla ve içine yürü.
+      win.world.teleport(win.world.map.goalX - 0.2, win.world.map.goalY + 0.5);
+      // Varil olmayan bir zamanda: varillerden uzağız (x ≈ 13.8 > 11.5).
+      var guard = 0;
+      while (!win.finished && guard++ < 200) {
+        win.step(0.016, const WorldInput(1, 1)); // ekranda sağ-aşağı ≈ +x
+        if (win.world.map.goalX == win.world.x.floor()) break;
+      }
+      win.step(0.016, const WorldInput(1, 1));
+      expect(win.finished, isTrue);
+      expect(win.reachedGoal, isTrue);
+      expect(win.score, greaterThanOrEqualTo(20));
+
+      final lose = ParkourSession();
+      lose.world.teleport(2.5, 3.5);
+      lose.step(61, WorldInput.none);
+      expect(lose.finished, isTrue);
+      expect(lose.reachedGoal, isFalse);
+      expect(lose.score, 0);
+    });
+
+    test('hazine avı: 3 sandık uzak yerleşir, ipucu uzaklıkla soğur/ısınır', () {
+      for (var seed = 0; seed < 20; seed++) {
+        final session = TreasureSession(Random(seed));
+        final chests = session.world.props.where((p) => p.kind == 'chest').toList();
+        expect(chests.length, TreasureSession.chestCount);
+        for (final c in chests) {
+          expect(session.world.map.isWalkable(c.x.floor(), c.y.floor()), isTrue);
+          final dx = c.x - session.world.spawnX;
+          final dy = c.y - session.world.spawnY;
+          expect(sqrt(dx * dx + dy * dy), greaterThanOrEqualTo(6 - 1e-9));
+        }
+        for (var i = 0; i < chests.length; i++) {
+          for (var j = i + 1; j < chests.length; j++) {
+            final dx = chests[i].x - chests[j].x;
+            final dy = chests[i].y - chests[j].y;
+            expect(sqrt(dx * dx + dy * dy), greaterThanOrEqualTo(6 - 1e-9));
+          }
+        }
+      }
+      expect(TreasureSession.hintFor(1), contains('Yanıyorsun'));
+      expect(TreasureSession.hintFor(4), contains('Sıcak'));
+      expect(TreasureSession.hintFor(7), contains('Ilık'));
+      expect(TreasureSession.hintFor(20), contains('Soğuk'));
+
+      final session = TreasureSession(Random(3));
+      final chests = session.world.props.where((p) => p.kind == 'chest').toList();
+      var previous = -1;
+      for (final c in chests) {
+        session.world.teleport(c.x, c.y);
+        session.step(0.016, WorldInput.none);
+        expect(session.found, greaterThan(previous));
+        previous = session.found;
+      }
+      expect(session.finished, isTrue);
+      expect(session.score, greaterThanOrEqualTo(300));
+    });
+
+    test('yıldız yağmuru: 60 saniyede biter, puan yıldız × 10', () {
+      final session = StarRushSession(Random(1));
+      final spot = townCoinSpots.first;
+      session.world.teleport(spot.$1 + 0.5, spot.$2 + 0.5);
+      session.step(0.016, WorldInput.none);
+      expect(session.score, 10);
+      // Yıldızlar 3 saniyede yeniden doğar: aynı yerde tekrar toplanır.
+      session.world.teleport(10.5, 14.5);
+      session.step(3.5, WorldInput.none);
+      session.world.teleport(spot.$1 + 0.5, spot.$2 + 0.5);
+      session.step(0.016, WorldInput.none);
+      expect(session.score, 20);
+      session.step(70, WorldInput.none);
+      expect(session.finished, isTrue);
+      expect(session.timeLeft, 0);
+    });
+
+    test('kontrolcü: giyim ve market — altın yetmezse reddeder, yeterse kuşanır',
+        () {
+      final controller = TownController(random: Random(1));
+      final crown = shopItemById('hat_crown')!; // 100
+      final cap = shopItemById('hat_cap')!; // 20
+      expect(controller.buyOrEquip(crown), isFalse);
+      expect(controller.profile.avatar.hat, 'hat_none');
+
+      expect(controller.buyOrEquip(cap), isTrue);
+      expect(controller.profile.avatar.hat, 'hat_cap');
+      expect(controller.profile.coins, 30);
+      expect(controller.isEquipped(cap), isTrue);
+
+      // Sahip olunan eşya bedava değiştirilir.
+      expect(controller.buyOrEquip(shopItemById('hat_none')!), isTrue);
+      expect(controller.buyOrEquip(cap), isTrue);
+      expect(controller.profile.coins, 30);
+
+      controller.setSkin(5);
+      controller.setHairColor(2);
+      controller.setOutfitColor(7);
+      controller.setSkin(99); // yok sayılır
+      expect(controller.profile.avatar.skin, 5);
+      expect(controller.profile.avatar.hairColor, 2);
+      expect(controller.profile.avatar.outfitColor, 7);
+
+      expect(controller.buyFurniture(shopItemById('furn_tv')!), isFalse);
+      controller.profile.coins = 200;
+      expect(controller.buyFurniture(shopItemById('furn_tv')!), isTrue);
+      expect(controller.profile.coins, 130);
+      expect(controller.buyFurniture(shopItemById('hat_cap')!), isFalse);
+    });
+
+    test('kontrolcü: oda yerleştirme envanteri tüketir, taşır, döndürür, kaldırır',
+        () {
+      final controller = TownController(random: Random(1));
+      final lamp = shopItemById('furn_lamp')!;
+      final bed = shopItemById('furn_bed')!;
+      expect(controller.profile.availableCount('furn_lamp'), 1);
+
+      expect(controller.placeItem(lamp, 1, 1), isTrue);
+      expect(controller.profile.availableCount('furn_lamp'), 0);
+      expect(controller.placeItem(lamp, 3, 3), isFalse, reason: 'adet bitti');
+
+      expect(controller.placeItem(bed, 1, 1), isFalse, reason: 'lambayla çakışır');
+      expect(controller.placeItem(bed, 4, 4), isTrue);
+      expect(controller.rotatePlaced(1), isTrue);
+      expect(controller.profile.room.items[1].rotation, 1);
+      expect(controller.movePlaced(1, 7, 7), isFalse, reason: 'sığmaz');
+      expect(controller.movePlaced(1, 6, 5), isTrue);
+
+      controller.setRoomFloor(3);
+      controller.setRoomWall(2);
+      expect(controller.profile.room.floorColor, 3);
+      expect(controller.profile.room.wallColor, 2);
+      controller.setRoomFloor(99);
+      expect(controller.profile.room.floorColor, 3);
+
+      controller.removePlaced(0);
+      expect(controller.profile.availableCount('furn_lamp'), 1);
+    });
+
+    test('kontrolcü: ilerleme kaydedilir ve yeni oturumda yüklenir', () async {
+      final repo = InMemoryTownProgressRepository();
+      final first = TownController(repository: repo, random: Random(1));
+      first.buyOrEquip(shopItemById('hat_party')!);
+      first.setSkin(4);
+      first.saveNow();
+      await Future<void>.delayed(Duration.zero);
+
+      final second = TownController(repository: repo, random: Random(1));
+      await second.load();
+      expect(second.profile.avatar.hat, 'hat_party');
+      expect(second.profile.avatar.skin, 4);
+      expect(second.profile.coins, 10);
+    });
+
+    test('kontrolcü: kapıya girince doğru faz açılır, geri dönünce kasaba', () {
+      final controller = TownController(random: Random(1));
+      controller.enterTown();
+      expect(controller.phase, TownPhase.town);
+      expect(controller.doorPrompt, isNull);
+
+      const expected = {
+        DoorKind.wardrobe: TownPhase.wardrobe,
+        DoorKind.market: TownPhase.market,
+        DoorKind.home: TownPhase.home,
+        DoorKind.arcade: TownPhase.arcade,
+      };
+      for (final b in controller.world.map.buildings) {
+        controller.world.teleport(b.doorX + 0.5, b.doorY + 0.5);
+        controller.tick(0.016);
+        expect(controller.doorPrompt, b.kind);
+        controller.enterNearbyDoor();
+        expect(controller.phase, expected[b.kind]);
+        controller.backToTown();
+        expect(controller.phase, TownPhase.town);
+      }
+    });
+
+    test('kontrolcü: kasabada altın toplamak cüzdanı artırır', () {
+      final controller = TownController(random: Random(1));
+      controller.enterTown();
+      final before = controller.profile.coins;
+      final spot = townCoinSpots.first;
+      controller.world.teleport(spot.$1 + 0.5, spot.$2 + 0.5);
+      controller.tick(0.016);
+      expect(controller.profile.coins, greaterThan(before));
+    });
+
+    test('kontrolcü: serbest mini oyun ödül verir ve oyun salonuna döner', () {
+      final controller = TownController(random: Random(2));
+      controller.startFreeMiniGame(MiniGameKind.stars);
+      expect(controller.phase, TownPhase.miniGame);
+      expect(controller.contest, isFalse);
+
+      final before = controller.profile.coins;
+      final spot = townCoinSpots.first;
+      controller.session!.world.teleport(spot.$1 + 0.5, spot.$2 + 0.5);
+      controller.tick(0.016);
+      controller.session!.finish();
+      controller.tick(0.016);
+      expect(controller.sessionFinished, isTrue);
+
+      final reward = controller.session!.rewardCoins;
+      controller.continueAfterMiniGame();
+      expect(controller.phase, TownPhase.arcade);
+      expect(controller.profile.coins, before + reward);
+    });
+
+    test('kontrolcü: yarışma — iki oyuncu üçer oyun, sıra devri ve sıralama', () {
+      final controller = TownController(random: Random(3));
+      controller.startContest(['Ada', 'Can']);
+      expect(controller.phase, TownPhase.miniGame);
+      expect(controller.contest, isTrue);
+
+      final kinds = <MiniGameKind>[];
+      for (var player = 0; player < 2; player++) {
+        for (var round = 0; round < townRoundsPerPlayer; round++) {
+          kinds.add(controller.session!.kind);
+          // Ada'ya yüksek, Can'a düşük puan: yıldız oyununda sayaç artır.
+          controller.session!.finish();
+          controller.session!.score = player == 0 ? 100 : 10;
+          controller.continueAfterMiniGame();
+        }
+        if (player == 0) {
+          expect(controller.phase, TownPhase.turnTransition);
+          expect(controller.currentPlayerIndex, 1);
+          controller.acknowledgeTurnTransition();
+          expect(controller.phase, TownPhase.miniGame);
+        }
+      }
+      expect(controller.phase, TownPhase.finished);
+      // Her oyuncu her oyunu tam bir kez oynar.
+      expect(kinds.sublist(0, 3), MiniGameKind.values);
+      expect(kinds.sublist(3), MiniGameKind.values);
+      final ranked = controller.rankedByScore;
+      expect(ranked.first.name, 'Ada');
+      expect(ranked.first.totalScore, 300);
+      expect(ranked.last.totalScore, 30);
+
+      controller.restart();
+      expect(controller.phase, TownPhase.setup);
+    });
+
+    /// Ana menüden Renkli Kasaba'ya girer (katalogdaki 14. kart). Dünya ekranı
+    /// sürekli kare istediği için burada `pumpAndSettle` kullanılmaz.
+    Future<void> openTown(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 7800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const GamePlatformApp());
+      await tester.tap(find.text('Renkli Kasaba'));
+      await tester.pumpAndSettle();
+    }
+
+    TownController controllerOf(WidgetTester tester) =>
+        tester.element(find.byType(Scaffold).last).read<TownController>();
+
+    testWidgets('kasabaya gir: klavye avatarı yürütür, kapıda Gir düğmesi çıkar',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      expect(controller.phase, TownPhase.town);
+      expect(find.byKey(const Key('townCoins')), findsOneWidget);
+      expect(find.byKey(const Key('townJoystick')), findsOneWidget);
+
+      final startX = controller.world.x;
+      final startY = controller.world.y;
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump(const Duration(milliseconds: 16));
+      final moved =
+          (controller.world.x - startX).abs() + (controller.world.y - startY).abs();
+      expect(moved, greaterThan(0.3), reason: 'klavye girdisi avatarı yürütmeli');
+
+      // Girdi bırakılınca durur.
+      final stopX = controller.world.x;
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.world.x, closeTo(stopX, 1e-9));
+
+      // Giyim dükkânı kapısına ışınla: Gir düğmesi çıkar.
+      final wardrobe = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.wardrobe);
+      controller.world.teleport(wardrobe.doorX + 0.5, wardrobe.doorY + 0.5);
+      await tester.pump(const Duration(milliseconds: 32));
+      expect(find.byKey(const Key('townEnterDoor')), findsOneWidget);
+      expect(find.textContaining('Giyim Dükkânı'), findsWidgets);
+    });
+
+    testWidgets('joystick sürüklenince avatar hareket eder', (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      final startX = controller.world.x;
+      final startY = controller.world.y;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('townJoystick'))),
+      );
+      await gesture.moveBy(const Offset(40, 0));
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(
+        (controller.world.x - startX).abs() + (controller.world.y - startY).abs(),
+        greaterThan(0.3),
+      );
+    });
+
+    testWidgets('giyim dükkânında şapka satın al ve kuşan', (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      final wardrobe = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.wardrobe);
+      controller.world.teleport(wardrobe.doorX + 0.5, wardrobe.doorY + 0.5);
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byKey(const Key('townEnterDoor')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.wardrobe);
+
+      await tester.tap(find.byKey(const Key('wardrobeCategory_hat')));
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('wardrobeItem_hat_cap')));
+      await tester.tap(find.byKey(const Key('wardrobeItem_hat_cap')));
+      await tester.pump();
+      expect(controller.profile.avatar.hat, 'hat_cap');
+      expect(controller.profile.coins, 30);
+
+      // Tacı alacak altın yok: düğme kapalı.
+      final crownButton = tester.widget<FilledButton>(
+        find.byKey(const Key('wardrobeItem_hat_crown')),
+      );
+      expect(crownButton.onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('skin_4')));
+      await tester.pump();
+      expect(controller.profile.avatar.skin, 4);
+
+      // Geri: kasabaya dön.
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+      expect(controller.phase, TownPhase.town);
+    });
+
+    testWidgets('market ve oda: mobilya al, envanterden odaya yerleştir',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      controller.profile.coins = 100;
+
+      // Market
+      final market = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.market);
+      controller.world.teleport(market.doorX + 0.5, market.doorY + 0.5);
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byKey(const Key('townEnterDoor')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.market);
+      await tester.tap(find.byKey(const Key('marketBuy_furn_plant')));
+      await tester.pump();
+      expect(controller.profile.owned['furn_plant'], 1);
+      expect(controller.profile.coins, 90);
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+
+      // Ev
+      final home = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.home);
+      controller.world.teleport(home.doorX + 0.5, home.doorY + 0.5);
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byKey(const Key('townEnterDoor')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.home);
+
+      await tester.tap(find.byKey(const Key('roomInv_furn_plant')));
+      await tester.pump();
+      final roomFinder = find.byKey(const Key('roomTap'));
+      final size = tester.getSize(roomFinder);
+      final center = size.center(Offset.zero);
+      final tile = IsoRoomView.tileAt(center, size);
+      expect(tile, isNotNull);
+      await tester.tapAt(tester.getTopLeft(roomFinder) + center);
+      await tester.pump();
+
+      final placed = controller.profile.room.items
+          .where((i) => i.itemId == 'furn_plant')
+          .toList();
+      expect(placed.length, 1);
+      expect(placed.first.x, tile!.$1);
+      expect(placed.first.y, tile.$2);
+      // Envanterden tükendi: çip kayboldu.
+      expect(find.byKey(const Key('roomInv_furn_plant')), findsNothing);
+    });
+
+    testWidgets('oyun salonu: parkur başlar, süre/durum rozetleri görünür',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      final arcade = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.arcade);
+      controller.world.teleport(arcade.doorX + 0.5, arcade.doorY + 0.5);
+      await tester.pump(const Duration(milliseconds: 32));
+      await tester.tap(find.byKey(const Key('townEnterDoor')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.arcade);
+
+      await tester.tap(find.byKey(const Key('arcadeStart_parkour')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.miniGame);
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('miniTime')), findsOneWidget);
+      expect(find.textContaining('Çarpma'), findsOneWidget);
+
+      controller.session!.finish();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('townMiniContinue')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('townMiniContinue')));
+      await tester.pump();
+      expect(controller.phase, TownPhase.arcade);
+    });
+
+    testWidgets('mini oyun yarışı: 1 kişi üç oyunu bitirir ve tebrik edilir',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.text('1 Kişi'));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('townContest')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      expect(controller.phase, TownPhase.miniGame);
+
+      for (var round = 0; round < townRoundsPerPlayer; round++) {
+        for (var i = 0; i < 5; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(find.byKey(const Key('miniTime')), findsOneWidget);
+        controller.session!.finish();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byKey(const Key('miniScore')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('townMiniContinue')));
+        await tester.pump();
+      }
+      expect(controller.phase, TownPhase.finished);
+      expect(find.text('Tebrikler, 1. Oyuncu!'), findsOneWidget);
+    });
+
+    testWidgets('dar ekranda (320 px) kasaba, dükkân, oda ve mini oyun taşmaz',
+        (tester) async {
+      await openTown(tester);
+      tester.view.physicalSize = const Size(320, 640);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(tester.takeException(), isNull, reason: 'kasaba');
+
+      for (final phase in [
+        TownPhase.wardrobe,
+        TownPhase.market,
+        TownPhase.home,
+        TownPhase.arcade,
+      ]) {
+        controller.phase = phase;
+        controller.notifyListeners();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.takeException(), isNull, reason: '$phase');
+      }
+
+      controller.startFreeMiniGame(MiniGameKind.treasure);
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      controller.session!.finish();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull, reason: 'mini oyun sonucu');
+    });
+
+    /// Dünya-ekran noktasını, kameranın avatara kilitli olduğu tuval
+    /// koordinatına çevirir (çizimle aynı dönüşüm).
+    Offset localOf(TownWorld world, Size size, Offset worldScreen) =>
+        (worldScreen - IsoWorldPainter.cameraCenter(world)) *
+            IsoWorldView.zoomFor(size) +
+        size.center(Offset.zero);
+
+    test('dokunma hedefi: altın, sandık, bina ve zemin doğru kareye çözülür', () {
+      final world = townWorld(spots: townCoinSpots);
+      const size = Size(800, 600);
+      final zoom = IsoWorldView.zoomFor(size);
+
+      // Havada süzülen altının çizildiği yere dokunmak, altının karesini verir
+      // (zemin karesine değil).
+      final coin = world.coins.firstWhere((c) => c.x > 8 && c.y > 6);
+      final coinLocal = localOf(
+        world,
+        size,
+        IsoProjection.toScreen(coin.x, coin.y) + const Offset(0, -12),
+      );
+      expect(
+        IsoWorldPainter.tapTarget(coinLocal, size, world, zoom),
+        (coin.x.floor(), coin.y.floor()),
+      );
+
+      // Binanın çatısına dokunmak kapısını verir.
+      final b = world.map.buildings.firstWhere((b) => b.kind == DoorKind.market);
+      final roof = localOf(
+        world,
+        size,
+        IsoProjection.toScreen(b.x + b.w / 2, b.y + b.h / 2) + const Offset(0, -40),
+      );
+      expect(
+        IsoWorldPainter.tapTarget(roof, size, world, zoom),
+        (b.doorX, b.doorY),
+      );
+
+      // Kapı paspasına dokunmak da kapıyı verir.
+      final mat = localOf(
+        world,
+        size,
+        IsoProjection.toScreen(b.doorX + 0.5, b.doorY + 0.5),
+      );
+      expect(
+        IsoWorldPainter.tapTarget(mat, size, world, zoom),
+        (b.doorX, b.doorY),
+      );
+
+      // Boş zemine dokunmak o zemin karesidir.
+      final bare = TownWorld(map: buildTownMap(), random: Random(1), startX: 9.5, startY: 14.5);
+      final ground = localOf(bare, size, IsoProjection.toScreen(12.5, 14.5));
+      expect(IsoWorldPainter.tapTarget(ground, size, bare, zoom), (12, 14));
+    });
+
+    test('kontrolcü: kapının önünde aynı kapıya dokunmak içeri sokar', () {
+      final controller = TownController(random: Random(1));
+      controller.enterTown();
+      final b = controller.world.map.buildings
+          .firstWhere((b) => b.kind == DoorKind.home);
+      // Uzaktayken dokunmak yalnızca yürütür.
+      controller.tapTile(b.doorX, b.doorY);
+      expect(controller.phase, TownPhase.town);
+      expect(controller.world.hasPath, isTrue);
+
+      controller.world.teleport(b.doorX + 0.5, b.doorY + 0.5);
+      controller.tapTile(b.doorX, b.doorY);
+      expect(controller.phase, TownPhase.home);
+    });
+
+    test('kontrolcü: mini oyunda dokun-yürü çalışır, bitmiş oyunda yok sayılır',
+        () {
+      final controller = TownController(random: Random(2));
+      controller.startFreeMiniGame(MiniGameKind.stars);
+      final world = controller.session!.world;
+      controller.tapTile(9, 14);
+      expect(world.hasPath, isTrue);
+
+      world.teleport(world.spawnX, world.spawnY);
+      controller.session!.finish();
+      final before = world.hasPath;
+      controller.tapTile(3, 7);
+      expect(world.hasPath, before, reason: 'bitmiş oyunda yol kurulmaz');
+    });
+
+    testWidgets('fareyle: altına tıklayınca avatar yürüyüp toplar', (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      final world = controller.world;
+
+      final tapArea = find.byKey(const Key('townWorldTap'));
+      final size = tester.getSize(tapArea);
+      final origin = tester.getTopLeft(tapArea);
+
+      // Başlangıca en yakın altın.
+      final coin = world.coins.reduce((a, b) {
+        double d(WorldCoin c) =>
+            (c.x - world.x) * (c.x - world.x) + (c.y - world.y) * (c.y - world.y);
+        return d(a) <= d(b) ? a : b;
+      });
+      final before = controller.profile.coins;
+      await tester.tapAt(
+        origin +
+            localOf(
+              world,
+              size,
+              IsoProjection.toScreen(coin.x, coin.y) + const Offset(0, -12),
+            ),
+      );
+      await tester.pump();
+      expect(world.hasPath, isTrue, reason: 'altına yürümek için yol kurulmalı');
+
+      for (var i = 0; i < 40 && coin.active; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(coin.active, isFalse, reason: 'altın toplanmalı');
+      expect(controller.profile.coins, greaterThan(before));
+    });
+
+    testWidgets('fareyle: binaya tıkla → kapıya yürür, tekrar tıkla → içeri girer',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      final world = controller.world;
+      final b = world.map.buildings.firstWhere((b) => b.kind == DoorKind.arcade);
+
+      final tapArea = find.byKey(const Key('townWorldTap'));
+      final size = tester.getSize(tapArea);
+      final origin = tester.getTopLeft(tapArea);
+
+      Offset roof() => origin +
+          localOf(
+            world,
+            size,
+            IsoProjection.toScreen(b.x + b.w / 2, b.y + b.h / 2) +
+                const Offset(0, -40),
+          );
+
+      await tester.tapAt(roof());
+      await tester.pump();
+      for (var i = 0; i < 80 && world.nearbyDoor?.kind != DoorKind.arcade; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(world.nearbyDoor?.kind, DoorKind.arcade);
+      expect(controller.phase, TownPhase.town);
+
+      await tester.tapAt(roof());
+      await tester.pump();
+      expect(controller.phase, TownPhase.arcade);
+    });
+
+    testWidgets('fareyle: yıldız yağmurunda yıldıza tıklayınca toplanır',
+        (tester) async {
+      await openTown(tester);
+      await tester.tap(find.byKey(const Key('townEnter')));
+      await tester.pump();
+      final controller = controllerOf(tester);
+      controller.startFreeMiniGame(MiniGameKind.stars);
+      await tester.pump();
+      final session = controller.session!;
+      final world = session.world;
+
+      final tapArea = find.byKey(const Key('townWorldTap'));
+      final size = tester.getSize(tapArea);
+      final origin = tester.getTopLeft(tapArea);
+
+      final star = world.coins.reduce((a, b) {
+        double d(WorldCoin c) =>
+            (c.x - world.x) * (c.x - world.x) + (c.y - world.y) * (c.y - world.y);
+        return d(a) <= d(b) ? a : b;
+      });
+      await tester.tapAt(
+        origin +
+            localOf(
+              world,
+              size,
+              IsoProjection.toScreen(star.x, star.y) + const Offset(0, -12),
+            ),
+      );
+      await tester.pump();
+      for (var i = 0; i < 40 && session.score == 0; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(session.score, greaterThanOrEqualTo(10));
     });
   });
 }
