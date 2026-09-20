@@ -22,6 +22,8 @@ class AvatarModel implements AvatarRig {
     required three.Object3D? legR,
     required three.Object3D? armL,
     required three.Object3D? armR,
+    required three.Object3D? foreL,
+    required three.Object3D? foreR,
     required three.Object3D? body,
     required three.Object3D? head,
     required three.Object3D? wingL,
@@ -30,6 +32,8 @@ class AvatarModel implements AvatarRig {
        _legR = legR,
        _armL = armL,
        _armR = armR,
+       _foreL = foreL,
+       _foreR = foreR,
        _body = body,
        _head = head,
        _wingL = wingL,
@@ -41,6 +45,8 @@ class AvatarModel implements AvatarRig {
       _legR,
       _armL,
       _armR,
+      _foreL,
+      _foreR,
       _body,
       _head,
       _wingL,
@@ -88,6 +94,14 @@ class AvatarModel implements AvatarRig {
     } finally {
       _loading = false;
     }
+  }
+
+  static three.Object3D? _findBase(three.Object3D root, String base) {
+    three.Object3D? found;
+    root.traverse((o) {
+      if (found == null && o.name.split('.').first == base) found = o;
+    });
+    return found;
   }
 
   static int _hex(Color c) => c.toARGB32() & 0xFFFFFF;
@@ -162,6 +176,10 @@ class AvatarModel implements AvatarRig {
       legR: root.getObjectByName('LegR'),
       armL: root.getObjectByName('ArmL'),
       armR: root.getObjectByName('ArmR'),
+      // Dirsek pivotları her kıyafet grubunda ayrıdır (Blender aynı adları
+      // `ForearmL.001`… diye numaralar): kalan gruptakini `.`'tan önceye bakarak bul.
+      foreL: _findBase(root, 'ForearmL'),
+      foreR: _findBase(root, 'ForearmR'),
       body: root.getObjectByName('Body'),
       head: root.getObjectByName('Head'),
       wingL: root.getObjectByName('WingL'),
@@ -179,6 +197,9 @@ class AvatarModel implements AvatarRig {
     _armR?.rotation.x = swing * 0.85;
     _armL?.rotation.z = -0.09 - (moving ? 0 : 0.02 + breathe);
     _armR?.rotation.z = 0.09 + (moving ? 0 : 0.02 + breathe);
+    // Dirsek: kol öne giderken önkol hafifçe bükülür (öne = negatif x).
+    _foreL?.rotation.x = -(0.12 + (moving ? 0.55 * max(0.0, swing) : 0.0));
+    _foreR?.rotation.x = -(0.12 + (moving ? 0.55 * max(0.0, -swing) : 0.0));
     _body?.rotation.x = moving ? 0.07 : 0;
     _body?.position.y = moving ? 0 : breathe * 0.4;
     _head?.rotation.z = moving ? swing * 0.04 : sin(time * 1.3 + phase) * 0.025;

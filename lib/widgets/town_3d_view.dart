@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter/material.dart';
 import 'package:three_js/three_js.dart' as three;
 
@@ -55,6 +56,22 @@ class _Town3DViewState extends State<Town3DView> {
   /// Kamera avatardan bu kadar uzakta (kare uzayında +x,+y yönünde; yükseklik ayrı).
   static const _camBack = 5.5;
   static const _camHeight = 8.5;
+
+  /// Yakınlaştırma çarpanı: kamera uzaklığı bu kadarıyla çarpılır (küçük = yakın,
+  /// açı sabit kalır). Fare tekerleği, iki parmakla sıkıştırma ve +/- düğmeleri.
+  static const _zoomMin = 0.28;
+  static const _zoomMax = 1.6;
+  double _zoom = 1.0;
+
+  void _setZoom(double value) {
+    setState(() => _zoom = value.clamp(_zoomMin, _zoomMax).toDouble());
+  }
+
+  /// Ekrandaki parmaklar (sıkıştırma için): işaretçi kimliği → konum.
+  final Map<int, Offset> _pointers = {};
+  double _pinchStartDistance = 0;
+  double _pinchStartZoom = 1;
+  bool _gestureIsPinch = false;
 
   three.Object3D? _avatar;
   AvatarRig? _playerRig;
@@ -410,9 +427,9 @@ class _Town3DViewState extends State<Town3DView> {
     final world = widget.world;
     final target = three.Vector3(world.x, 0.6, world.y);
     final desired = three.Vector3(
-      world.x + _camBack,
-      _camHeight,
-      world.y + _camBack,
+      world.x + _camBack * _zoom,
+      _camHeight * _zoom,
+      world.y + _camBack * _zoom,
     );
     if (snap) {
       camera.position.setFrom(desired);
@@ -601,12 +618,42 @@ class _Town3DViewState extends State<Town3DView> {
                   key: const Key('townWorldTap3d'),
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (e) {
-                    _downAt = e.localPosition;
-                    _downTime = e.timeStamp;
+                    _pointers[e.pointer] = e.localPosition;
+                    if (_pointers.length == 1) {
+                      _downAt = e.localPosition;
+                      _downTime = e.timeStamp;
+                      _gestureIsPinch = false;
+                    } else if (_pointers.length == 2) {
+                      // İkinci parmak: yürüme dokunuşu iptal, sıkıştırma başlar.
+                      _downAt = null;
+                      _gestureIsPinch = true;
+                      final pts = _pointers.values.toList();
+                      _pinchStartDistance = (pts[0] - pts[1]).distance;
+                      _pinchStartZoom = _zoom;
+                    }
+                  },
+                  onPointerMove: (e) {
+                    if (!_pointers.containsKey(e.pointer)) return;
+                    _pointers[e.pointer] = e.localPosition;
+                    if (_pointers.length == 2 && _pinchStartDistance > 1) {
+                      final pts = _pointers.values.toList();
+                      final distance = (pts[0] - pts[1]).distance;
+                      if (distance > 1) {
+                        // Parmaklar açılınca yakınlaş (çarpan küçülür).
+                        _setZoom(
+                          _pinchStartZoom * _pinchStartDistance / distance,
+                        );
+                      }
+                    }
                   },
                   onPointerUp: (e) {
+                    _pointers.remove(e.pointer);
                     final start = _downAt;
                     _downAt = null;
+                    if (_gestureIsPinch) {
+                      if (_pointers.isEmpty) _gestureIsPinch = false;
+                      return;
+                    }
                     if (start == null || widget.onTapTile == null) return;
                     final quick =
                         (e.timeStamp - _downTime).inMilliseconds < 500;
@@ -616,15 +663,80 @@ class _Town3DViewState extends State<Town3DView> {
                     final tile = _tapTarget(e.localPosition, size);
                     if (tile != null) widget.onTapTile!(tile.$1, tile.$2);
                   },
-                  onPointerCancel: (_) => _downAt = null,
+                  onPointerCancel: (e) {
+                    _pointers.remove(e.pointer);
+                    _downAt = null;
+                    if (_pointers.isEmpty) _gestureIsPinch = false;
+                  },
+                  // Fare tekerleği: yukarı = yakınlaş.
+                  onPointerSignal: (event) {
+                    if (event is PointerScrollEvent) {
+                      _setZoom(_zoom * exp(event.scrollDelta.dy * 0.0012));
+                    }
+                  },
                   child: _three.build(),
                 );
               },
             ),
           ),
         ),
+        Positioned(
+          right: 12,
+          top: 56,
+          child: Column(
+            children: [
+              _ZoomButton(
+                key: const Key('townZoomIn'),
+                icon: Icons.add,
+                tooltip: 'Yakınlaştır',
+                onPressed: () => _setZoom(_zoom * 0.8),
+              ),
+              const SizedBox(height: 6),
+              _ZoomButton(
+                key: const Key('townZoomOut'),
+                icon: Icons.remove,
+                tooltip: 'Uzaklaştır',
+                onPressed: () => _setZoom(_zoom / 0.8),
+              ),
+            ],
+          ),
+        ),
         ...widget.overlay,
       ],
+    );
+  }
+}
+
+/// Yakınlaştırma düğmesi (yarı saydam yuvarlak, oyun görünümünün üstünde).
+class _ZoomButton extends StatelessWidget {
+  const _ZoomButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: const Color(0xB3263238),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
     );
   }
 }

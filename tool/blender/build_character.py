@@ -6,7 +6,8 @@ sekmesinde). `build()` sahneyi kurar, `preview(...)` bir kombinasyonu gösterir,
 
 Sözleşme (oyun kodu `lib/widgets/avatar_model.dart` buna dayanır):
 - Karakter **Blender -Y'ye bakar** (glTF/three'de +z), ayakları z=0'da, boyu ~1,35.
-- Pivot düğümleri: `Body`, `Head`, `ArmL`, `ArmR`, `LegL`, `LegR`, `WingL`, `WingR`.
+- Pivot düğümleri: `Body`, `Head`, `ArmL`, `ArmR`, `ForearmL`, `ForearmR` (dirsek; her kıyafet
+  grubunun içinde), `LegL`, `LegR`, `WingL`, `WingR`.
 - Varyant grupları adı `hair_*`, `outfit_*`, `hat_*`, `acc_*` (mağaza kimlikleri);
   aynı varyantın farklı pivotlara ait parçaları `outfit_space@head` gibi
   `@parça` soneki taşır. Oyun `@`'ten önceki kısma bakar.
@@ -247,6 +248,16 @@ def build():
     arms = {s: E("ArmL" if s < 0 else "ArmR", (s * 0.28, 0.87, 0), body) for s in (-1, 1)}
     OUTFITS = ("tee", "dress", "hoodie", "suit", "space")
 
+    def fringe(g, tag, sweep=1.0):
+        """Alnın üstünde yumuşak, hafif yana taranmış kâkül tutamları."""
+        for i, (x, y, z, sx, sy, sz, rz) in enumerate([
+            (-0.10 * sweep, 0.150, 0.198, 1.5, 0.62, 0.8, 0.35),
+            (0.0, 0.165, 0.200, 1.7, 0.66, 0.8, 0.12),
+            (0.10 * sweep, 0.150, 0.198, 1.5, 0.62, 0.8, -0.3),
+        ]):
+            P(f"{tag}_fr{i}", sphere(0.07, 12, 8), "Hair", pos=H(x, y, z),
+              scale=(sx, sy, sz), rot=(0.55, 0, rz), parent=g)
+
     # ── Gövde: her kıyafetin kendi gövdesi
     def torso(g, color, width, name):
         P(name + "_torso", cyl(width * 0.95, width, 0.46, 18), color, pos=(0, 0.67, 0), scale=(1, 1, 0.66), parent=g)
@@ -284,6 +295,9 @@ def build():
             P(n + "_btnB", cyl(0.022, 0.022, 0.03, 8), "Green", pos=(0.05, 0.74, 0.168), rot=(PI / 2, 0, 0), parent=g)
             P(n + "_pack", box(0.3, 0.38, 0.13), "Gray", pos=(0, 0.7, -0.19), parent=g, smooth=False, round_=True)
     P("neck", cyl(0.065, 0.07, 0.09, 10), "Skin", pos=(0, 0.95, 0), parent=body)
+    for o in ("tee", "dress", "hoodie"):
+        gg = [c for c in created if c.name == f"outfit_{o}@body"][0]
+        P(f"{o}_collar", arc(0.085, 0.02, 2 * PI, 20, 6), "OutfitLight", pos=(0, 0.925, 0.005), rot=(PI / 2 - 0.15, 0, 0), parent=gg)
 
     # ── Bacaklar
     for s, leg in legs.items():
@@ -294,52 +308,72 @@ def build():
             P(f"{o}_leg{s}", cyl(0.07, 0.062, 0.34, 10), mat, pos=(s * 0.1, 0.27, 0), parent=g)
             P(f"{o}_shoe{s}", box(0.15, 0.09, 0.25), shoe, pos=(s * 0.1, 0.055, 0.04), parent=g, round_=True)
 
-    # ── Kollar
+    # ── Kollar: omuz pivotu (ArmL/R) + dirsek pivotu (ForearmL/R, her kıyafet
+    # grubunun içinde). Üst kol/dirsek omuza, önkol/el dirseğe bağlıdır.
     for s, arm in arms.items():
         ax = s * 0.28
+        side = "L" if s < 0 else "R"
         for o in OUTFITS:
-            g = E(f"outfit_{o}@arm{'L' if s < 0 else 'R'}", (0, 0, 0), arm)
+            g = E(f"outfit_{o}@arm{side}", (0, 0, 0), arm)
+            fore = E(f"Forearm{side}", (ax, 0.67, 0), g)
             n = f"{o}_a{s}"
-            if o in ("tee", "dress"):
-                P(n + "_sleeve", cyl(0.068, 0.064, 0.13, 10), "Outfit", pos=(ax, 0.805, 0), parent=g)
-                P(n + "_fore", cyl(0.055, 0.05, 0.23, 10), "Skin", pos=(ax, 0.645, 0), parent=g)
-                P(n + "_hand", sphere(0.062, 10, 8), "Skin", pos=(ax, 0.5, 0), parent=g)
-                P(n + "_ball", sphere(0.068, 10, 8), "Outfit", pos=(ax, 0.87, 0), parent=g)
-            elif o == "space":
-                P(n + "_sleeve", cyl(0.065, 0.058, 0.34, 10), "White", pos=(ax, 0.70, 0), parent=g)
-                P(n + "_hand", sphere(0.064, 10, 8), "Outfit", pos=(ax, 0.5, 0), parent=g)
-                P(n + "_ball", sphere(0.068, 10, 8), "White", pos=(ax, 0.87, 0), parent=g)
+            short = o in ("tee", "dress")
+            space = o == "space"
+            sleeve = "White" if space else "Outfit"
+            cuff = "Outfit" if space else ("White" if o == "suit" else "OutfitLight")
+            hand_mat = "Outfit" if space else "Skin"
+
+            # üst kol
+            if short:
+                P(n + "_up", cyl(0.055, 0.052, 0.2, 10), "Skin", pos=(ax, 0.77, 0), parent=g)
+                P(n + "_sleeve", cyl(0.07, 0.066, 0.13, 10), sleeve, pos=(ax, 0.805, 0), parent=g)
+                P(n + "_hem", arc(0.068, 0.012, 2 * PI, 14, 5), "OutfitLight", pos=(ax, 0.742, 0), rot=(PI / 2, 0, 0), parent=g)
+                P(n + "_elbow", sphere(0.055, 10, 8), "Skin", pos=(ax, 0.67, 0), parent=g)
             else:
-                P(n + "_sleeve", cyl(0.065, 0.058, 0.34, 10), "Outfit", pos=(ax, 0.70, 0), parent=g)
-                P(n + "_hand", sphere(0.062, 10, 8), "Skin", pos=(ax, 0.5, 0), parent=g)
-                P(n + "_ball", sphere(0.068, 10, 8), "Outfit", pos=(ax, 0.87, 0), parent=g)
+                P(n + "_up", cyl(0.066, 0.06, 0.2, 10), sleeve, pos=(ax, 0.77, 0), parent=g)
+                P(n + "_elbow", sphere(0.06, 10, 8), sleeve, pos=(ax, 0.67, 0), parent=g)
+            P(n + "_ball", sphere(0.07, 10, 8), sleeve, pos=(ax, 0.87, 0), parent=g)
+
+            # önkol + manşet
+            if short:
+                P(n + "_fore", cyl(0.05, 0.044, 0.17, 10), "Skin", pos=(ax, 0.585, 0), parent=fore)
+            else:
+                P(n + "_fore", cyl(0.058, 0.05, 0.17, 10), sleeve, pos=(ax, 0.585, 0), parent=fore)
+                P(n + "_cuff", arc(0.052, 0.011, 2 * PI, 14, 5), cuff, pos=(ax, 0.51, 0), rot=(PI / 2, 0, 0), parent=fore)
+
+            # el: avuç + başparmak (gövdeye bakan iç yan)
+            P(n + "_hand", sphere(0.058, 12, 10), hand_mat, pos=(ax, 0.475, 0.005), scale=(1, 1.15, 0.85), parent=fore)
+            P(n + "_thumb", sphere(0.024, 8, 6), hand_mat, pos=(ax - s * 0.05, 0.5, 0.03),
+              scale=(0.8, 1.4, 0.9), rot=(0, 0, s * 0.3), parent=fore)
 
     # ── Baş
     P("head", sphere(0.25, 24, 16), "Skin", pos=H(0, 0, 0), scale=(1, 0.96, 1), parent=head)
     for s in (-1, 1):
         P(f"ear{s}", sphere(0.05, 8, 6), "Skin", pos=H(s * 0.245, -0.01, 0), scale=(0.5, 1, 1), parent=head)
-        P(f"eye{s}", sphere(0.036, 10, 8), "Dark", pos=H(s * 0.088, 0.01, 0.222), scale=(1, 1, 0.55), parent=head)
-        P(f"shine{s}", sphere(0.012, 6, 5), "White", pos=H(s * 0.088 + 0.012, 0.028, 0.244), parent=head)
-        P(f"brow{s}", box(0.07, 0.014, 0.014), "Hair", pos=H(s * 0.088, 0.078, 0.232), rot=(0, 0, s * -0.12), parent=head, smooth=False)
+        P(f"eyew{s}", sphere(0.052, 14, 10), "White", pos=H(s * 0.09, 0.005, 0.208), scale=(1, 1.12, 0.5), parent=head)
+        P(f"eye{s}", sphere(0.038, 14, 10), "Dark", pos=H(s * 0.09, 0.0, 0.228), scale=(1, 1.12, 0.5), parent=head)
+        P(f"shine{s}", sphere(0.014, 8, 6), "White", pos=H(s * 0.09 + 0.013, 0.022, 0.249), parent=head)
+        P(f"shineb{s}", sphere(0.007, 6, 5), "White", pos=H(s * 0.09 - 0.012, -0.016, 0.248), parent=head)
+        P(f"brow{s}", box(0.075, 0.016, 0.018), "Hair", pos=H(s * 0.09, 0.075, 0.226), rot=(0.1, 0, s * -0.16), parent=head, smooth=False, round_=True)
         P(f"cheek{s}", sphere(0.038, 8, 6), "Blush", pos=H(s * 0.15, -0.06, 0.195), scale=(1, 1, 0.4), parent=head)
     P("nose", sphere(0.024, 8, 6), "SkinDark", pos=H(0, -0.025, 0.243), scale=(1, 1, 0.7), parent=head)
     P("mouth", arc(0.045, 0.008, PI, 14, 6), "Mouth", pos=H(0, -0.055, 0.232), rot=(0, 0, PI), parent=head)
 
     # ── Saç (kubbe ortak; stil parçaları gruplarda)
-    P("hair_dome", sphere(0.268, 20, 12, PI * 0.56), "Hair", pos=H(0, 0.02, -0.012), parent=head, open_=True)
+    P("hair_dome", sphere(0.27, 22, 14, PI * 0.5), "Hair", pos=H(0, 0.035, -0.02), rot=(-0.5, 0, 0), parent=head, open_=True)
     g = E("hair_short", (0, 0, 0), head)
-    P("hs_fringe", box(0.34, 0.06, 0.04), "Hair", pos=H(0, 0.17, 0.21), parent=g)
+    fringe(g, "hs")
     for s in (-1, 1):
-        P(f"hs_side{s}", box(0.045, 0.14, 0.1), "Hair", pos=H(s * 0.245, 0.02, -0.02), parent=g)
+        P(f"hs_side{s}", sphere(0.06, 10, 8), "Hair", pos=H(s * 0.235, 0.0, 0.03), scale=(0.55, 1.7, 0.9), parent=g)
     g = E("hair_long", (0, 0, 0), head)
     P("hl_back", box(0.5, 0.56, 0.1), "Hair", pos=H(0, -0.18, -0.2), parent=g, round_=True)
     for s in (-1, 1):
         P(f"hl_side{s}", box(0.06, 0.4, 0.14), "Hair", pos=H(s * 0.24, -0.12, -0.06), parent=g, round_=True)
-    P("hl_fringe", box(0.34, 0.05, 0.04), "Hair", pos=H(0, 0.17, 0.21), parent=g)
+    fringe(g, "hl", 1.15)
     g = E("hair_bun", (0, 0, 0), head)
     P("hb_bun", sphere(0.115, 14, 10), "Hair", pos=H(0, 0.3, -0.06), parent=g)
     P("hb_tie", cyl(0.06, 0.06, 0.04, 10), "Pink", pos=H(0, 0.235, -0.045), parent=g)
-    P("hb_fringe", box(0.3, 0.05, 0.04), "Hair", pos=H(0, 0.17, 0.21), parent=g)
+    fringe(g, "hb", 0.9)
     g = E("hair_spiky", (0, 0, 0), head)
     for i in range(8):
         a = i / 8 * 2 * PI
@@ -349,7 +383,7 @@ def build():
     g = E("hair_curly", (0, 0, 0), head)
     for i in range(10):
         a = i / 10 * 2 * PI
-        P(f"hc_curl{i}", sphere(0.085, 10, 8), "Hair", pos=H(math.cos(a) * 0.22, 0.1 + (0.02 if i % 2 == 0 else 0), math.sin(a) * 0.2 - 0.02), parent=g)
+        P(f"hc_curl{i}", sphere(0.085, 10, 8), "Hair", pos=H(math.cos(a) * 0.22, 0.1 + (0.02 if i % 2 == 0 else 0), math.sin(a) * 0.15 - 0.06), parent=g)
     for i in range(4):
         a = i / 4 * 2 * PI + 0.4
         P(f"hc_top{i}", sphere(0.09, 10, 8), "Hair", pos=H(math.cos(a) * 0.1, 0.25, math.sin(a) * 0.1), parent=g)
