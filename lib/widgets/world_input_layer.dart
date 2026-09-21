@@ -52,9 +52,13 @@ class WorldInputLayer extends StatefulWidget {
     super.key,
     required this.onInput,
     required this.child,
+    this.onRotateKey,
   });
 
   final ValueChanged<WorldInput> onInput;
+
+  /// Q / E tuşu (basılı tutunca tekrarlar): -1 = sola, +1 = sağa döndür.
+  final ValueChanged<int>? onRotateKey;
   final Widget child;
 
   @override
@@ -70,6 +74,17 @@ class _WorldInputLayerState extends State<WorldInputLayer> {
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
+        widget.onRotateKey != null) {
+      if (event.logicalKey == LogicalKeyboardKey.keyQ) {
+        widget.onRotateKey!(-1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyE) {
+        widget.onRotateKey!(1);
+        return KeyEventResult.handled;
+      }
+    }
     if (event is KeyDownEvent) {
       _keys.add(event.logicalKey);
     } else if (event is KeyUpEvent) {

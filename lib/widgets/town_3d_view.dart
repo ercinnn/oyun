@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:three_js/three_js.dart' as three;
 
 import '../models/town/avatar_spec.dart';
+import '../models/town/iso_projection.dart';
 import '../models/town/town_map.dart';
 import '../models/town/town_world.dart';
 import 'avatar_3d.dart';
@@ -51,7 +52,12 @@ class Town3DView extends StatefulWidget {
 }
 
 class _Town3DViewState extends State<Town3DView> {
-  late final three.ThreeJS _three;
+  /// Ekran boyutu sıfırdan büyük olunca ilk `build`'de kurulur. three_js doku
+  /// boyutunu kurulduğu anki `MediaQuery` boyutundan okur; Android'de ilk karede
+  /// bu 0 olabilir ve native doku "no texture width" ile reddedilir (yükleme
+  /// çarkında sonsuza kadar takılır). Boyut gelene kadar bekleriz.
+  three.ThreeJS? _threeOrNull;
+  three.ThreeJS get _three => _threeOrNull!;
 
   /// Kamera avatardan bu kadar uzakta (kare uzayında +x,+y yönünde; yükseklik ayrı).
   static const _camBack = 5.5;
@@ -60,8 +66,49 @@ class _Town3DViewState extends State<Town3DView> {
   /// Yakınlaştırma çarpanı: kamera uzaklığı bu kadarıyla çarpılır (küçük = yakın,
   /// açı sabit kalır). Fare tekerleği, iki parmakla sıkıştırma ve +/- düğmeleri.
   static const _zoomMin = 0.28;
-  static const _zoomMax = 1.6;
-  double _zoom = 1.0;
+  static const _zoomMax = 3.2;
+  double _zoom = 1.8;
+
+  /// Varsayılan uzaklık: bütün binalar görünsün. Dikey (telefon) ekranda yatay
+  /// görüş dar olduğundan daha uzak başlar.
+  static double _defaultZoom(double aspect) {
+    if (aspect >= 1.2) return 1.8;
+    if (aspect <= 0.6) return 3.0;
+    return 3.0 - (aspect - 0.6) / 0.6 * 1.2;
+  }
+
+  /// Kameranın karakter etrafındaki açısı (radyan). `_yawTarget`'a doğru
+  /// yumuşakça yaklaşır. Girdi (joystick/tuş) bu açı kadar döndürülür ki
+  /// "yukarı" hep ekranda yukarı olsun.
+  double _yaw = 0;
+  double _yawTarget = 0;
+  bool _dragging = false;
+  WorldInput _rawInput = WorldInput.none;
+
+  void _rotateBy(double radians) => _yawTarget += radians;
+
+  /// Ekran uzayındaki girdiyi kamera açısına göre döndürür (`TownWorld.step`
+  /// girdiyi varsayılan izometrik görünüme göre bekler).
+  WorldInput _rotateInput(WorldInput input) {
+    if (input.isZero || _yaw.abs() < 1e-4) return input;
+    final tile = IsoProjection.screenDirToTile(input.dx, input.dy);
+    final c = cos(_yaw), s = sin(_yaw);
+    final tx = tile.dx * c - tile.dy * s;
+    final ty = tile.dx * s + tile.dy * c;
+    final screen = IsoProjection.toScreen(tx, ty);
+    final length = sqrt(screen.dx * screen.dx + screen.dy * screen.dy);
+    if (length == 0) return input;
+    final strength = min(1.0, sqrt(input.dx * input.dx + input.dy * input.dy));
+    return WorldInput(
+      screen.dx / length * strength,
+      screen.dy / length * strength,
+    );
+  }
+
+  void _onInput(WorldInput input) {
+    _rawInput = input;
+    widget.onInput(_rotateInput(input));
+  }
 
   void _setZoom(double value) {
     setState(() => _zoom = value.clamp(_zoomMin, _zoomMax).toDouble());
@@ -99,7 +146,10 @@ class _Town3DViewState extends State<Town3DView> {
     super.initState();
     _lastX = widget.world.x;
     _lastY = widget.world.y;
-    _three = three.ThreeJS(
+  }
+
+  void _createThree() {
+    _threeOrNull = three.ThreeJS(
       onSetupComplete: () => setState(() {}),
       setup: _setup,
     );
@@ -107,7 +157,7 @@ class _Town3DViewState extends State<Town3DView> {
 
   @override
   void dispose() {
-    _three.dispose();
+    _threeOrNull?.dispose();
     three.loading.clear();
     super.dispose();
   }
@@ -133,8 +183,8 @@ class _Town3DViewState extends State<Town3DView> {
     final camera = three.PerspectiveCamera(
       40,
       _three.width / _three.height,
-      0.1,
-      200,
+      0.5,
+      140,
     );
     _three.camera = camera;
     _placeCamera(camera, snap: true);
@@ -142,16 +192,20 @@ class _Town3DViewState extends State<Town3DView> {
     scene.add(three.AmbientLight(0xffffff, 0.38));
     final sun = three.DirectionalLight(0xfff4e0, 0.9);
     sun.castShadow = true;
-    sun.shadow?.mapSize.width = 1024;
-    sun.shadow?.mapSize.height = 1024;
+    sun.shadow?.mapSize.width = 2048;
+    sun.shadow?.mapSize.height = 2048;
+    // Gölge bozulması (shadow acne) önlemi: çatı ve duvarlardaki titreyen,
+    // taramalı desen kendi kendini gölgelemekten gelir.
+    sun.shadow?.bias = -0.0006;
+    sun.shadow?.normalBias = 0.03;
     final shadowCam = sun.shadow?.camera;
     if (shadowCam != null) {
-      shadowCam.left = -14;
-      shadowCam.right = 14;
-      shadowCam.top = 14;
-      shadowCam.bottom = -14;
+      shadowCam.left = -20;
+      shadowCam.right = 20;
+      shadowCam.top = 20;
+      shadowCam.bottom = -20;
       shadowCam.near = 1;
-      shadowCam.far = 60;
+      shadowCam.far = 80;
     }
     scene.add(sun);
     scene.add(sun.target);
@@ -426,10 +480,13 @@ class _Town3DViewState extends State<Town3DView> {
   }) {
     final world = widget.world;
     final target = three.Vector3(world.x, 0.6, world.y);
+    // Kamera, karakterin etrafında `_yaw` kadar döner (yatay düzlemde).
+    final c = cos(_yaw), s = sin(_yaw);
+    final ox = _camBack * _zoom, oz = _camBack * _zoom;
     final desired = three.Vector3(
-      world.x + _camBack * _zoom,
+      world.x + ox * c - oz * s,
       _camHeight * _zoom,
-      world.y + _camBack * _zoom,
+      world.y + ox * s + oz * c,
     );
     if (snap) {
       camera.position.setFrom(desired);
@@ -447,6 +504,12 @@ class _Town3DViewState extends State<Town3DView> {
     dt = min(0.1, dt);
     if (dt <= 0) return;
     widget.onTick(dt);
+
+    // Kamera açısı hedefe yaklaşırken basılı girdiyi de yeni açıya göre güncelle.
+    if ((_yawTarget - _yaw).abs() > 1e-4) {
+      _yaw += (_yawTarget - _yaw) * min(1.0, dt * 8);
+      if (!_rawInput.isZero) widget.onInput(_rotateInput(_rawInput));
+    }
 
     final world = widget.world;
     final avatar = _avatar;
@@ -604,11 +667,20 @@ class _Town3DViewState extends State<Town3DView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_threeOrNull == null) {
+      if (MediaQuery.sizeOf(context).isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final size = MediaQuery.sizeOf(context);
+      _zoom = _defaultZoom(size.width / size.height);
+      _createThree();
+    }
     return Stack(
       children: [
         Positioned.fill(
           child: WorldInputLayer(
-            onInput: widget.onInput,
+            onInput: _onInput,
+            onRotateKey: (dir) => _rotateBy(dir * 0.12),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final size = Size(constraints.maxWidth, constraints.maxHeight);
@@ -620,6 +692,7 @@ class _Town3DViewState extends State<Town3DView> {
                   onPointerDown: (e) {
                     _pointers[e.pointer] = e.localPosition;
                     if (_pointers.length == 1) {
+                      _dragging = false;
                       _downAt = e.localPosition;
                       _downTime = e.timeStamp;
                       _gestureIsPinch = false;
@@ -635,6 +708,25 @@ class _Town3DViewState extends State<Town3DView> {
                   onPointerMove: (e) {
                     if (!_pointers.containsKey(e.pointer)) return;
                     _pointers[e.pointer] = e.localPosition;
+                    // Tek parmak/fare sürükleme: kamerayı karakter etrafında
+                    // döndür (küçük kıpırdamalar dokunuş sayılır).
+                    final start = _downAt;
+                    if (_pointers.length == 1 &&
+                        !_gestureIsPinch &&
+                        start != null) {
+                      if (!_dragging &&
+                          (e.localPosition - start).distance > 12) {
+                        _dragging = true;
+                      }
+                      if (_dragging) {
+                        final turn = e.delta.dx * 0.009;
+                        _yaw += turn;
+                        _yawTarget += turn;
+                        if (!_rawInput.isZero) {
+                          widget.onInput(_rotateInput(_rawInput));
+                        }
+                      }
+                    }
                     if (_pointers.length == 2 && _pinchStartDistance > 1) {
                       final pts = _pointers.values.toList();
                       final distance = (pts[0] - pts[1]).distance;
@@ -652,6 +744,10 @@ class _Town3DViewState extends State<Town3DView> {
                     _downAt = null;
                     if (_gestureIsPinch) {
                       if (_pointers.isEmpty) _gestureIsPinch = false;
+                      return;
+                    }
+                    if (_dragging) {
+                      _dragging = false; // sürükleme yürüme dokunuşu değildir
                       return;
                     }
                     if (start == null || widget.onTapTile == null) return;
@@ -697,6 +793,20 @@ class _Town3DViewState extends State<Town3DView> {
                 icon: Icons.remove,
                 tooltip: 'Uzaklaştır',
                 onPressed: () => _setZoom(_zoom / 0.8),
+              ),
+              const SizedBox(height: 14),
+              _ZoomButton(
+                key: const Key('townRotateLeft'),
+                icon: Icons.rotate_left,
+                tooltip: 'Sola döndür (Q)',
+                onPressed: () => _rotateBy(-0.6),
+              ),
+              const SizedBox(height: 6),
+              _ZoomButton(
+                key: const Key('townRotateRight'),
+                icon: Icons.rotate_right,
+                tooltip: 'Sağa döndür (E)',
+                onPressed: () => _rotateBy(0.6),
               ),
             ],
           ),

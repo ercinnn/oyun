@@ -13,10 +13,11 @@ import '../widgets/town_hud.dart';
 class TownWorldScreen extends StatelessWidget {
   const TownWorldScreen({super.key});
 
-  /// Gerçek 3D görünüm (`Town3DView`). Şimdilik **yalnızca web'de** açık: three_js
-  /// orada doğrulandı; Windows/APK doğrulanana kadar ve VM testlerinde (WebGL
-  /// yok) 2B `IsoWorldView`'e düşülür. Doğrulanınca bu bayrak genişletilir.
-  static bool use3d = kIsWeb;
+  /// Gerçek 3D görünüm (`Town3DView`). Varsayılan: **yalnızca web'de** açık
+  /// (three_js orada doğrulandı); VM testlerinde (WebGL yok) ve doğrulanmamış
+  /// platformlarda 2B `IsoWorldView`'e düşülür. Android/masaüstünde denemek için
+  /// `--dart-define=USE_3D=true` ile derle; doğrulanınca varsayılan genişletilir.
+  static bool use3d = kIsWeb || const bool.fromEnvironment('USE_3D');
 
   @override
   Widget build(BuildContext context) {
