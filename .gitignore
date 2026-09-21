@@ -49,3 +49,7 @@ app.*.map.json
 
 # Supabase veritabanı yedekleri (asla depoya girmemeli)
 *.backup.gz
+
+# Blender kaynak dosyaları yalnızca yerelde tutulur (ikili; depoyu şişirmesin)
+*.blend
+*.blend1
