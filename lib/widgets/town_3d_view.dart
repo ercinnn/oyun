@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/gestures.dart' show PointerScrollEvent;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:three_js/three_js.dart' as three;
 
@@ -120,10 +121,10 @@ class _Town3DViewState extends State<Town3DView> {
   double _pinchStartZoom = 1;
   bool _gestureIsPinch = false;
 
+  three.DirectionalLight? _sun;
   three.Object3D? _avatar;
   AvatarRig? _playerRig;
   final List<AvatarRig> _npcRigs = [];
-  three.DirectionalLight? _sun;
   double _heading = 0;
   double _lastX = 0;
   double _lastY = 0;
@@ -183,8 +184,10 @@ class _Town3DViewState extends State<Town3DView> {
     final camera = three.PerspectiveCamera(
       40,
       _three.width / _three.height,
-      0.5,
-      140,
+      // Mobilde derinlik tamponu düşük hassasiyetlidir: aralık ne kadar geniş
+      // olursa çatı/kenar gibi üst üste yüzeyler o kadar yanıp söner (z-fighting).
+      kIsWeb ? 0.5 : 1.5,
+      kIsWeb ? 140 : 70,
     );
     _three.camera = camera;
     _placeCamera(camera, snap: true);
@@ -200,13 +203,17 @@ class _Town3DViewState extends State<Town3DView> {
     sun.shadow?.normalBias = 0.03;
     final shadowCam = sun.shadow?.camera;
     if (shadowCam != null) {
-      shadowCam.left = -20;
-      shadowCam.right = 20;
-      shadowCam.top = 20;
-      shadowCam.bottom = -20;
+      shadowCam.left = -22;
+      shadowCam.right = 22;
+      shadowCam.top = 22;
+      shadowCam.bottom = -22;
       shadowCam.near = 1;
       shadowCam.far = 80;
     }
+    final cx = world.map.width / 2;
+    final cy = world.map.height / 2;
+    sun.position.setValues(cx + 6, 12, cy + 4);
+    sun.target?.position.setValues(cx, 0, cy);
     scene.add(sun);
     scene.add(sun.target);
     _sun = sun;
@@ -225,7 +232,11 @@ class _Town3DViewState extends State<Town3DView> {
         final tile = three.Mesh(tileGeometry, material(_tileColor(kind)));
         tile.position.setValues(
           x + 0.5,
-          kind == TileKind.water ? -0.16 : -0.1,
+          kind == TileKind.water
+              ? -0.16
+              : kind == TileKind.building
+              ? -0.14 // bina zemini modelle aynı düzlemde çakışmasın
+              : -0.1,
           y + 0.5,
         );
         tile.receiveShadow = true;
@@ -238,8 +249,37 @@ class _Town3DViewState extends State<Town3DView> {
     await _loadBuildings(scene);
     scene.add(_buildAvatar());
     _buildActors(scene);
+    if (!kIsWeb) _isolateMaterialPrograms(scene);
 
     _three.addAnimationEvent(_onFrame);
+  }
+
+  /// Android'de (flutter_angle) aynı GL programını paylaşan malzemeler arasında
+  /// renk sızıyor: bir parça, kendinden hemen önce çizilen parçanın rengini
+  /// alıyor (çatı meyvenin yeşiline, duvar başka binanın rengine dönüyor) ve
+  /// çizim sırası kamerayla değiştiği için renkler dönerken/yakınlaşırken
+  /// oynuyor. Web'de aynı renderer kodu sorunsuz. Bu yüzden her farklı görünüme
+  /// (renk + malzeme değerleri) kendi programını veriyoruz: GL uniform değerleri
+  /// program başına saklandığından bir program yalnızca tek bir rengi taşır ve
+  /// başka parçanın rengi ona geçemez. Aynı değerli malzemeler aynı programı
+  /// paylaşır; program sayısı farklı görünüm sayısı kadardır (~100).
+  static void _isolateMaterialPrograms(three.Object3D root) {
+    void isolate(three.Material m) {
+      final key = StringBuffer(m.runtimeType)
+        ..write(m.color.getHex())
+        ..write('/${m.opacity}/${m.transparent}');
+      if (m is three.MeshStandardMaterial) {
+        key.write('/${m.roughness}/${m.metalness}');
+        key.write('/${m.emissive?.getHex()}/${m.emissiveIntensity}');
+      }
+      final k = key.toString();
+      m.customProgramCacheKey = () => k;
+    }
+
+    root.traverse((o) {
+      final m = o is three.Mesh ? o.material : null;
+      if (m != null) isolate(m);
+    });
   }
 
   /// Binalar: Blender'da modellenip GLB olarak `assets/models/`'e konan modeller
