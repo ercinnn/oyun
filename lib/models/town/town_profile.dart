@@ -3,17 +3,23 @@ import 'room_layout.dart';
 import 'shop_catalog.dart';
 
 /// Cihazda saklanan kasaba ilerlemesi: avatar, altın, sahip olunan eşyalar
-/// (mobilyada adetle) ve oda düzeni.
+/// (mobilyada adetle), oda düzeni ve ses tercihleri.
 class TownProfile {
   TownProfile({
     this.avatar = const AvatarSpec(),
     this.coins = 50,
     Map<String, int>? owned,
     this.room = const RoomLayout(),
+    this.soundOn = true,
+    this.musicOn = true,
   }) : owned = owned ?? _starterItems();
 
   AvatarSpec avatar;
   int coins;
+
+  /// Ses efektleri ve müzik açık mı (ayrı ayrı kapatılabilir).
+  bool soundOn;
+  bool musicOn;
 
   /// Eşya kimliği → adet (avatar eşyaları 1, mobilya birden fazla olabilir).
   Map<String, int> owned;
@@ -49,6 +55,8 @@ class TownProfile {
     'coins': coins,
     'owned': owned,
     'room': room.toJson(),
+    'soundOn': soundOn,
+    'musicOn': musicOn,
   };
 
   /// Bozuk/eksik kayıtta güvenli varsayılana düşer.
@@ -73,6 +81,9 @@ class TownProfile {
       coins: coins is int && coins >= 0 ? coins : 50,
       owned: ownedItems,
       room: RoomLayout.fromJson(json['room']),
+      // Ses tercihleri sonradan eklendi: eski kayıtta alan yok, açık kalır.
+      soundOn: json['soundOn'] is bool ? json['soundOn'] as bool : true,
+      musicOn: json['musicOn'] is bool ? json['musicOn'] as bool : true,
     );
   }
 }

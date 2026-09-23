@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../controllers/town_controller.dart';
 import '../games/town_game.dart';
 import '../models/town/avatar_spec.dart';
+import '../services/town_sounds.dart';
 
 const _looks = <String, AvatarSpec>{
   'fancy': AvatarSpec(
@@ -55,7 +56,8 @@ void main() {
     MaterialApp(
       home: ChangeNotifierProvider(
         create: (_) {
-          final controller = TownController()..enterTown();
+          final controller = TownController(sounds: createTownSounds())
+            ..enterTown();
           if (look != null) controller.profile.avatar = look;
           return controller;
         },

@@ -6,6 +6,7 @@ import '../controllers/town_controller.dart';
 import '../widgets/iso_world_view.dart';
 import '../widgets/town_3d_view.dart';
 import '../widgets/town_hud.dart';
+import '../widgets/town_sound_toggles.dart';
 
 /// Serbest kasaba: yürü, altın topla, kapılara gir. Çizim `frame` bildirimiyle
 /// yenilenir; bu ekran ağacı yalnızca altın/kapı gibi ayrık değişimlerde
@@ -53,6 +54,7 @@ class TownWorldScreen extends StatelessWidget {
         title: const Text('Renkli Kasaba'),
         // Geri oku oyundan çıkmak yerine kurulum ekranına döner.
         leading: BackButton(onPressed: controller.leaveToSetup),
+        actions: const [TownSoundToggles()],
       ),
       body: use3d
           ? Town3DView(

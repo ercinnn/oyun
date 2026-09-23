@@ -35,6 +35,10 @@ import 'package:bombali_sayilar/models/town/town_phase.dart';
 import 'package:bombali_sayilar/models/town/town_profile.dart';
 import 'package:bombali_sayilar/models/town/town_world.dart';
 import 'package:bombali_sayilar/services/town_progress_repository.dart';
+import 'package:bombali_sayilar/data/town_sound_clips.dart';
+import 'package:bombali_sayilar/services/audio/clip_synth.dart';
+import 'package:bombali_sayilar/services/audio/sound_clip.dart';
+import 'package:bombali_sayilar/services/town_sounds.dart';
 import 'package:bombali_sayilar/widgets/iso_room_view.dart';
 import 'package:bombali_sayilar/widgets/iso_world_painter.dart';
 import 'package:bombali_sayilar/widgets/iso_world_view.dart';
@@ -5157,6 +5161,195 @@ void main() {
       expect(controller.phase, TownPhase.setup);
     });
 
+    test('ses tarifleri: her klip geçerli, duyulur ve sonu sessiz WAV üretir', () {
+      final clips = <String, SoundClip>{
+        'coin': townCoinClip,
+        'star': townStarClip,
+        'doorNear': townDoorNearClip,
+        'doorOpen': townDoorOpenClip,
+        'purchase': townPurchaseClip,
+        'denied': townDeniedClip,
+        'place': townPlaceClip,
+        'chest': townChestClip,
+        'bump': townBumpClip,
+        'gameStart': townGameStartClip,
+        'win': townWinClip,
+        'lose': townLoseClip,
+        for (final (index, clip) in townStepClips.indexed) 'step$index': clip,
+      };
+
+      clips.forEach((name, clip) {
+        final wav = renderClipWav(clip);
+        expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
+        expect(String.fromCharCodes(wav.sublist(8, 12)), 'WAVE');
+        final bytes = ByteData.sublistView(wav);
+        final samples = (wav.length - 44) ~/ 2;
+        expect(bytes.getUint32(40, Endian.little), samples * 2);
+
+        var peak = 0;
+        for (var i = 0; i < samples; i++) {
+          peak = max(peak, bytes.getInt16(44 + i * 2, Endian.little).abs());
+        }
+        expect(peak, greaterThan(3000), reason: '$name duyulmalı');
+        expect(peak, lessThanOrEqualTo(32767));
+
+        // Zarf `durMs` içinde bittiği için sonu sessiz olmalı ("pop" yok).
+        var tail = 0;
+        for (var i = samples - clip.sampleRate ~/ 200; i < samples; i++) {
+          tail = max(tail, bytes.getInt16(44 + i * 2, Endian.little).abs());
+        }
+        expect(tail, lessThan(peak ~/ 20), reason: '$name kuyruğu sönmeli');
+      });
+    });
+
+    test('müzik döngüsü: tam 16 vuruş uzunluğunda ve dikişsiz', () {
+      expect(townMusicClip.totalMs, 9600);
+      final samples = renderClip(townMusicClip);
+      expect(samples.length, (townMusicClip.sampleRate * 9.6).round());
+
+      // Döngü dikişi: hem baş hem son neredeyse sıfır olmalı, yoksa her
+      // tekrarda duyulur bir tık olur.
+      expect(samples.first.abs(), lessThan(0.02));
+      expect(samples.last.abs(), lessThan(0.02));
+
+      var peak = 0.0;
+      for (final sample in samples) {
+        peak = max(peak, sample.abs());
+      }
+      expect(peak, greaterThan(0.1), reason: 'müzik duyulmalı');
+      expect(peak, lessThanOrEqualTo(1.0), reason: 'müzik kırpılmamalı');
+    });
+
+    test('nota adı frekansa çevrilir', () {
+      expect(noteHz('A4'), closeTo(440, 1e-9));
+      expect(noteHz('A5'), closeTo(880, 1e-9));
+      expect(noteHz('C4'), closeTo(261.6256, 1e-3));
+      expect(noteHz('C#4'), closeTo(277.1826, 1e-3));
+      expect(noteHz('Db4'), closeTo(277.1826, 1e-3));
+      expect(() => noteHz('H4'), throwsArgumentError);
+      expect(() => noteHz('A'), throwsArgumentError);
+    });
+
+    test('kontrolcü: olaylara göre doğru ses çalar, kapalıyken susar', () {
+      final sounds = _FakeTownSounds();
+      final controller = TownController(random: Random(1), sounds: sounds);
+
+      // Kasabaya girmek müziği başlatır; kurulum ekranı sessizdir.
+      controller.enterTown();
+      expect(sounds.musicPlaying, isTrue);
+      controller.leaveToSetup();
+      expect(sounds.musicPlaying, isFalse);
+      controller.enterTown();
+
+      // Altın toplamak "coin", yıldız "star" çalar.
+      sounds.calls.clear();
+      final coin = controller.world.coins.firstWhere((c) => !c.isStar);
+      controller.world.teleport(coin.x, coin.y);
+      controller.tick(0.016);
+      expect(sounds.calls, contains('coin'));
+
+      sounds.calls.clear();
+      final star = controller.world.coins.firstWhere((c) => c.isStar);
+      controller.world.teleport(star.x, star.y);
+      controller.tick(0.016);
+      expect(sounds.calls, contains('star'));
+
+      // Yürümek ayak sesi çıkarır (bir adım mesafesinden fazla yol alınca).
+      sounds.calls.clear();
+      controller.world.teleport(townStartX, townStartY);
+      controller.setInput(const WorldInput(1, 0));
+      for (var i = 0; i < 40; i++) {
+        controller.tick(0.016);
+      }
+      expect(sounds.calls, contains('step'));
+      controller.setInput(WorldInput.none);
+
+      // Kapıdan girmek "doorOpen", satın alma "purchase", parasızlık "denied".
+      sounds.calls.clear();
+      final door = controller.world.map.buildings.first;
+      controller.world.teleport(door.doorX + 0.5, door.doorY + 0.5);
+      controller.tick(0.016);
+      controller.enterNearbyDoor();
+      expect(sounds.calls, contains('doorOpen'));
+
+      sounds.calls.clear();
+      expect(controller.buyOrEquip(shopItemById('hat_crown')!), isFalse);
+      expect(sounds.calls, ['denied']);
+      sounds.calls.clear();
+      expect(controller.buyOrEquip(shopItemById('hat_cap')!), isTrue);
+      expect(sounds.calls, ['purchase']);
+
+      // Ses kapatılınca efekt çalınmaz; müzik ayrı anahtardadır.
+      controller.toggleSound();
+      sounds.calls.clear();
+      controller.profile.coins = 500;
+      expect(controller.buyFurniture(shopItemById('furn_tv')!), isTrue);
+      expect(sounds.calls, isEmpty);
+      expect(sounds.musicPlaying, isTrue);
+      controller.toggleMusic();
+      expect(sounds.musicPlaying, isFalse);
+      expect(controller.profile.soundOn, isFalse);
+      expect(controller.profile.musicOn, isFalse);
+    });
+
+    test('kontrolcü: mini oyun sesleri (başlangıç, çarpma, sandık, bitiş)', () {
+      final sounds = _FakeTownSounds();
+      final controller = TownController(random: Random(2), sounds: sounds);
+
+      controller.startFreeMiniGame(MiniGameKind.parkour);
+      expect(sounds.calls, contains('gameStart'));
+
+      // Suya girmek başa döndürür ve "bump" çalar.
+      sounds.calls.clear();
+      final parkour = controller.session! as ParkourSession;
+      final water = [
+        for (var y = 0; y < parkour.world.map.height; y++)
+          for (var x = 0; x < parkour.world.map.width; x++)
+            if (parkour.world.map.isHazard(x, y)) (x, y),
+      ].first;
+      parkour.world.teleport(water.$1 + 0.5, water.$2 + 0.5);
+      controller.tick(0.016);
+      expect(sounds.calls, contains('bump'));
+
+      // Puansız bitiş "lose", puanlı bitiş "win".
+      sounds.calls.clear();
+      controller.session!.finish();
+      controller.tick(0.016);
+      expect(sounds.calls, contains('lose'));
+
+      controller.continueAfterMiniGame();
+      controller.startFreeMiniGame(MiniGameKind.treasure);
+      sounds.calls.clear();
+      final chest =
+          controller.session!.world.props.firstWhere((p) => p.kind == 'chest');
+      controller.session!.world.teleport(chest.x, chest.y);
+      controller.tick(0.016);
+      expect(sounds.calls, contains('chest'));
+
+      sounds.calls.clear();
+      controller.session!.score = 120;
+      controller.session!.finished = true;
+      controller.tick(0.016);
+      expect(sounds.calls, contains('win'));
+    });
+
+    test('ses tercihleri kayıtta saklanır, eski kayıtta açık kalır', () async {
+      final repo = InMemoryTownProgressRepository();
+      final first = TownController(repository: repo, random: Random(1));
+      first.toggleSound();
+      first.toggleMusic();
+      await Future<void>.delayed(Duration.zero);
+
+      final second = TownController(repository: repo, random: Random(1));
+      await second.load();
+      expect(second.profile.soundOn, isFalse);
+      expect(second.profile.musicOn, isFalse);
+
+      // Ses alanları olmayan eski kayıt: ses açık kabul edilir.
+      expect(TownProfile.fromJson({'coins': 10}).soundOn, isTrue);
+      expect(TownProfile.fromJson({'coins': 10}).musicOn, isTrue);
+    });
+
     /// Ana menüden Renkli Kasaba'ya girer (katalogdaki 14. kart). Dünya ekranı
     /// sürekli kare istediği için burada `pumpAndSettle` kullanılmaz.
     Future<void> openTown(WidgetTester tester) async {
@@ -5640,6 +5833,60 @@ class _FakeMoveSounds implements ChessMoveSounds {
 
   @override
   void playCheckSound() => calls.add('check');
+
+  @override
+  void dispose() => disposed = true;
+}
+
+class _FakeTownSounds implements TownSounds {
+  final calls = <String>[];
+  bool musicPlaying = false;
+  bool disposed = false;
+
+  @override
+  void step() => calls.add('step');
+
+  @override
+  void coin() => calls.add('coin');
+
+  @override
+  void star() => calls.add('star');
+
+  @override
+  void doorNear() => calls.add('doorNear');
+
+  @override
+  void doorOpen() => calls.add('doorOpen');
+
+  @override
+  void purchase() => calls.add('purchase');
+
+  @override
+  void denied() => calls.add('denied');
+
+  @override
+  void placeItem() => calls.add('placeItem');
+
+  @override
+  void chest() => calls.add('chest');
+
+  @override
+  void bump() => calls.add('bump');
+
+  @override
+  void gameStart() => calls.add('gameStart');
+
+  @override
+  void win() => calls.add('win');
+
+  @override
+  void lose() => calls.add('lose');
+
+  @override
+  void startMusic() => musicPlaying = true;
+
+  @override
+  void stopMusic() => musicPlaying = false;
 
   @override
   void dispose() => disposed = true;

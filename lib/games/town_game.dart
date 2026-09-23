@@ -13,6 +13,7 @@ import '../screens/town_turn_transition_screen.dart';
 import '../screens/town_wardrobe_screen.dart';
 import '../screens/town_world_screen.dart';
 import '../services/town_progress_repository.dart';
+import '../services/town_sounds.dart';
 
 /// "Renkli Kasaba" (izometrik 2.5D dünya: gez, avatarını giydir, odanı döşe,
 /// mini oyun oyna) route'u. Diğer oyunlar gibi kendi [TownController] örneğini
@@ -26,9 +27,10 @@ class TownGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) =>
-          TownController(repository: SharedPrefsTownProgressRepository())
-            ..load(),
+      create: (_) => TownController(
+        repository: SharedPrefsTownProgressRepository(),
+        sounds: createTownSounds(),
+      )..load(),
       child: const TownRoot(),
     );
   }

@@ -12,6 +12,7 @@ import '../models/town/town_phase.dart';
 import '../models/town/town_profile.dart';
 import '../models/town/town_world.dart';
 import '../services/town_progress_repository.dart';
+import '../services/town_sounds.dart';
 
 /// Yarışma modunda her oyuncunun oynadığı tur sayısı (üç mini oyun, birer kez).
 /// Diğer oyunların round sabitleriyle aynı adı kullanmıyoruz ("ambiguous
@@ -34,14 +35,22 @@ class FrameNotifier extends ChangeNotifier {
 /// kalıcılığı yönetir. `Future.delayed` kullanılmaz; kayıtlar fire-and-forget
 /// yazılır ve hatalar yutulur.
 class TownController extends ChangeNotifier {
-  TownController({TownProgressRepository? repository, Random? random})
-    : _repository = repository ?? InMemoryTownProgressRepository(),
-      _random = random ?? Random() {
+  TownController({
+    TownProgressRepository? repository,
+    Random? random,
+    TownSounds? sounds,
+  }) : _repository = repository ?? InMemoryTownProgressRepository(),
+       _random = random ?? Random(),
+       _sounds = sounds {
     world = _newTownWorld();
   }
 
   final TownProgressRepository _repository;
   final Random _random;
+
+  /// Ses servisi; verilmezse oyun tamamen sessiz çalışır (testlerin varsayılanı,
+  /// bkz. satrançtaki `ChessController.moveSounds`).
+  final TownSounds? _sounds;
 
   /// Karede bir kez atılan çizim bildirimi.
   final FrameNotifier frame = FrameNotifier();
@@ -73,6 +82,33 @@ class TownController extends ChangeNotifier {
   DoorKind? _lastDoor;
   int _lastSecond = -1;
   bool _lastSessionFinished = false;
+
+  // Ses için izlenen son değerler (dünya sayaçları kümülatif, delta bakılır).
+  double _lastX = 0;
+  double _lastY = 0;
+  double _stepDistance = 0;
+  int _lastCoinTotal = 0;
+  int _lastStarTotal = 0;
+  int _lastHits = 0;
+  int _lastFound = 0;
+
+  /// Bir ayak sesi ile diğeri arasında yürünen mesafe (kare). Karakter
+  /// `TownWorld.speed` (3,4 kare/sn) ile koştuğu için bu değer doğrudan adım
+  /// tempusunu belirler: 1,15 ≈ saniyede 3 adım. Daha küçük bir değer
+  /// (ilk denemedeki 0,62 → saniyede 5,4 adım) tarayıcıda makineli tüfek gibi
+  /// duyuluyordu; küçültürken dinlemeden değiştirme.
+  static const double _stepStride = 1.15;
+
+  /// Müziğin çaldığı fazlar: kurulum, sıra devri ve sonuç ekranı sessizdir
+  /// (oradaki metni okumak için sessizlik daha uygun).
+  static const Set<TownPhase> _musicPhases = {
+    TownPhase.town,
+    TownPhase.wardrobe,
+    TownPhase.market,
+    TownPhase.home,
+    TownPhase.arcade,
+    TownPhase.miniGame,
+  };
 
   TownPlayerState get currentPlayer => players[currentPlayerIndex];
 
@@ -108,6 +144,99 @@ class TownController extends ChangeNotifier {
 
   void _markDirty() => _dirty = true;
 
+  // ─────────────────────────── Ses ───────────────────────────
+
+  /// Bir efekt çalar (ses kapalıysa ya da servis yoksa hiçbir şey yapmaz).
+  void _fx(void Function(TownSounds sounds) play) {
+    final sounds = _sounds;
+    if (sounds == null || !profile.soundOn) return;
+    play(sounds);
+  }
+
+  /// Fazı değiştirir ve müziği faza göre açar/kapatır. Faz her zaman buradan
+  /// değişir; aksi hâlde müzik bir ekranda takılı kalır.
+  void _setPhase(TownPhase next) {
+    phase = next;
+    _syncMusic();
+  }
+
+  void _syncMusic() {
+    final sounds = _sounds;
+    if (sounds == null) return;
+    if (profile.musicOn && _musicPhases.contains(phase)) {
+      sounds.startMusic();
+    } else {
+      sounds.stopMusic();
+    }
+  }
+
+  /// Ses efektlerini açıp kapatır (tercih kaydedilir).
+  void toggleSound() {
+    profile.soundOn = !profile.soundOn;
+    saveNow();
+    // Açıldığında kısa bir tık: düğmenin işe yaradığı duyulsun.
+    _fx((sounds) => sounds.placeItem());
+    notifyListeners();
+  }
+
+  /// Müziği açıp kapatır (tercih kaydedilir).
+  void toggleMusic() {
+    profile.musicOn = !profile.musicOn;
+    saveNow();
+    _syncMusic();
+    notifyListeners();
+  }
+
+  /// Dünyadaki kümülatif sayaçları ses için başlangıç değerine çeker; yeni bir
+  /// dünyaya (mini oyun ya da kasabaya dönüş) geçerken çağrılır, yoksa taze
+  /// dünyanın sıfır sayaçları "eksi delta" sayılıp ses tetiklenmezdi.
+  void _resyncWorldSounds(TownWorld target) {
+    _lastX = target.x;
+    _lastY = target.y;
+    _stepDistance = 0;
+    _lastCoinTotal = target.coinsCollectedTotal;
+    _lastStarTotal = target.starsCollectedTotal;
+    _lastHits = 0;
+    _lastFound = 0;
+  }
+
+  /// Dünyanın bu karedeki değişimlerinden ses üretir (ayak sesi, altın, yıldız).
+  void _observeWorldSounds(TownWorld target) {
+    if (target.moving) {
+      final dx = target.x - _lastX;
+      final dy = target.y - _lastY;
+      _stepDistance += sqrt(dx * dx + dy * dy);
+      if (_stepDistance >= _stepStride) {
+        _stepDistance = 0;
+        _fx((sounds) => sounds.step());
+      }
+    } else {
+      // Dururken bir sonraki adımın sesi hemen gelsin (yürümeye başlar başlamaz).
+      _stepDistance = _stepStride * 0.7;
+    }
+    _lastX = target.x;
+    _lastY = target.y;
+
+    if (target.starsCollectedTotal > _lastStarTotal) {
+      _fx((sounds) => sounds.star());
+    } else if (target.coinsCollectedTotal > _lastCoinTotal) {
+      _fx((sounds) => sounds.coin());
+    }
+    _lastStarTotal = target.starsCollectedTotal;
+    _lastCoinTotal = target.coinsCollectedTotal;
+  }
+
+  /// Mini oyuna özgü olayların sesi (çarpma, sandık).
+  void _observeSessionSounds(MiniGameSession current) {
+    if (current is ParkourSession && current.hits > _lastHits) {
+      _lastHits = current.hits;
+      _fx((sounds) => sounds.bump());
+    } else if (current is TreasureSession && current.found > _lastFound) {
+      _lastFound = current.found;
+      _fx((sounds) => sounds.chest());
+    }
+  }
+
   /// Bekleyen değişiklikleri hemen yazar.
   void saveNow() {
     _dirty = false;
@@ -122,7 +251,8 @@ class TownController extends ChangeNotifier {
     contest = false;
     session = null;
     input = WorldInput.none;
-    phase = TownPhase.town;
+    _resyncWorldSounds(world);
+    _setPhase(TownPhase.town);
     notifyListeners();
   }
 
@@ -130,7 +260,7 @@ class TownController extends ChangeNotifier {
   void leaveToSetup() {
     saveNow();
     input = WorldInput.none;
-    phase = TownPhase.setup;
+    _setPhase(TownPhase.setup);
     notifyListeners();
   }
 
@@ -140,12 +270,13 @@ class TownController extends ChangeNotifier {
     if (door == null) return;
     input = WorldInput.none;
     saveNow();
-    phase = switch (door) {
+    _fx((sounds) => sounds.doorOpen());
+    _setPhase(switch (door) {
       DoorKind.wardrobe => TownPhase.wardrobe,
       DoorKind.market => TownPhase.market,
       DoorKind.home => TownPhase.home,
       DoorKind.arcade => TownPhase.arcade,
-    };
+    });
     notifyListeners();
   }
 
@@ -153,7 +284,8 @@ class TownController extends ChangeNotifier {
   void backToTown() {
     saveNow();
     session = null;
-    phase = TownPhase.town;
+    _resyncWorldSounds(world);
+    _setPhase(TownPhase.town);
     notifyListeners();
   }
 
@@ -164,7 +296,7 @@ class TownController extends ChangeNotifier {
     session = null;
     contest = false;
     input = WorldInput.none;
-    phase = TownPhase.setup;
+    _setPhase(TownPhase.setup);
     notifyListeners();
   }
 
@@ -194,6 +326,7 @@ class TownController extends ChangeNotifier {
   void tick(double dt) {
     if (phase == TownPhase.town) {
       world.step(dt, input);
+      _observeWorldSounds(world);
       final value = world.takeCollectedValue();
       if (value > 0) {
         profile.coins += value;
@@ -203,18 +336,24 @@ class TownController extends ChangeNotifier {
       final door = world.nearbyDoor?.kind;
       if (door != _lastDoor) {
         _lastDoor = door;
+        if (door != null) _fx((sounds) => sounds.doorNear());
         notifyListeners();
       }
     } else if (phase == TownPhase.miniGame) {
       final current = session;
       if (current == null) return;
       current.step(dt, input);
+      _observeWorldSounds(current.world);
+      _observeSessionSounds(current);
       final second = current.timeLeft.ceil();
       final finishedNow = current.finished;
       if (second != _lastSecond || finishedNow != _lastSessionFinished) {
         _lastSecond = second;
         _lastSessionFinished = finishedNow;
-        if (finishedNow) input = WorldInput.none;
+        if (finishedNow) {
+          input = WorldInput.none;
+          _fx((sounds) => current.score > 0 ? sounds.win() : sounds.lose());
+        }
         notifyListeners();
       }
     }
@@ -240,7 +379,15 @@ class TownController extends ChangeNotifier {
   /// true; altın yetmezse false.
   bool buyOrEquip(ShopItem item) {
     if (item.category == ShopCategory.furniture) return false;
-    if (!profile.owns(item.id) && !profile.buy(item)) return false;
+    if (!profile.owns(item.id)) {
+      if (!profile.buy(item)) {
+        _fx((sounds) => sounds.denied());
+        return false;
+      }
+      _fx((sounds) => sounds.purchase());
+    } else {
+      _fx((sounds) => sounds.placeItem());
+    }
     final avatar = profile.avatar;
     profile.avatar = switch (item.category) {
       ShopCategory.hair => avatar.copyWith(hairStyle: item.id),
@@ -281,6 +428,7 @@ class TownController extends ChangeNotifier {
   bool buyFurniture(ShopItem item) {
     if (item.category != ShopCategory.furniture) return false;
     final bought = profile.buy(item);
+    _fx((sounds) => bought ? sounds.purchase() : sounds.denied());
     if (bought) {
       _markDirty();
       notifyListeners();
@@ -294,7 +442,11 @@ class TownController extends ChangeNotifier {
   /// false.
   bool placeItem(ShopItem item, int x, int y, {int rotation = 0}) {
     if (profile.availableCount(item.id) <= 0) return false;
-    if (!profile.room.canPlace(item, x, y, rotation)) return false;
+    if (!profile.room.canPlace(item, x, y, rotation)) {
+      _fx((sounds) => sounds.denied());
+      return false;
+    }
+    _fx((sounds) => sounds.placeItem());
     profile.room = profile.room.copyWith(
       items: [
         ...profile.room.items,
@@ -316,6 +468,7 @@ class TownController extends ChangeNotifier {
     if (!profile.room.canPlace(item, placed.x, placed.y, rotation, ignoreIndex: index)) {
       return false;
     }
+    _fx((sounds) => sounds.placeItem());
     final items = [...profile.room.items];
     items[index] = placed.copyWith(rotation: rotation);
     profile.room = profile.room.copyWith(items: items);
@@ -333,6 +486,7 @@ class TownController extends ChangeNotifier {
     if (!profile.room.canPlace(item, x, y, placed.rotation, ignoreIndex: index)) {
       return false;
     }
+    _fx((sounds) => sounds.placeItem());
     final items = [...profile.room.items];
     items[index] = placed.copyWith(x: x, y: y);
     profile.room = profile.room.copyWith(items: items);
@@ -344,6 +498,7 @@ class TownController extends ChangeNotifier {
   /// [index]'teki eşyayı odadan kaldır (envantere döner).
   void removePlaced(int index) {
     if (index < 0 || index >= profile.room.items.length) return;
+    _fx((sounds) => sounds.placeItem());
     final items = [...profile.room.items]..removeAt(index);
     profile.room = profile.room.copyWith(items: items);
     _markDirty();
@@ -386,7 +541,9 @@ class TownController extends ChangeNotifier {
     input = WorldInput.none;
     _lastSecond = -1;
     _lastSessionFinished = false;
-    phase = TownPhase.miniGame;
+    _resyncWorldSounds(session!.world);
+    _setPhase(TownPhase.miniGame);
+    _fx((sounds) => sounds.gameStart());
     notifyListeners();
   }
 
@@ -407,7 +564,7 @@ class TownController extends ChangeNotifier {
       }
       session = null;
       saveNow();
-      phase = TownPhase.arcade;
+      _setPhase(TownPhase.arcade);
       notifyListeners();
       return;
     }
@@ -420,13 +577,13 @@ class TownController extends ChangeNotifier {
       final next = _findNextUnfinishedPlayerIndex();
       if (next == null) {
         session = null;
-        phase = TownPhase.finished;
+        _setPhase(TownPhase.finished);
         notifyListeners();
         return;
       }
       currentPlayerIndex = next;
       session = null;
-      phase = TownPhase.turnTransition;
+      _setPhase(TownPhase.turnTransition);
       notifyListeners();
       return;
     }
@@ -449,6 +606,7 @@ class TownController extends ChangeNotifier {
   @override
   void dispose() {
     frame.dispose();
+    _sounds?.dispose();
     super.dispose();
   }
 }

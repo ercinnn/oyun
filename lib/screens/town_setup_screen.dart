@@ -5,6 +5,7 @@ import '../controllers/profile_controller.dart';
 import '../controllers/town_controller.dart';
 import '../widgets/avatar_painter.dart';
 import '../widgets/player_count_selector.dart';
+import '../widgets/town_sound_toggles.dart';
 
 class TownSetupScreen extends StatefulWidget {
   const TownSetupScreen({super.key});
@@ -54,7 +55,10 @@ class _TownSetupScreenState extends State<TownSetupScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<TownController>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Renkli Kasaba')),
+      appBar: AppBar(
+        title: const Text('Renkli Kasaba'),
+        actions: const [TownSoundToggles()],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),

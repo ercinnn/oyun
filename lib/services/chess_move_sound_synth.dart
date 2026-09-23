@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'audio/biquad.dart';
+import 'audio/wav.dart';
 import 'chess_move_sound_recipe.dart';
 
 /// Web Audio kullanılamayan platformlarda (Android/masaüstü) aynı
@@ -18,14 +20,14 @@ Uint8List renderMoveSoundWav(
   final attack = recipe.attackMs / 1000;
   final decay = recipe.decayMs / 1000;
 
-  final bodyLowpass = _Biquad()..lowpass(recipe.bodyLowpassHz, sampleRate);
-  final impactHighpass = [for (final _ in recipe.impacts) _Biquad()];
+  final bodyLowpass = Biquad()..lowpass(recipe.bodyLowpassHz, sampleRate);
+  final impactHighpass = [for (final _ in recipe.impacts) Biquad()];
   // Her (temas, çınlama) çifti kendi süzgeç durumunu taşır.
   final ringFilters = [
     for (final _ in recipe.impacts)
       [
         for (final r in recipe.ringModes)
-          _Biquad()..bandpass(r.hz, sampleRate, r.q),
+          Biquad()..bandpass(r.hz, sampleRate, r.q),
       ],
   ];
 
@@ -89,80 +91,5 @@ Uint8List renderMoveSoundWav(
     final v = (mix * recipe.gain).clamp(-1.0, 1.0);
     pcm[n] = (v * 32767).round();
   }
-  return _wav(pcm, sampleRate);
-}
-
-Uint8List _wav(Int16List pcm, int sampleRate) {
-  final dataLen = pcm.length * 2;
-  final bytes = ByteData(44 + dataLen);
-  void ascii(int offset, String s) {
-    for (var i = 0; i < s.length; i++) {
-      bytes.setUint8(offset + i, s.codeUnitAt(i));
-    }
-  }
-
-  ascii(0, 'RIFF');
-  bytes.setUint32(4, 36 + dataLen, Endian.little);
-  ascii(8, 'WAVE');
-  ascii(12, 'fmt ');
-  bytes.setUint32(16, 16, Endian.little);
-  bytes.setUint16(20, 1, Endian.little); // PCM
-  bytes.setUint16(22, 1, Endian.little); // mono
-  bytes.setUint32(24, sampleRate, Endian.little);
-  bytes.setUint32(28, sampleRate * 2, Endian.little);
-  bytes.setUint16(32, 2, Endian.little);
-  bytes.setUint16(34, 16, Endian.little);
-  ascii(36, 'data');
-  bytes.setUint32(40, dataLen, Endian.little);
-  for (var i = 0; i < pcm.length; i++) {
-    bytes.setInt16(44 + i * 2, pcm[i], Endian.little);
-  }
-  return bytes.buffer.asUint8List();
-}
-
-/// RBJ "Audio EQ Cookbook" iki kutuplu süzgeci (Web Audio `BiquadFilterNode`
-/// ile aynı formüller). Katsayılar örnekler arasında değiştirilebilir; süzgeç
-/// durumu korunur (süpürmeli yüksek geçiren için gerekli).
-class _Biquad {
-  double _b0 = 1, _b1 = 0, _b2 = 0, _a1 = 0, _a2 = 0;
-  double _x1 = 0, _x2 = 0, _y1 = 0, _y2 = 0;
-
-  void _set(double b0, double b1, double b2, double a0, double a1, double a2) {
-    _b0 = b0 / a0;
-    _b1 = b1 / a0;
-    _b2 = b2 / a0;
-    _a1 = a1 / a0;
-    _a2 = a2 / a0;
-  }
-
-  void lowpass(double hz, int sampleRate, [double q = 0.7071]) {
-    final w = 2 * pi * hz / sampleRate;
-    final c = cos(w);
-    final alpha = sin(w) / (2 * q);
-    _set((1 - c) / 2, 1 - c, (1 - c) / 2, 1 + alpha, -2 * c, 1 - alpha);
-  }
-
-  void highpass(double hz, int sampleRate, [double q = 0.7071]) {
-    final w = 2 * pi * hz / sampleRate;
-    final c = cos(w);
-    final alpha = sin(w) / (2 * q);
-    _set((1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + alpha, -2 * c, 1 - alpha);
-  }
-
-  /// Sabit 0 dB tepe kazançlı band-geçiren.
-  void bandpass(double hz, int sampleRate, double q) {
-    final w = 2 * pi * hz / sampleRate;
-    final c = cos(w);
-    final alpha = sin(w) / (2 * q);
-    _set(alpha, 0, -alpha, 1 + alpha, -2 * c, 1 - alpha);
-  }
-
-  double process(double x) {
-    final y = _b0 * x + _b1 * _x1 + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
-    _x2 = _x1;
-    _x1 = x;
-    _y2 = _y1;
-    _y1 = y;
-    return y;
-  }
+  return encodeWav16(pcm, sampleRate);
 }
