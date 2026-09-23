@@ -256,6 +256,14 @@ class TownController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Yalnızca geliştirme girişi için (`lib/dev/town_3d_probe.dart`): kasabada
+  /// yürümeye gerek kalmadan bir ekranı açar. Oyunun akışında kullanılmaz.
+  void debugJumpToPhase(TownPhase target) {
+    input = WorldInput.none;
+    _setPhase(target);
+    notifyListeners();
+  }
+
   /// Dünyadan kurulum ekranına dön.
   void leaveToSetup() {
     saveNow();

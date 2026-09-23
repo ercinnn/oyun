@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/town_3d.dart';
 import '../controllers/town_controller.dart';
 import '../models/town/room_layout.dart';
 import '../models/town/shop_catalog.dart';
+import '../widgets/furniture_thumb.dart';
 import '../widgets/iso_room_view.dart';
+import '../widgets/room_3d_view.dart';
 
 /// Evim: izometrik oda. Envanterden bir eşya seç, bir kareye dokunup
 /// yerleştir; yerleştirilmiş bir eşyaya dokunup seç, döndür, taşı ya da kaldır.
@@ -77,11 +80,19 @@ class _TownRoomScreenState extends State<TownRoomScreen> {
       body: Column(
         children: [
           Expanded(
-            child: IsoRoomView(
-              layout: layout,
-              selectedIndex: _selectedIndex,
-              onTapTile: _onTapTile,
-            ),
+            // 3B açıkken oda da kasabayla aynı görsel dilde (Blender mobilya
+            // modelleri); testler/WebGL'siz platformlar izometrik görünümde.
+            child: townUse3d
+                ? Room3DView(
+                    layout: layout,
+                    selectedIndex: _selectedIndex,
+                    onTapTile: _onTapTile,
+                  )
+                : IsoRoomView(
+                    layout: layout,
+                    selectedIndex: _selectedIndex,
+                    onTapTile: _onTapTile,
+                  ),
           ),
           Container(
             constraints: const BoxConstraints(maxHeight: 260),
@@ -122,8 +133,9 @@ class _TownRoomScreenState extends State<TownRoomScreen> {
                         for (final item in inventory)
                           ChoiceChip(
                             key: Key('roomInv_${item.id}'),
+                            avatar: FurnitureThumb(item: item, size: 30),
                             label: Text(
-                              '${item.emoji} ${item.name} ×${profile.availableCount(item.id)}',
+                              '${item.name} ×${profile.availableCount(item.id)}',
                             ),
                             selected: _armedItemId == item.id,
                             onSelected: (selected) => setState(() {

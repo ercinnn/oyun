@@ -11,6 +11,8 @@ import '../models/town/town_map.dart';
 import '../models/town/town_world.dart';
 import 'avatar_3d.dart';
 import 'avatar_model.dart';
+import 'scene_zoom_button.dart';
+import 'three_pick.dart';
 import 'world_input_layer.dart';
 
 /// Kasabanın gerçek 3D görünümü (three_js). `IsoWorldView` ile aynı sözleşmeyi
@@ -22,7 +24,7 @@ import 'world_input_layer.dart';
 /// `-x,-y`'ye doğru): ekranda "sağ" = `x - y`. Bu yüzden `TownWorld.step`'in
 /// ekran-uzayı girdi dönüşümü değişmeden doğru çalışır.
 ///
-/// **Yalnızca web'de doğrulandı**; `TownWorldScreen.use3d` diğer platformlarda
+/// **Yalnızca web'de doğrulandı**; `townUse3d` (config/town_3d.dart) diğer platformlarda
 /// (ve testlerde: VM'de WebGL yok) 2B görünüme düşer.
 class Town3DView extends StatefulWidget {
   const Town3DView({
@@ -249,37 +251,9 @@ class _Town3DViewState extends State<Town3DView> {
     await _loadBuildings(scene);
     scene.add(_buildAvatar());
     _buildActors(scene);
-    if (!kIsWeb) _isolateMaterialPrograms(scene);
+    if (!kIsWeb) isolateMaterialPrograms(scene);
 
     _three.addAnimationEvent(_onFrame);
-  }
-
-  /// Android'de (flutter_angle) aynı GL programını paylaşan malzemeler arasında
-  /// renk sızıyor: bir parça, kendinden hemen önce çizilen parçanın rengini
-  /// alıyor (çatı meyvenin yeşiline, duvar başka binanın rengine dönüyor) ve
-  /// çizim sırası kamerayla değiştiği için renkler dönerken/yakınlaşırken
-  /// oynuyor. Web'de aynı renderer kodu sorunsuz. Bu yüzden her farklı görünüme
-  /// (renk + malzeme değerleri) kendi programını veriyoruz: GL uniform değerleri
-  /// program başına saklandığından bir program yalnızca tek bir rengi taşır ve
-  /// başka parçanın rengi ona geçemez. Aynı değerli malzemeler aynı programı
-  /// paylaşır; program sayısı farklı görünüm sayısı kadardır (~100).
-  static void _isolateMaterialPrograms(three.Object3D root) {
-    void isolate(three.Material m) {
-      final key = StringBuffer(m.runtimeType)
-        ..write(m.color.getHex())
-        ..write('/${m.opacity}/${m.transparent}');
-      if (m is three.MeshStandardMaterial) {
-        key.write('/${m.roughness}/${m.metalness}');
-        key.write('/${m.emissive?.getHex()}/${m.emissiveIntensity}');
-      }
-      final k = key.toString();
-      m.customProgramCacheKey = () => k;
-    }
-
-    root.traverse((o) {
-      final m = o is three.Mesh ? o.material : null;
-      if (m != null) isolate(m);
-    });
   }
 
   /// Binalar: Blender'da modellenip GLB olarak `assets/models/`'e konan modeller
@@ -583,49 +557,14 @@ class _Town3DViewState extends State<Town3DView> {
 
   // ─────────────────────────── Dokun-yürü ───────────────────────────
 
-  /// Kamera tabanı: konum + ileri/sağ/yukarı birim vektörleri. Sahne
-  /// kamerasıyla aynı `lookAt` hedefini kullanır.
-  _CameraBasis? _basis() {
-    final cam = _three.camera;
-    final px = cam.position.x, py = cam.position.y, pz = cam.position.z;
-    var fx = _look.x - px, fy = _look.y - py, fz = _look.z - pz;
-    final fl = sqrt(fx * fx + fy * fy + fz * fz);
-    if (fl == 0) return null;
-    fx /= fl;
-    fy /= fl;
-    fz /= fl;
-    // sağ = ileri × (0,1,0)
-    var rx = -fz;
-    var rz = fx;
-    final rl = sqrt(rx * rx + rz * rz);
-    if (rl == 0) return null;
-    rx /= rl;
-    rz /= rl;
-    // yukarı = sağ × ileri  (ry = 0)
-    final ux = -rz * fy;
-    final uy = rz * fx - rx * fz;
-    final uz = rx * fy;
-    return _CameraBasis(
-      pos: [px, py, pz],
-      fwd: [fx, fy, fz],
-      right: [rx, 0, rz],
-      up: [ux, uy, uz],
-    );
-  }
+  /// Kamera tabanı (ortak hesap, bkz. `three_pick.dart`). Sahne kamerasıyla
+  /// aynı `lookAt` hedefini kullanır.
+  ThreeSceneBasis? _basis() =>
+      ThreeSceneBasis.of(_three.camera, _look, fovDeg: _fovDeg);
 
   /// Dünya noktasının ekran konumu (piksel); kameranın arkasındaysa null.
-  Offset? _project(double x, double y, double z, Size size) {
-    final b = _basis();
-    if (b == null) return null;
-    final v = [x - b.pos[0], y - b.pos[1], z - b.pos[2]];
-    final depth = b.dot(v, b.fwd);
-    if (depth <= 0) return null;
-    final tanH = tan(_fovDeg * pi / 360);
-    final aspect = size.width / size.height;
-    final nx = b.dot(v, b.right) / (depth * tanH * aspect);
-    final ny = b.dot(v, b.up) / (depth * tanH);
-    return Offset((nx + 1) / 2 * size.width, (1 - ny) / 2 * size.height);
-  }
+  Offset? _project(double x, double y, double z, Size size) =>
+      _basis()?.project(x, y, z, size);
 
   /// Dokunulan noktanın **yürünecek karesi**. Sırayla: altın/yıldız (havada
   /// süzüldükleri için ekrandaki yerine bakılır), bina gövdesi/çatısı (kapısına
@@ -650,56 +589,33 @@ class _Town3DViewState extends State<Town3DView> {
     if (coinTile != null) return coinTile;
 
     // Dokunma ışını.
-    final tanH = tan(_fovDeg * pi / 360);
-    final k =
-        (local.dx / size.width * 2 - 1) * tanH * (size.width / size.height);
-    final m = (1 - local.dy / size.height * 2) * tanH;
-    final d = [
-      for (var i = 0; i < 3; i++) b.fwd[i] + b.right[i] * k + b.up[i] * m,
-    ];
+    final d = b.rayThrough(local, size);
 
-    // Bina kutusuyla kesişim (slab yöntemi); en yakın isabet kazanır.
+    // Bina kutusuyla kesişim; en yakın isabet kazanır.
     double? bestT;
     TownBuilding? hit;
     for (final building in world.map.buildings) {
       const height = 3.0; // duvar 2,0 + çatı 0,95 (modeller)
-      final lo = [building.x.toDouble(), 0.0, building.y.toDouble()];
-      final hi = [
-        (building.x + building.w).toDouble(),
-        height,
-        (building.y + building.h).toDouble(),
-      ];
-      var tMin = 0.0;
-      var tMax = double.infinity;
-      var ok = true;
-      for (var a = 0; a < 3; a++) {
-        final o = b.pos[a];
-        if (d[a].abs() < 1e-9) {
-          if (o < lo[a] || o > hi[a]) ok = false;
-        } else {
-          var t1 = (lo[a] - o) / d[a];
-          var t2 = (hi[a] - o) / d[a];
-          if (t1 > t2) {
-            final tmp = t1;
-            t1 = t2;
-            t2 = tmp;
-          }
-          tMin = max(tMin, t1);
-          tMax = min(tMax, t2);
-        }
-      }
-      if (ok && tMin <= tMax && (bestT == null || tMin < bestT)) {
-        bestT = tMin;
+      final t = b.intersectBox(
+        d,
+        [building.x.toDouble(), 0.0, building.y.toDouble()],
+        [
+          (building.x + building.w).toDouble(),
+          height,
+          (building.y + building.h).toDouble(),
+        ],
+      );
+      if (t != null && (bestT == null || t < bestT)) {
+        bestT = t;
         hit = building;
       }
     }
     if (hit != null) return (hit.doorX, hit.doorY);
 
-    if (d[1].abs() < 1e-9) return null;
-    final t = -b.pos[1] / d[1];
-    if (t <= 0) return null;
-    final tx = (b.pos[0] + d[0] * t).floor();
-    final ty = (b.pos[2] + d[2] * t).floor();
+    final ground = b.hitPlane(d);
+    if (ground == null) return null;
+    final tx = ground.$1.floor();
+    final ty = ground.$2.floor();
     final map = world.map;
     if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return null;
     return (tx, ty);
@@ -821,28 +737,28 @@ class _Town3DViewState extends State<Town3DView> {
           top: 56,
           child: Column(
             children: [
-              _ZoomButton(
+              SceneZoomButton(
                 key: const Key('townZoomIn'),
                 icon: Icons.add,
                 tooltip: 'Yakınlaştır',
                 onPressed: () => _setZoom(_zoom * 0.8),
               ),
               const SizedBox(height: 6),
-              _ZoomButton(
+              SceneZoomButton(
                 key: const Key('townZoomOut'),
                 icon: Icons.remove,
                 tooltip: 'Uzaklaştır',
                 onPressed: () => _setZoom(_zoom / 0.8),
               ),
               const SizedBox(height: 14),
-              _ZoomButton(
+              SceneZoomButton(
                 key: const Key('townRotateLeft'),
                 icon: Icons.rotate_left,
                 tooltip: 'Sola döndür (Q)',
                 onPressed: () => _rotateBy(-0.6),
               ),
               const SizedBox(height: 6),
-              _ZoomButton(
+              SceneZoomButton(
                 key: const Key('townRotateRight'),
                 icon: Icons.rotate_right,
                 tooltip: 'Sağa döndür (E)',
@@ -855,56 +771,4 @@ class _Town3DViewState extends State<Town3DView> {
       ],
     );
   }
-}
-
-/// Yakınlaştırma düğmesi (yarı saydam yuvarlak, oyun görünümünün üstünde).
-class _ZoomButton extends StatelessWidget {
-  const _ZoomButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: const Color(0xB3263238),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Kamera tabanı (dokunma ışını ve izdüşüm için).
-class _CameraBasis {
-  const _CameraBasis({
-    required this.pos,
-    required this.fwd,
-    required this.right,
-    required this.up,
-  });
-
-  final List<double> pos;
-  final List<double> fwd;
-  final List<double> right;
-  final List<double> up;
-
-  double dot(List<double> a, List<double> b) =>
-      a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }

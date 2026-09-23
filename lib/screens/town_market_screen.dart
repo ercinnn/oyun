@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/town_controller.dart';
 import '../models/town/shop_catalog.dart';
+import '../widgets/furniture_thumb.dart';
 import '../widgets/town_hud.dart';
 
 /// Market: mobilya satın al (birden çok alınabilir); odana Evim'den yerleştir.
@@ -42,7 +43,7 @@ class TownMarketScreen extends StatelessWidget {
               for (final item in shopItemsIn(ShopCategory.furniture))
                 Card(
                   child: ListTile(
-                    leading: Text(item.emoji, style: const TextStyle(fontSize: 28)),
+                    leading: FurnitureThumb(item: item, size: 48),
                     title: Text(item.name),
                     subtitle: Text(
                       '${item.price} altın · Sende: ${profile.owned[item.id] ?? 0}',

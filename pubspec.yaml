@@ -68,6 +68,7 @@ flutter:
     - assets/sounds/bomb.wav
     - assets/sounds/win.wav
     - assets/models/
+    - assets/thumbs/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

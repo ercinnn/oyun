@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -5348,6 +5350,149 @@ void main() {
       // Ses alanları olmayan eski kayıt: ses açık kabul edilir.
       expect(TownProfile.fromJson({'coins': 10}).soundOn, isTrue);
       expect(TownProfile.fromJson({'coins': 10}).musicOn, isTrue);
+    });
+
+    test('mobilya varlıkları: her eşyanın GLB modeli ve market önizlemesi var', () {
+      final furniture = shopItemsIn(ShopCategory.furniture);
+      expect(furniture, isNotEmpty);
+
+      // GLB'nin JSON bölümünü saf Dart'ta oku (three_js/WebGL gerekmez):
+      // 12 baytlık başlık, ardından uzunluk + tür etiketli parçalar.
+      final glb = File('assets/models/furniture.glb');
+      expect(glb.existsSync(), isTrue, reason: 'furniture.glb üretilmemiş');
+      final bytes = glb.readAsBytesSync();
+      final data = ByteData.sublistView(bytes);
+      expect(data.getUint32(0, Endian.little), 0x46546C67, reason: 'glTF sihirli sayısı');
+      final total = data.getUint32(8, Endian.little);
+      Map<String, Object?>? gltf;
+      var offset = 12;
+      while (offset + 8 <= total) {
+        final length = data.getUint32(offset, Endian.little);
+        final type = data.getUint32(offset + 4, Endian.little);
+        if (type == 0x4E4F534A) {
+          gltf = jsonDecode(
+            utf8.decode(bytes.sublist(offset + 8, offset + 8 + length)),
+          ) as Map<String, Object?>;
+          break;
+        }
+        offset += 8 + length;
+      }
+      expect(gltf, isNotNull, reason: 'GLB içinde JSON bölümü yok');
+
+      final nodes = (gltf!['nodes'] as List).cast<Map<String, Object?>>();
+      final sceneRoots = ((gltf['scenes'] as List).first
+              as Map<String, Object?>)['nodes'] as List;
+      final rootNames = {
+        for (final index in sceneRoots) nodes[index as int]['name'] as String,
+      };
+
+      for (final item in furniture) {
+        // Oyun tarafı grubu tam bu adla arar (`FurnitureModel.tryBuild`).
+        expect(
+          rootNames,
+          contains(item.id),
+          reason:
+              '${item.id} için GLB grubu yok — tool/blender/build_furniture.py '
+              'çalıştırılıp yeniden dışa aktarılmalı',
+        );
+        // Market/envanter önizlemesi (`FurnitureThumb`).
+        final thumb = File('assets/thumbs/${item.id}.png');
+        expect(
+          thumb.existsSync(),
+          isTrue,
+          reason: '${item.id} için assets/thumbs/${item.id}.png yok '
+              '(render_thumbs çalıştırılmalı)',
+        );
+        expect(thumb.lengthSync(), greaterThan(1000));
+      }
+    });
+
+    test('mobilya modelleri ayak izine sığar (GLB kutusu katalogla uyumlu)', () {
+      // Modelin yerel kutusu `0..width` × `0..depth` aralığında olmalı; taşarsa
+      // oda çarpışma denetimi ile görüntü birbirini tutmaz (komşu kareye sarkar).
+      // Kutu bilgisi GLB'nin erişimci (accessor) min/max alanlarından okunur.
+      final bytes = File('assets/models/furniture.glb').readAsBytesSync();
+      final data = ByteData.sublistView(bytes);
+      final length = data.getUint32(12, Endian.little);
+      final gltf = jsonDecode(utf8.decode(bytes.sublist(20, 20 + length)))
+          as Map<String, Object?>;
+
+      final nodes = (gltf['nodes'] as List).cast<Map<String, Object?>>();
+      final meshes = (gltf['meshes'] as List).cast<Map<String, Object?>>();
+      final accessors = (gltf['accessors'] as List).cast<Map<String, Object?>>();
+      final sceneRoots = ((gltf['scenes'] as List).first
+              as Map<String, Object?>)['nodes'] as List;
+
+      /// Düğüm ve altlarındaki tüm konum erişimcilerinin min/max'ından kutu.
+      (List<double>, List<double>) boundsOf(int index) {
+        final lo = [double.infinity, double.infinity, double.infinity];
+        final hi = [-double.infinity, -double.infinity, -double.infinity];
+        void visit(int i, List<double> offset) {
+          final node = nodes[i];
+          final translation = (node['translation'] as List?)
+                  ?.map((v) => (v as num).toDouble())
+                  .toList() ??
+              const [0.0, 0.0, 0.0];
+          final here = [
+            for (var a = 0; a < 3; a++) offset[a] + translation[a],
+          ];
+          final mesh = node['mesh'];
+          if (mesh is int) {
+            for (final primitive
+                in (meshes[mesh]['primitives'] as List).cast<Map<String, Object?>>()) {
+              final position =
+                  (primitive['attributes'] as Map<String, Object?>)['POSITION'];
+              if (position is! int) continue;
+              final accessor = accessors[position];
+              // `min`/`max` adlarını kullanma: dart:math'in işlevlerini gölgeler.
+              final lowest = (accessor['min'] as List).cast<num>();
+              final highest = (accessor['max'] as List).cast<num>();
+              for (var a = 0; a < 3; a++) {
+                lo[a] = min(lo[a], here[a] + lowest[a].toDouble());
+                hi[a] = max(hi[a], here[a] + highest[a].toDouble());
+              }
+            }
+          }
+          for (final child in (node['children'] as List?) ?? const []) {
+            visit(child as int, here);
+          }
+        }
+
+        visit(index, const [0.0, 0.0, 0.0]);
+        return (lo, hi);
+      }
+
+      final rootByName = <String, int>{
+        for (final index in sceneRoots.cast<int>())
+          nodes[index]['name'] as String: index,
+      };
+
+      for (final item in shopItemsIn(ShopCategory.furniture)) {
+        final index = rootByName[item.id];
+        if (index == null) continue; // önceki test bunu zaten bildirir
+        final (lo, hi) = boundsOf(index);
+        // glTF Y-up: x = kare genişliği, z = kare derinliği, y = yükseklik.
+        // Küçük bir pay bırakılır (kenar payları, saçak vb.).
+        const slack = 0.06;
+        expect(lo[0], greaterThan(-slack), reason: '${item.id} x altına taşıyor');
+        expect(lo[2], greaterThan(-slack), reason: '${item.id} z altına taşıyor');
+        expect(
+          hi[0],
+          lessThan(item.width + slack),
+          reason: '${item.id} genişliği ${item.width} kareyi aşıyor',
+        );
+        expect(
+          hi[2],
+          lessThan(item.depth + slack),
+          reason: '${item.id} derinliği ${item.depth} kareyi aşıyor',
+        );
+        // Yükseklik katalogla kabaca uyuşmalı (dokunma kutusu buna dayanıyor).
+        expect(
+          hi[1],
+          lessThan(item.height + 0.25),
+          reason: '${item.id} modeli katalog yüksekliğinden çok yüksek',
+        );
+      }
     });
 
     /// Ana menüden Renkli Kasaba'ya girer (katalogdaki 14. kart). Dünya ekranı

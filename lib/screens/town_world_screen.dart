@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/town_3d.dart';
 import '../controllers/town_controller.dart';
 import '../widgets/iso_world_view.dart';
 import '../widgets/town_3d_view.dart';
@@ -13,12 +13,6 @@ import '../widgets/town_sound_toggles.dart';
 /// yeniden kurulur.
 class TownWorldScreen extends StatelessWidget {
   const TownWorldScreen({super.key});
-
-  /// Gerçek 3D görünüm (`Town3DView`). Varsayılan: **yalnızca web'de** açık
-  /// (three_js orada doğrulandı); VM testlerinde (WebGL yok) ve doğrulanmamış
-  /// platformlarda 2B `IsoWorldView`'e düşülür. Android/masaüstünde denemek için
-  /// `--dart-define=USE_3D=true` ile derle; doğrulanınca varsayılan genişletilir.
-  static bool use3d = kIsWeb || const bool.fromEnvironment('USE_3D');
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +50,7 @@ class TownWorldScreen extends StatelessWidget {
         leading: BackButton(onPressed: controller.leaveToSetup),
         actions: const [TownSoundToggles()],
       ),
-      body: use3d
+      body: townUse3d
           ? Town3DView(
               world: controller.world,
               avatar: controller.profile.avatar,
