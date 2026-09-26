@@ -8,6 +8,7 @@ import '../models/fleming/petri.dart';
 import '../models/fleming/resistance.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/fleming/fleming_scene_view.dart';
+import '../widgets/science_lab/lab_guide.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
 import '../widgets/science_lab/scientist_sound_toggle.dart';
 
@@ -16,21 +17,38 @@ import '../widgets/science_lab/scientist_sound_toggle.dart';
 class FlemingExploreScreen extends StatelessWidget {
   const FlemingExploreScreen({super.key});
 
+  static const _stations = [
+    LabStation(
+      FlemingStation.petri,
+      'Petri Kabı',
+      '🧫',
+      'Küflü kapla küfsüz kabı günler boyunca karşılaştır.',
+    ),
+    LabStation(
+      FlemingStation.hygiene,
+      'Temizlik',
+      '🧼',
+      'Mikroplar nereden geliyor? Kapak ve eller ne değiştiriyor?',
+    ),
+    LabStation(
+      FlemingStation.medicine,
+      'Doğru İlaç',
+      '💊',
+      'Antibiyotiği kaç gün kullanmak gerekiyor?',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<FlemingController>();
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<FlemingStation>(
+        LabStationPicker<FlemingStation>(
           key: const Key('flemingStation'),
-          segments: [
-            for (final s in FlemingStation.values)
-              ButtonSegment(value: s, label: Text(s.label)),
-          ],
-          selected: {controller.station},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => controller.setStation(v.first),
+          stations: _stations,
+          selected: controller.station,
+          onSelected: controller.setStation,
         ),
         const SizedBox(height: 12),
         switch (controller.station) {
@@ -74,15 +92,45 @@ class _PetriControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        LabStepList(
+          steps: [
+            LabStep(
+              '"Bir gün beklet"e basıp iki kabı karşılaştır.',
+              done: controller.sawMoldRing,
+            ),
+            LabStep(
+              'Küfün çevresindeki bakterisiz halkayı bul.',
+              done: controller.sawMoldRing && d >= 3,
+            ),
+            LabStep(
+              'Küfü kaldır: A kabı da B gibi mi oldu?',
+              done: controller.triedNoMold,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('flemingNextDay'),
+          onPressed: d >= petriMaxDays ? null : controller.nextDay,
+          icon: Icons.wb_sunny,
+          label: 'Bir gün beklet',
+        ),
+        const SizedBox(height: 6),
         SwitchListTile(
           key: const Key('flemingMold'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('A kabına küf (Penicillium) koy'),
-          subtitle: const Text('B kabı her zaman küfsüz: kontrol kabı'),
+          title: const Text(
+            'A kabına küf (Penicillium) koy',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'B kabı her zaman küfsüz: kontrol kabı',
+            style: TextStyle(fontSize: 14),
+          ),
           value: controller.mold,
           onChanged: controller.setMold,
         ),
-        Text('Gün: ${formatTr(d)}'),
+        LabSectionTitle('Gün: ${formatTr(d)}'),
         Slider(
           key: const Key('flemingDay'),
           value: d,
@@ -91,16 +139,11 @@ class _PetriControls extends StatelessWidget {
           divisions: petriMaxDays,
           onChanged: controller.setDay,
         ),
-        OutlinedButton.icon(
-          key: const Key('flemingNextDay'),
-          onPressed: d >= petriMaxDays ? null : controller.nextDay,
-          icon: const Icon(Icons.wb_sunny),
-          label: const Text('Bir gün beklet'),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         LabInfoCard(
           key: const Key('flemingPetriInfo'),
           color: Colors.teal.shade50,
+          icon: Icons.biotech,
           text: d == 0
               ? 'Bakteriler ekildi ama henüz görünmüyorlar. Günleri ilerlet!'
               : 'A kabında $a, B kabında $b koloni var. '
@@ -121,15 +164,43 @@ class _HygieneControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        LabStepList(
+          steps: [
+            LabStep(
+              'Kabı "$hygieneDays gün beklet" ve kolonileri say.',
+              done: controller.incubatedSetups.isNotEmpty,
+            ),
+            LabStep(
+              'Kapağı aç ya da kaba yıkanmamış elle dokun, yeniden beklet.',
+              done: controller.incubatedSetups.length >= 2,
+            ),
+            LabStep(
+              'Yıkanmış elle dene: fark ne kadar?',
+              done: controller.incubatedSetups.any(
+                (s) => s.endsWith('/washed'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('flemingIncubate'),
+          onPressed: controller.incubate,
+          icon: Icons.hourglass_bottom,
+          label: '$hygieneDays gün beklet',
+        ),
+        const SizedBox(height: 6),
         SwitchListTile(
           key: const Key('flemingLid'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('Kabın kapağı açık kalsın'),
+          title: const Text(
+            'Kabın kapağı açık kalsın',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
           value: controller.lidOpen,
           onChanged: controller.setLid,
         ),
-        const Text('Kaba kim dokunsun?'),
-        const SizedBox(height: 4),
+        const LabSectionTitle('Kaba kim dokunsun?'),
         Wrap(
           spacing: 6,
           runSpacing: 4,
@@ -137,24 +208,18 @@ class _HygieneControls extends StatelessWidget {
             for (final h in HandTouch.values)
               ChoiceChip(
                 key: Key('flemingHand_${h.name}'),
-                label: Text(h.label),
+                label: Text(h.label, style: const TextStyle(fontSize: 15)),
                 selected: h == controller.hand,
                 onSelected: (_) => controller.setHand(h),
                 visualDensity: VisualDensity.compact,
               ),
           ],
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('flemingIncubate'),
-          onPressed: controller.incubate,
-          icon: const Icon(Icons.hourglass_bottom),
-          label: const Text('$hygieneDays gün beklet'),
-        ),
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('flemingHygieneInfo'),
           color: Colors.orange.shade50,
+          icon: Icons.clean_hands,
           text: controller.incubated
               ? '${controller.scene.hygieneCount} koloni üredi. Mikroplar havada '
                     've ellerimizde bulunur; sabunla yıkanmış el çok daha az '
@@ -179,7 +244,33 @@ class _MedicineControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('İlaç kaç gün kullanılsın? $t gün (doktor: $fullCourseDays gün)'),
+        LabStepList(
+          steps: [
+            LabStep(
+              '"$observedDays günü izle"ye bas ve grafiğe bak.',
+              done: controller.coursesRun.isNotEmpty,
+            ),
+            LabStep(
+              'İlacı erken bırakınca ne oluyor, dene.',
+              done: controller.coursesRun.any((d) => d < fullCourseDays),
+            ),
+            LabStep(
+              'Doktorun dediği gibi $fullCourseDays gün kullan.',
+              done: controller.coursesRun.contains(fullCourseDays),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('flemingRunCourse'),
+          onPressed: controller.runCourse,
+          icon: Icons.medication,
+          label: '$observedDays günü izle',
+        ),
+        const SizedBox(height: 10),
+        LabSectionTitle(
+          'İlaç kaç gün kullanılsın? $t gün (doktor: $fullCourseDays gün)',
+        ),
         Slider(
           key: const Key('flemingTreatment'),
           value: t.toDouble(),
@@ -188,16 +279,13 @@ class _MedicineControls extends StatelessWidget {
           divisions: fullCourseDays,
           onChanged: (v) => controller.setTreatmentDays(v.round()),
         ),
-        FilledButton.icon(
-          key: const Key('flemingRunCourse'),
-          onPressed: controller.runCourse,
-          icon: const Icon(Icons.medication),
-          label: const Text('$observedDays günü izle'),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         LabInfoCard(
           key: const Key('flemingMedicineInfo'),
-          color: done && end.cleared ? Colors.green.shade50 : Colors.red.shade50,
+          color: done && end.cleared
+              ? Colors.green.shade50
+              : Colors.red.shade50,
+          icon: Icons.medication_outlined,
           text: !done
               ? 'Yeşiller ilaca duyarlı, kırmızılar dayanıklı bakteriler. İlacı '
                     'kaç gün kullanırsan bakteriler yok olur?'
@@ -207,8 +295,11 @@ class _MedicineControls extends StatelessWidget {
                     '%${(end.resistantShare * 100).round()}\'i dayanıklı. '
                     'Hastalık geri döndü ve ilaç artık daha zor işe yarar.',
         ),
-        const LabInfoCard(
-          text: 'Unutma: Antibiyotiği yalnızca doktor verir. Grip ve soğuk '
+        LabInfoCard(
+          color: Colors.blue.shade50,
+          icon: Icons.health_and_safety,
+          text:
+              'Unutma: Antibiyotiği yalnızca doktor verir. Grip ve soğuk '
               'algınlığı virüslerle olur; antibiyotik virüslere işe yaramaz.',
         ),
       ],

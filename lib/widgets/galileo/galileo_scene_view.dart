@@ -7,6 +7,8 @@ import '../../models/galileo/galileo_scene.dart';
 import '../../models/galileo/jupiter.dart';
 import '../../models/galileo/solar.dart';
 import '../../models/galileo/telescope.dart';
+import '../../models/science/science_task.dart' show formatTr;
+import '../science_lab/lab_labels.dart';
 import 'galileo_insets.dart';
 import 'galileo_lab_3d_view.dart';
 
@@ -30,8 +32,17 @@ class GalileoSceneView extends StatelessWidget {
             Positioned.fill(
               child: scientistsUse3d
                   ? GalileoLab3DView(scene: scene)
-                  : CustomPaint(
-                      painter: _Galileo2DPainter(scene, tube, nights, day),
+                  : ValueListenableBuilder<bool>(
+                      valueListenable: labLabelsOn,
+                      builder: (context, showLabels, _) => CustomPaint(
+                        painter: _Galileo2DPainter(
+                          scene,
+                          tube,
+                          nights,
+                          day,
+                          showLabels: showLabels,
+                        ),
+                      ),
                     ),
             ),
             Positioned(
@@ -95,7 +106,16 @@ class _Tweened extends StatelessWidget {
 }
 
 class _Galileo2DPainter extends CustomPainter {
-  _Galileo2DPainter(this.scene, this.tube, this.nights, this.day);
+  _Galileo2DPainter(
+    this.scene,
+    this.tube,
+    this.nights,
+    this.day, {
+    required this.showLabels,
+  });
+
+  /// Sahne etiketleri (gezegen ve uydu adları, teleskop).
+  final bool showLabels;
 
   final GalileoScene scene;
   final double tube;
@@ -141,6 +161,14 @@ class _Galileo2DPainter extends CustomPainter {
       ..strokeWidth = 3;
     canvas.drawLine(base, base + Offset(-20, size.height * 0.28), leg);
     canvas.drawLine(base, base + Offset(20, size.height * 0.28), leg);
+    if (showLabels) {
+      paintLabLabel(canvas, base - Offset(0, size.height * 0.12),
+          const LabLabel("Galileo'nun teleskobu", emoji: '🔭'), bounds: size);
+      paintLabLabel(canvas, base + Offset(0, size.height * 0.2),
+          LabLabel.value('Tüp: ${formatTr(tube, digits: 0)} cm'), bounds: size);
+      paintLabLabel(canvas, Offset(size.width * 0.9, size.height * 0.2),
+          LabLabel(scene.target.label), bounds: size);
+    }
   }
 
   void _jupiter(Canvas canvas, Size size) {
@@ -160,6 +188,22 @@ class _Galileo2DPainter extends CustomPainter {
       final p = c + Offset(r * cos(a), r * 0.4 * sin(a));
       canvas.drawCircle(p, m.id == scene.highlightMoonId ? 5 : 3.5,
           Paint()..color = Color(0xFF000000 | m.color));
+      if (showLabels) {
+        paintLabLabel(
+          canvas,
+          p - const Offset(0, 6),
+          LabLabel(
+            m.name,
+            color: m.id == scene.highlightMoonId ? const Color(0xFFF9A825) : null,
+          ),
+          bounds: size,
+          scale: 0.85,
+        );
+      }
+    }
+    if (showLabels) {
+      paintLabLabel(canvas, c - Offset(0, scale * 1.4 + 2), const LabLabel('Jüpiter'),
+          bounds: size);
     }
   }
 
@@ -183,6 +227,19 @@ class _Galileo2DPainter extends CustomPainter {
       if (p.id == 'venus') venus = pos;
       final hl = scene.highlightPlanetIds.contains(p.id);
       canvas.drawCircle(pos, hl ? 6 : 4, Paint()..color = Color(0xFF000000 | p.color));
+      if (showLabels) {
+        paintLabLabel(
+          canvas,
+          pos - const Offset(0, 6),
+          LabLabel(p.name, color: hl ? const Color(0xFFF9A825) : null),
+          bounds: size,
+          scale: 0.85,
+        );
+      }
+    }
+    if (showLabels) {
+      paintLabLabel(canvas, c - Offset(0, scale * 0.9 + 2),
+          const LabLabel('Güneş', emoji: '☀️'), bounds: size);
     }
     if (scene.venusOffsetDeg != null && earth != null && venus != null) {
       canvas.drawLine(earth, venus, Paint()
@@ -193,5 +250,9 @@ class _Galileo2DPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_Galileo2DPainter old) =>
-      old.scene != scene || old.tube != tube || old.nights != nights || old.day != day;
+      old.scene != scene ||
+      old.tube != tube ||
+      old.nights != nights ||
+      old.day != day ||
+      old.showLabels != showLabels;
 }

@@ -9,6 +9,8 @@ import '../../models/curie/geiger.dart';
 import '../../models/curie/shielding.dart';
 import '../../models/curie/therapy.dart';
 import '../../models/science/science_task.dart' show formatTr;
+import '../science_lab/lab_labels.dart';
+import '../science_lab/lab_style.dart';
 import 'curie_lab_3d_view.dart';
 
 /// Curie laboratuvarı: 3B açıksa `CurieLab3DView`, değilse 2B yedek; ikisinin
@@ -28,7 +30,12 @@ class CurieSceneView extends StatelessWidget {
           Positioned.fill(
             child: scientistsUse3d
                 ? CurieLab3DView(scene: scene)
-                : CustomPaint(painter: _Curie2DPainter(scene)),
+                : ValueListenableBuilder<bool>(
+                    valueListenable: labLabelsOn,
+                    builder: (context, showLabels, _) => CustomPaint(
+                      painter: _Curie2DPainter(scene, showLabels: showLabels),
+                    ),
+                  ),
           ),
           Positioned(left: 8, bottom: 8, child: _inset()),
         ],
@@ -37,42 +44,20 @@ class CurieSceneView extends StatelessWidget {
   }
 
   Widget _inset() => switch (scene.station) {
-    CurieStation.geiger => _Panel(
+    CurieStation.geiger => LabInset.reading(
       key: const Key('curieGeigerMeter'),
-      children: [
-        Text(
-          '${formatCps(scene.geigerCps)} tık/sn',
-          style: const TextStyle(
-            color: Color(0xFFFF8A80),
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          scene.sample == null
-              ? 'Sayaç boşta · yalnızca arka plan'
-              : '${scene.sample!.name} · ${formatTr(scene.distanceCm)} cm',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
-        ),
-      ],
+      value: '${formatCps(scene.geigerCps)} tık/sn',
+      valueColor: const Color(0xFFFF8A80),
+      caption: scene.sample == null
+          ? 'Sayaç boşta · yalnızca arka plan'
+          : '${scene.sample!.name} · ${formatTr(scene.distanceCm)} cm',
     ),
-    CurieStation.shield => _Panel(
+    CurieStation.shield => LabInset.reading(
       key: const Key('curieShieldMeter'),
-      children: [
-        Text(
-          '${formatCps(scene.shieldCps)} tık/sn',
-          style: TextStyle(
-            color: Color(0xFF000000 | scene.ray.color),
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          '${scene.ray.label} ışını · ${scene.shield.label} · geçen %'
+      value: '${formatCps(scene.shieldCps)} tık/sn',
+      valueColor: Color(0xFF000000 | scene.ray.color),
+      caption: '${scene.ray.label} ışını · ${scene.shield.label} · geçen %'
           '${(transmission(scene.ray, scene.shield) * 100).round()}',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
-        ),
-      ],
     ),
     CurieStation.therapy => DoseMapView(dose: scene.dose, beamsOn: scene.beamsOn),
   };
@@ -88,23 +73,28 @@ class DoseMapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
+    return LabInset(
       key: const Key('curieDoseMap'),
       children: [
+        const LabInsetCaption('Doz haritası'),
+        const SizedBox(height: 4),
         SizedBox(
-          width: 150,
-          height: 150,
+          width: 140,
+          height: 140,
           child: CustomPaint(painter: _DosePainter(dose)),
         ),
-        const SizedBox(height: 4),
-        Text(
-          beamsOn
-              ? 'Tümör ${formatTr(dose.tumorDose)} · sağlıklı doku en çok '
-                    '${formatTr(dose.maxHealthyDose)} · '
-                    '${dose.safe ? 'güvenli' : 'fazla!'}'
-              : 'Işınlar kapalı',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
-        ),
+        const SizedBox(height: 6),
+        if (beamsOn) ...[
+          LabInsetValue(
+            dose.safe ? 'Güvenli plan' : 'Fazla ışın!',
+            color: dose.safe ? const Color(0xFF69F0AE) : const Color(0xFFFF8A80),
+          ),
+          LabInsetCaption(
+            'Tümör ${formatTr(dose.tumorDose)} · sağlıklı doku en çok '
+            '${formatTr(dose.maxHealthyDose)}',
+          ),
+        ] else
+          const LabInsetCaption('Işınlar kapalı'),
       ],
     );
   }
@@ -159,31 +149,18 @@ class _DosePainter extends CustomPainter {
   bool shouldRepaint(_DosePainter old) => old.dose != dose;
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel({super.key, required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: const Color(0xCC101418),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    ),
-  );
-}
-
 /// 2B yedek: istasyonun durağan şeması.
 class _Curie2DPainter extends CustomPainter {
-  _Curie2DPainter(this.scene);
+  _Curie2DPainter(this.scene, {required this.showLabels});
 
   final CurieScene scene;
+
+  /// Sahne etiketleri (numune adları, sonda, kalkan, tümör).
+  final bool showLabels;
+
+  void _tag(Canvas canvas, Size size, Offset tip, LabLabel label) {
+    if (showLabels) paintLabLabel(canvas, tip, label, bounds: size, scale: 0.9);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -216,6 +193,8 @@ class _Curie2DPainter extends CustomPainter {
       final x = step * (i + 1);
       _text(canvas, s.emoji, Offset(x, benchY - 30), 22);
       if (s.id == scene.sample?.id) {
+        _tag(canvas, size, Offset(x, benchY - 32),
+            LabLabel(s.name, color: const Color(0xFFC62828)));
         // Sonda: numunenin altından, uzaklık kadar aşağıda.
         final d = scene.distanceCm / counterMaxCm * size.height * 0.4;
         canvas.drawLine(
@@ -225,6 +204,8 @@ class _Curie2DPainter extends CustomPainter {
             ..color = const Color(0xFF90A4AE)
             ..strokeWidth = 6,
         );
+        _tag(canvas, size, Offset(x + 34, benchY + 60 + d),
+            LabLabel.value('Sonda ${formatTr(scene.distanceCm)} cm'));
       }
     }
   }
@@ -254,7 +235,11 @@ class _Curie2DPainter extends CustomPainter {
       };
       canvas.drawRect(Rect.fromCenter(center: Offset(mid, y), width: w, height: 70),
           Paint()..color = const Color(0xFF37474F));
+      _tag(canvas, size, Offset(mid, y - 36), LabLabel(scene.shield.label));
     }
+    _tag(canvas, size, Offset(size.width * 0.15, y - 26),
+        LabLabel('${scene.ray.label} kaynağı', color: Color(0xFF000000 | scene.ray.color)));
+    _tag(canvas, size, Offset(size.width * 0.85, y - 20), const LabLabel('Sayaç'));
   }
 
   void _therapy(Canvas canvas, Size size) {
@@ -263,6 +248,9 @@ class _Curie2DPainter extends CustomPainter {
     final r = min(size.width, size.height) * 0.3;
     canvas.drawCircle(c, r, Paint()..color = const Color(0xFFFFCCBC));
     canvas.drawCircle(c, r * tumorRadius / bodyRadius, Paint()..color = const Color(0xFF8E24AA));
+    _tag(canvas, size, c - Offset(0, r * tumorRadius / bodyRadius + 2),
+        const LabLabel('Tümör', color: Color(0xFF6A1B9A)));
+    _tag(canvas, size, c - Offset(r * 0.7, r * 0.72), const LabLabel('Sağlıklı doku'));
     if (!scene.beamsOn) return;
     for (final b in scene.beams) {
       final a = b.angleDeg * pi / 180;
@@ -274,5 +262,6 @@ class _Curie2DPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_Curie2DPainter old) => old.scene != scene;
+  bool shouldRepaint(_Curie2DPainter old) =>
+      old.scene != scene || old.showLabels != showLabels;
 }

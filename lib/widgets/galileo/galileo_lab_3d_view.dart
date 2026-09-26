@@ -7,8 +7,10 @@ import '../../models/galileo/galileo_scene.dart';
 import '../../models/galileo/jupiter.dart';
 import '../../models/galileo/solar.dart';
 import '../../models/galileo/telescope.dart';
+import '../../models/science/science_task.dart' show formatTr;
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Galileo'nun gözlemevinin 3B görünümü. Modeller Blender'da üretilmiştir
 /// (`assets/models/galileo.glb`, üretici `tool/blender/build_galileo.py`);
@@ -275,6 +277,54 @@ class _GalileoLab3DViewState extends Lab3DState<GalileoLab3DView> {
   }
 
   // ─────────────────────────── Kamera ───────────────────────────
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels {
+    final s = _s;
+    switch (s.station) {
+      case GalileoStation.telescope:
+        final target = _skyTarget;
+        return [
+          anchor(const LabLabel('Galileo\'nun teleskobu', emoji: '🔭'),
+              _balconyX + 0.3, 1.75, 0.1),
+          anchor(LabLabel.value('Tüp: ${formatTr(_shownTube, digits: 0)} cm'),
+              _balconyX + 0.9, 1.05, 0.5),
+          if (target != null)
+            anchorAt(target, LabLabel(s.target.label), dy: 1.3),
+        ];
+      case GalileoStation.jupiter:
+        final hl = s.highlightMoon;
+        return [
+          anchor(const LabLabel('Jüpiter'), _jupiterX, _spaceY + 2.1, 0),
+          for (final m in jupiterMoons)
+            anchorAt(
+              _moons[m.id]!,
+              LabLabel(
+                m.name,
+                color: hl?.id == m.id ? const Color(0xFFF9A825) : null,
+              ),
+              dy: 0.45,
+            ),
+        ];
+      case GalileoStation.solar:
+        return [
+          anchor(const LabLabel('Güneş', emoji: '☀️'), _solarX, _spaceY + 1.4, 0),
+          for (final p in planets)
+            anchorAt(
+              _planets[p.id]!,
+              LabLabel(
+                p.name,
+                color: s.highlightPlanetIds.contains(p.id)
+                    ? const Color(0xFFF9A825)
+                    : null,
+              ),
+              dy: p.id == 'jupiter' ? 0.75 : 0.42,
+            ),
+        ];
+    }
+  }
 
   @override
   LabCameraShot get cameraShot => switch (_s.station) {

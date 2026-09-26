@@ -7,8 +7,10 @@ import '../../models/archimedes/archimedes_scene.dart';
 import '../../models/archimedes/archimedes_screw.dart';
 import '../../models/archimedes/boat.dart';
 import '../../models/archimedes/buoyancy.dart';
+import '../../models/science/science_task.dart' show formatTr;
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Arşimet atölyesinin gerçek 3B görünümü (three_js). Modeller Blender'da
 /// üretilmiştir (`assets/models/archimedes.glb`, üretici
@@ -403,6 +405,119 @@ class _ArchimedesLab3DViewState extends Lab3DState<ArchimedesLab3DView> {
       final r = 0.6 + fill;
       d.scale.setValues(r, r, r);
     }
+  }
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  /// Yalnızca görünen istasyonun etiketleri. Konumlar animasyondaki
+  /// değerlerden okunur: düşen cismin adı onunla iner, su seviyesi yazısı
+  /// suyla yükselir.
+  @override
+  List<LabAnchor> get labels {
+    final s = widget.scene;
+    return switch (s.station) {
+      ArchimedesStation.tank => _tankLabels(s),
+      ArchimedesStation.boat => _boatLabels(s),
+      ArchimedesStation.screw => _screwLabels(s),
+    };
+  }
+
+  final three.Vector3 _base = three.Vector3();
+
+  List<LabAnchor> _tankLabels(ArchimedesScene s) {
+    const k = _tankScale;
+    final out = <LabAnchor>[];
+    for (var i = 0; i < s.tanks.length && i < _tanks.length; i++) {
+      final tank = s.tanks[i];
+      final nodes = _tanks[i];
+      final b = nodes.root.getWorldPosition(_base);
+      final (bx, by, bz) = (b.x, b.y, b.z);
+      final tag = tank.label;
+      if (tag != null) {
+        out.add(anchor(
+          LabLabel.tag(tag),
+          bx - (_tankInner / 2 + 0.2) * k,
+          by + _tankHeightUnits * k * 0.8,
+          bz,
+        ));
+      }
+      out.add(anchor(
+        LabLabel.value('Su: ${formatTr(nodes.level * 10)} cm'),
+        bx + (_tankInner / 2) * k,
+        by + nodes.level * k,
+        bz + (_tankInner / 2) * k,
+      ));
+      final named = [
+        ?tank.held,
+        if (tank.dropped.isNotEmpty) tank.dropped.last,
+      ];
+      for (final o in named) {
+        final node = _objects['$i/${o.id}'];
+        if (node == null) continue;
+        out.add(anchorAt(
+          node.node,
+          LabLabel(o.name, emoji: o.emoji),
+          dy: (node.height - node.baseOffset) * k + 0.04,
+        ));
+      }
+      if (nodes.beakerWater != null) {
+        out.add(anchor(
+          LabLabel.value('Taşan: ${(nodes.overflow / 0.85 * 80).round()} mL'),
+          bx + 0.55 * k,
+          by + 1.0 * k,
+          bz + (_tankInner / 2 + 0.75) * k,
+        ));
+      }
+    }
+    return out;
+  }
+
+  List<LabAnchor> _boatLabels(ArchimedesScene s) {
+    final boat = s.boat;
+    if (boat == null || _boatModel == null) return const [];
+    final sinking = boat.sinks(s.crates);
+    final layers = s.crates == 0 ? 0 : (s.crates - 1) ~/ 6 + 1;
+    return [
+      anchor(
+        LabLabel(boat.name, emoji: boat.emoji),
+        _boatStationX,
+        _boatY + _hull(boat) + 0.25 + layers * 0.31,
+        0,
+      ),
+      anchor(
+        LabLabel.value(sinking ? 'Battı!' : '${s.crates} sandık yük'),
+        _boatStationX + 1.9,
+        -0.05,
+        0.9,
+      ),
+    ];
+  }
+
+  List<LabAnchor> _screwLabels(ArchimedesScene s) {
+    final a = _shownAngle * pi / 180;
+    final mid = screwLengthM * 0.5;
+    return [
+      anchor(
+        const LabLabel('Arşimet vidası'),
+        _screwPivotX + cos(a) * mid,
+        _screwPivotY + sin(a) * mid + 0.45,
+        0,
+      ),
+      anchor(
+        LabLabel.value('Açı: ${s.screwAngle.round()}°'),
+        _screwPivotX + 0.7,
+        _screwPivotY + 0.15,
+        0.6,
+      ),
+      anchor(const LabLabel('Nehir', emoji: '🌊'), _screwStationX - 3.6, -0.05, 1.2),
+      anchor(
+        LabLabel('Tarla: ${_shownLitres.round()} / ${fieldNeedLitres.round()} litre',
+            emoji: '🌱'),
+        _screwPivotX + _fieldGap + 1.4,
+        fieldHeightM + 0.45,
+        0,
+      ),
+    ];
   }
 
   // ─────────────────────────── Kamera ───────────────────────────

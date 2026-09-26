@@ -8,9 +8,13 @@ import 'package:three_js/three_js.dart' as three;
 import '../glb_model_library.dart';
 import '../scene_zoom_button.dart';
 import '../three_pick.dart';
+import 'lab_labels.dart';
 
 /// Kameranın bakacağı nokta ve oradan uzaklığı (yakınlaştırma 1'de).
 typedef LabCameraShot = ({three.Vector3 look, three.Vector3 offset});
+
+/// Dünya koordinatındaki bir etiket noktası (bkz. [Lab3DState.labels]).
+typedef LabAnchor = ({LabLabel label, double x, double y, double z});
 
 /// Bilim İnsanları 3B görünümlerinin ortak iskeleti (Arşimet, Newton…):
 /// ThreeJS'in gecikmeli kurulumu, ışıklar, istasyonlar arası kayan kamera,
@@ -47,6 +51,24 @@ abstract class Lab3DState<W extends StatefulWidget> extends State<W> {
 
   /// Sahne verisi değişti: bir sonraki karede [syncWorld] çağrılır.
   void markDirty() => _dirty = true;
+
+  /// Sahnedeki nesnelerin etiketleri (dünya koordinatında). Her karede
+  /// okunur ve ekrana izdüşürülür; hareketli bir nesnenin etiketi onu izler
+  /// ([anchorAt]). Varsayılan: etiket yok.
+  List<LabAnchor> get labels => const [];
+
+  /// [node]'un o anki dünya konumunun [dy] üstündeki etiket.
+  LabAnchor anchorAt(three.Object3D node, LabLabel label, {double dy = 0}) {
+    final p = node.getWorldPosition(_tmp);
+    return (label: label, x: p.x, y: p.y + dy, z: p.z);
+  }
+
+  /// Sabit bir dünya noktasındaki etiket.
+  LabAnchor anchor(LabLabel label, double x, double y, double z) =>
+      (label: label, x: x, y: y, z: z);
+
+  final three.Vector3 _tmp = three.Vector3();
+  final ValueNotifier<List<PlacedLabLabel>> _placed = ValueNotifier(const []);
 
   // ─────────────────────────── Yardımcılar ───────────────────────────
 
@@ -110,6 +132,7 @@ abstract class Lab3DState<W extends StatefulWidget> extends State<W> {
 
   @override
   void dispose() {
+    _placed.dispose();
     _threeOrNull?.dispose();
     three.loading.clear();
     super.dispose();
@@ -153,6 +176,29 @@ abstract class Lab3DState<W extends StatefulWidget> extends State<W> {
       _zoom += (_zoomTarget - _zoom) * min(1.0, dt * 9);
     }
     _placeCamera(dt);
+    _placeLabels();
+  }
+
+  /// Etiketleri kameranın o anki görüşüyle ekrana izdüşürür. Yalnızca
+  /// etiket katmanı yeniden çizilir (`ValueNotifier`), widget ağacı değil.
+  void _placeLabels() {
+    final size = _boxSize;
+    if (!labLabelsOn.value || size.isEmpty) {
+      if (_placed.value.isNotEmpty) _placed.value = const [];
+      return;
+    }
+    final basis = ThreeSceneBasis.of(threeJs.camera, _look, fovDeg: fovDeg);
+    if (basis == null) return;
+    final placed = <PlacedLabLabel>[];
+    for (final a in labels) {
+      final tip = basis.project(a.x, a.y, a.z, size);
+      if (tip == null) continue;
+      if (tip.dx < -20 || tip.dx > size.width + 20) continue;
+      if (tip.dy < 12 || tip.dy > size.height + 20) continue;
+      placed.add((label: a.label, tip: tip));
+    }
+    if (placed.isEmpty && _placed.value.isEmpty) return;
+    _placed.value = placed;
   }
 
   /// Sahne kutusunun gerçek en/boy oranı.
@@ -165,6 +211,7 @@ abstract class Lab3DState<W extends StatefulWidget> extends State<W> {
   /// tam telafi eder. three_js pencere değişince oranı geri yazdığı için her
   /// karede denetlenir.
   double _boxAspect = 0;
+  Size _boxSize = Size.zero;
 
   void _placeCamera(double dt) {
     final camera = threeJs.camera as three.PerspectiveCamera;
@@ -217,11 +264,13 @@ abstract class Lab3DState<W extends StatefulWidget> extends State<W> {
             builder: (context, constraints) {
               if (constraints.maxHeight > 0 && constraints.maxWidth.isFinite) {
                 _boxAspect = constraints.maxWidth / constraints.maxHeight;
+                _boxSize = constraints.biggest;
               }
               return _listener();
             },
           ),
         ),
+        Positioned.fill(child: LabLabelLayer(placed: _placed)),
         Positioned(
           right: 8,
           top: 8,

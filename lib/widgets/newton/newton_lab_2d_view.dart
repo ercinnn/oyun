@@ -5,6 +5,7 @@ import '../../models/newton/falling.dart';
 import '../../models/newton/newton_scene.dart';
 import '../../models/newton/prism.dart';
 import '../../models/science/science_task.dart' show formatTr;
+import '../science_lab/lab_labels.dart';
 
 /// Newton laboratuvarının 2B yan kesiti: 3B görünümün (`NewtonLab3DView`)
 /// yedeği; testler ve 3B kapalı derlemeler bunu kullanır. Deney saati
@@ -20,13 +21,16 @@ class NewtonLab2DView extends StatelessWidget {
     final running = scene.run > 0;
     final seconds = running ? scene.duration : 0.0;
     return ClipRect(
-      child: TweenAnimationBuilder<double>(
-        key: ValueKey('newton-${scene.station.name}-${scene.run}'),
-        tween: Tween(begin: 0, end: seconds),
-        duration: Duration(milliseconds: (seconds * 1000).round()),
-        builder: (context, t, _) => CustomPaint(
-          painter: _NewtonPainter(scene, t),
-          size: Size.infinite,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: labLabelsOn,
+        builder: (context, showLabels, _) => TweenAnimationBuilder<double>(
+          key: ValueKey('newton-${scene.station.name}-${scene.run}'),
+          tween: Tween(begin: 0, end: seconds),
+          duration: Duration(milliseconds: (seconds * 1000).round()),
+          builder: (context, t, _) => CustomPaint(
+            painter: _NewtonPainter(scene, t, showLabels),
+            size: Size.infinite,
+          ),
         ),
       ),
     );
@@ -34,9 +38,12 @@ class NewtonLab2DView extends StatelessWidget {
 }
 
 class _NewtonPainter extends CustomPainter {
-  _NewtonPainter(this.scene, this.t);
+  _NewtonPainter(this.scene, this.t, this.showLabels);
 
   final NewtonScene scene;
+
+  /// Sahne etiketleri (A/B, Prizma, Perde…).
+  final bool showLabels;
 
   /// Deney başladığından beri geçen süre (s).
   final double t;
@@ -73,7 +80,11 @@ class _NewtonPainter extends CustomPainter {
       ..color = const Color(0xFFA9713F)
       ..strokeWidth = 4;
     canvas.drawLine(Offset(cx, groundY), Offset(cx, topY - 10), tower);
-    canvas.drawLine(Offset(cx - 90, topY - 10), Offset(cx + 90, topY - 10), tower);
+    canvas.drawLine(
+      Offset(cx - 90, topY - 10),
+      Offset(cx + 90, topY - 10),
+      tower,
+    );
     if (env == FallEnvironment.vacuum) {
       canvas.drawRect(
         Rect.fromLTRB(cx - 120, topY - 24, cx + 120, groundY),
@@ -91,22 +102,57 @@ class _NewtonPainter extends CustomPainter {
       final y = topY + (groundY - topY - 14) * d / towerHeightM;
       final x = cx + (i == 0 ? -70.0 : 70.0);
       _text(canvas, o.emoji, Offset(x, y + 4), 26, Colors.black, center: true);
-      _text(canvas, i == 0 ? 'A' : 'B', Offset(x, topY - 30), 14,
+      final tag = i == 0 ? 'A' : 'B';
+      final landed = scene.run > 0 && d >= towerHeightM - 1e-6;
+      if (showLabels) {
+        paintLabLabel(
+          canvas,
+          Offset(x, y + 2),
+          LabLabel(
+            landed
+                ? '$tag: ${formatTr(fallTime(o, env))} sn'
+                : '$tag: ${o.name}',
+            color: labTagColor(tag),
+          ),
+          bounds: size,
+        );
+      } else {
+        _text(
+          canvas,
+          tag,
+          Offset(x, topY - 30),
+          16,
           moon ? Colors.white : Colors.black87,
-          center: true);
-      if (scene.run > 0 && d >= towerHeightM - 1e-6) {
-        _text(canvas, '${formatTr(fallTime(o, env))} sn', Offset(x, groundY + 4),
-            12, Colors.white, center: true);
+          center: true,
+        );
+        if (landed) {
+          _text(
+            canvas,
+            '${formatTr(fallTime(o, env))} sn',
+            Offset(x, groundY + 2),
+            15,
+            Colors.white,
+            center: true,
+          );
+        }
       }
     }
-    _text(canvas, env.label, const Offset(10, 8), 13,
-        moon ? Colors.white : Colors.black87);
+    _text(
+      canvas,
+      env.label,
+      const Offset(10, 8),
+      16,
+      moon ? Colors.white : Colors.black87,
+    );
   }
 
   // ─────────────────────────── Prizma ───────────────────────────
 
   void _paintPrism(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF263238));
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF263238),
+    );
     final midY = size.height / 2;
     final lamp = Offset(size.width * 0.08, midY);
     final prism = Offset(size.width * 0.38, midY);
@@ -123,6 +169,34 @@ class _NewtonPainter extends CustomPainter {
       Rect.fromLTRB(screenX, midY - 70, screenX + 8, midY + 70),
       Paint()..color = Colors.white,
     );
+    if (showLabels) {
+      paintLabLabel(
+        canvas,
+        lamp - const Offset(0, 22),
+        const LabLabel('Fener', emoji: '🔦'),
+        bounds: size,
+      );
+      paintLabLabel(
+        canvas,
+        prism - const Offset(0, 38),
+        const LabLabel('Prizma'),
+        bounds: size,
+      );
+      if (scene.secondPrism) {
+        paintLabLabel(
+          canvas,
+          second + const Offset(0, 60),
+          const LabLabel('Ters prizma'),
+          bounds: size,
+        );
+      }
+      paintLabLabel(
+        canvas,
+        Offset(screenX + 4, midY - 72),
+        const LabLabel('Perde'),
+        bounds: size,
+      );
+    }
     if (scene.run == 0) return;
 
     final colors = scene.light.colors;
@@ -139,7 +213,8 @@ class _NewtonPainter extends CustomPainter {
     );
     final fan = ((t - 0.6) / 0.6).clamp(0.0, 1.0);
     if (fan <= 0) return;
-    final mean = spectrumColors.map(deviationDeg).reduce((a, b) => a + b) /
+    final mean =
+        spectrumColors.map(deviationDeg).reduce((a, b) => a + b) /
         spectrumColors.length;
     for (final c in colors) {
       // Aşağı doğru sapma ekranda büyütüldü (gerçek fark ~5°).
@@ -156,7 +231,11 @@ class _NewtonPainter extends CustomPainter {
       );
       if (!scene.secondPrism && fan >= 1) {
         canvas.drawRect(
-          Rect.fromCenter(center: end, width: 10, height: colors.length == 1 ? 14 : 8),
+          Rect.fromCenter(
+            center: end,
+            width: 10,
+            height: colors.length == 1 ? 14 : 8,
+          ),
           Paint()..color = Color(0xFF000000 | c.hex),
         );
       }
@@ -164,9 +243,13 @@ class _NewtonPainter extends CustomPainter {
     if (scene.secondPrism && fan >= 1) {
       final end = Offset(screenX, midY);
       final out = Color(0xFF000000 | scene.prism.recombinedHex);
-      canvas.drawLine(second, end, Paint()
-        ..color = out
-        ..strokeWidth = 3);
+      canvas.drawLine(
+        second,
+        end,
+        Paint()
+          ..color = out
+          ..strokeWidth = 3,
+      );
       canvas.drawCircle(end, 7, Paint()..color = out);
     }
   }
@@ -191,7 +274,10 @@ class _NewtonPainter extends CustomPainter {
   // ─────────────────────────── Araba ───────────────────────────
 
   void _paintCart(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFEFEBE9));
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFEFEBE9),
+    );
     const left = 24.0;
     final right = size.width - 16;
     final pxPerM = (right - left) / trackLengthM;
@@ -218,11 +304,33 @@ class _NewtonPainter extends CustomPainter {
           Paint()..color = const Color(0xFFC68A4E),
         );
       }
-      _text(canvas, '${i == 0 ? 'A' : 'B'} · ${lane.surface.label}',
-          Offset(left, y - 34), 12, Colors.black87);
-      if (scene.run > 0 && t >= cartTravelTime(lane, scene.push) - 1e-6) {
-        _text(canvas, '${formatTr(cartDistance(lane, scene.push))} m',
-            Offset(cartRect.right + 6, y - 8), 12, Colors.black87);
+      final tag = i == 0 ? 'A' : 'B';
+      _text(
+        canvas,
+        '$tag · ${lane.surface.label}',
+        Offset(left, y - 38),
+        15,
+        Colors.black87,
+      );
+      if (showLabels) {
+        paintLabLabel(
+          canvas,
+          Offset(cartRect.center.dx, cartRect.top - (lane.boxes > 0 ? 12 : 2)),
+          LabLabel(
+            scene.run > 0 ? '$tag: ${formatTr(x)} m' : '$tag arabası',
+            color: labTagColor(tag),
+          ),
+          bounds: size,
+        );
+      } else if (scene.run > 0 &&
+          t >= cartTravelTime(lane, scene.push) - 1e-6) {
+        _text(
+          canvas,
+          '${formatTr(cartDistance(lane, scene.push))} m',
+          Offset(cartRect.right + 6, y - 9),
+          15,
+          Colors.black87,
+        );
       }
     }
     final tick = Paint()
@@ -230,7 +338,11 @@ class _NewtonPainter extends CustomPainter {
       ..strokeWidth = 1;
     for (var m = 0; m <= trackLengthM; m++) {
       final x = left + m * pxPerM;
-      canvas.drawLine(Offset(x, size.height - 14), Offset(x, size.height - 6), tick);
+      canvas.drawLine(
+        Offset(x, size.height - 14),
+        Offset(x, size.height - 6),
+        tick,
+      );
     }
   }
 
@@ -249,7 +361,11 @@ class _NewtonPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(fontSize: size, color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: size,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -257,5 +373,6 @@ class _NewtonPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_NewtonPainter old) => old.scene != scene || old.t != t;
+  bool shouldRepaint(_NewtonPainter old) =>
+      old.scene != scene || old.t != t || old.showLabels != showLabels;
 }

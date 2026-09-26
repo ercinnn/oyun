@@ -8,6 +8,7 @@ import '../models/galileo/solar.dart';
 import '../models/galileo/telescope.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/galileo/galileo_scene_view.dart';
+import '../widgets/science_lab/lab_guide.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
 import '../widgets/science_lab/scientist_sound_toggle.dart';
 
@@ -17,25 +18,44 @@ import '../widgets/science_lab/scientist_sound_toggle.dart';
 class GalileoExploreScreen extends StatelessWidget {
   const GalileoExploreScreen({super.key});
 
+  static const _stations = [
+    LabStation(
+      GalileoStation.telescope,
+      'Teleskop',
+      '🔭',
+      'Mercekleri seç, tüpü kaydır ve gökyüzünü netleştir.',
+    ),
+    LabStation(
+      GalileoStation.jupiter,
+      "Jüpiter'in Uyduları",
+      '🪐',
+      'Geceleri ilerlet: uydular Jüpiter\'in çevresinde nasıl dolanıyor?',
+    ),
+    LabStation(
+      GalileoStation.solar,
+      'Güneş Sistemi',
+      '☀️',
+      "Günleri ilerlet ve Dünya'dan bakınca Venüs'ün şeklini izle.",
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<GalileoController>();
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<GalileoStation>(
+        LabStationPicker<GalileoStation>(
           key: const Key('galileoStation'),
-          segments: [
-            for (final s in GalileoStation.values)
-              ButtonSegment(value: s, label: Text(s.label)),
-          ],
-          selected: {controller.station},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => controller.setStation(v.first),
+          stations: _stations,
+          selected: controller.station,
+          onSelected: controller.setStation,
         ),
         const SizedBox(height: 12),
         switch (controller.station) {
-          GalileoStation.telescope => _TelescopeControls(controller: controller),
+          GalileoStation.telescope => _TelescopeControls(
+            controller: controller,
+          ),
           GalileoStation.jupiter => _JupiterControls(controller: controller),
           GalileoStation.solar => _SolarControls(controller: controller),
         },
@@ -75,7 +95,7 @@ Widget _chips<T>({
     for (final v in values)
       ChoiceChip(
         key: Key(keyOf(v)),
-        label: Text(label(v)),
+        label: Text(label(v), style: const TextStyle(fontSize: 15)),
         selected: v == selected,
         onSelected: (_) => onSelected(v),
         visualDensity: VisualDensity.compact,
@@ -98,37 +118,24 @@ class _TelescopeControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Neye bakalım?'),
-        const SizedBox(height: 4),
-        _chips<SkyTarget>(
-          values: SkyTarget.values,
-          selected: controller.target,
-          label: (t) => t.label,
-          onSelected: controller.setTarget,
-          keyOf: (t) => 'galileoTarget_${t.name}',
+        LabStepList(
+          steps: [
+            LabStep(
+              'Tüp boyu kaydırıcısıyla görüntüyü netleştir.',
+              done: controller.sawSharp,
+            ),
+            LabStep(
+              'Göz merceğini değiştir: görüntü büyüdü mü?',
+              done: controller.eyepiecesTried.length >= 2,
+            ),
+            LabStep(
+              "Ay'a, Jüpiter'e ve Venüs'e sırayla bak.",
+              done: controller.targetsViewed.length >= SkyTarget.values.length,
+            ),
+          ],
         ),
         const SizedBox(height: 10),
-        const Text('Objektif (dışbükey, öndeki mercek):'),
-        const SizedBox(height: 4),
-        _chips<double>(
-          values: objectiveLensesCm,
-          selected: fo,
-          label: (v) => '${formatTr(v)} cm',
-          onSelected: controller.setObjective,
-          keyOf: (v) => 'galileoObjective_${v.round()}',
-        ),
-        const SizedBox(height: 8),
-        const Text('Göz merceği (içbükey):'),
-        const SizedBox(height: 4),
-        _chips<double>(
-          values: eyepieceLensesCm,
-          selected: fe,
-          label: (v) => '${formatTr(v)} cm',
-          onSelected: controller.setEyepiece,
-          keyOf: (v) => 'galileoEyepiece_${v.round()}',
-        ),
-        const SizedBox(height: 8),
-        Text('Tüp boyu: ${formatTr(controller.tubeCm)} cm'),
+        LabSectionTitle('Tüp boyu: ${formatTr(controller.tubeCm)} cm'),
         Slider(
           key: const Key('galileoTube'),
           value: controller.tubeCm,
@@ -141,9 +148,39 @@ class _TelescopeControls extends StatelessWidget {
         LabInfoCard(
           key: const Key('galileoTelescopeInfo'),
           color: sharp ? Colors.green.shade50 : Colors.orange.shade50,
-          text: 'Büyütme: ${formatTr(fo)} ÷ ${formatTr(fe)} = '
-              '${formatTr(magnification(fo, fe))} kat. '
+          icon: sharp ? Icons.check_circle_outline : Icons.blur_on,
+          title: 'Büyütme: ${formatTr(magnification(fo, fe))} kat',
+          text:
+              '${formatTr(fo)} ÷ ${formatTr(fe)} = '
+              '${formatTr(magnification(fo, fe))}. '
               '${sharp ? 'Görüntü net! Tüp boyu = objektif − göz merceği = ${formatTr(sharpTubeCm(fo, fe))} cm.' : 'Görüntü bulanık: tüpü kaydırarak netleştir.'}',
+        ),
+        const SizedBox(height: 6),
+        const LabSectionTitle('Neye bakalım?'),
+        _chips<SkyTarget>(
+          values: SkyTarget.values,
+          selected: controller.target,
+          label: (t) => t.label,
+          onSelected: controller.setTarget,
+          keyOf: (t) => 'galileoTarget_${t.name}',
+        ),
+        const SizedBox(height: 6),
+        const LabSectionTitle('Objektif (dışbükey, öndeki mercek)'),
+        _chips<double>(
+          values: objectiveLensesCm,
+          selected: fo,
+          label: (v) => '${formatTr(v)} cm',
+          onSelected: controller.setObjective,
+          keyOf: (v) => 'galileoObjective_${v.round()}',
+        ),
+        const SizedBox(height: 6),
+        const LabSectionTitle('Göz merceği (içbükey)'),
+        _chips<double>(
+          values: eyepieceLensesCm,
+          selected: fe,
+          label: (v) => '${formatTr(v)} cm',
+          onSelected: controller.setEyepiece,
+          keyOf: (v) => 'galileoEyepiece_${v.round()}',
         ),
       ],
     );
@@ -163,7 +200,53 @@ class _JupiterControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Gece: ${formatTr(nights)}'),
+        LabStepList(
+          steps: [
+            LabStep(
+              '"Sonraki gece"ye bas ve uyduların yerini izle.',
+              done: controller.nightsAdvanced,
+            ),
+            LabStep(
+              'Bu geceyi deftere çiz.',
+              done: controller.notebook.isNotEmpty,
+            ),
+            LabStep(
+              'En az 3 gece çiz, çizimleri karşılaştır.',
+              done: controller.notebook.length >= 3,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: LabActionButton(
+                key: const Key('galileoNextNight'),
+                onPressed: controller.nextNight,
+                icon: Icons.nights_stay,
+                label: 'Sonraki gece',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('galileoSketch'),
+                onPressed: controller.sketchTonight,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                icon: const Icon(Icons.edit),
+                label: const Text('Deftere çiz'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LabSectionTitle('Gece: ${formatTr(nights)}'),
         Slider(
           key: const Key('galileoNights'),
           value: nights.clamp(0, 30).toDouble(),
@@ -171,27 +254,6 @@ class _JupiterControls extends StatelessWidget {
           max: 30,
           divisions: 120,
           onChanged: controller.setNights,
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('galileoNextNight'),
-                onPressed: controller.nextNight,
-                icon: const Icon(Icons.nights_stay),
-                label: const Text('Sonraki gece'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('galileoSketch'),
-                onPressed: controller.sketchTonight,
-                icon: const Icon(Icons.edit),
-                label: const Text('Deftere çiz'),
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 8),
         Card(
@@ -203,7 +265,7 @@ class _JupiterControls extends StatelessWidget {
               children: [
                 const Text(
                   'Gözlem defteri (O = Jüpiter, * = uydu)',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 6),
                 if (controller.notebook.isEmpty)
@@ -213,7 +275,10 @@ class _JupiterControls extends StatelessWidget {
                     Text(
                       '${formatTr(night).padLeft(4)}. gece  $sketch',
                       key: Key('galileoNote_${formatTr(night)}'),
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 15,
+                      ),
                       softWrap: false,
                       overflow: TextOverflow.fade,
                     ),
@@ -258,7 +323,52 @@ class _SolarControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Gün: ${day.round()}  (Dünya ${formatTr(earthTurns)} tur attı)'),
+        LabStepList(
+          steps: [
+            LabStep(
+              '"+30 gün" ile zamanı ilerlet.',
+              done: controller.daysAdvanced,
+            ),
+            LabStep(
+              "Venüs'ün ince hilal olduğu günü bul.",
+              done: controller.venusPhasesSeen.contains(VenusPhase.crescent),
+            ),
+            LabStep(
+              "Venüs'ün dolunay gibi göründüğü günü bul.",
+              done: controller.venusPhasesSeen.contains(VenusPhase.full),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: LabActionButton(
+                key: const Key('galileoPlus30'),
+                onPressed: () => controller.advanceDays(30),
+                icon: Icons.fast_forward,
+                label: '+30 gün',
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              key: const Key('galileoResetDay'),
+              onPressed: () => controller.setDay(0),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 12,
+                ),
+              ),
+              icon: const Icon(Icons.replay),
+              label: const Text('Başa dön'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LabSectionTitle(
+          'Gün: ${day.round()}  (Dünya ${formatTr(earthTurns)} tur attı)',
+        ),
         Slider(
           key: const Key('galileoDay'),
           value: day.clamp(0, 730).toDouble(),
@@ -267,36 +377,21 @@ class _SolarControls extends StatelessWidget {
           divisions: 146,
           onChanged: controller.setDay,
         ),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('galileoPlus30'),
-                onPressed: () => controller.advanceDays(30),
-                child: const Text('+30 gün'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('galileoResetDay'),
-                onPressed: () => controller.setDay(0),
-                child: const Text('Başa dön'),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('galileoVenusInfo'),
           color: Colors.indigo.shade50,
-          text: 'Dünya\'dan Venüs: ${view.phase.label.toLowerCase()} '
-              '(aydınlık kısım %${(view.litFraction * 100).round()}, '
-              'boyu ${formatTr(view.relativeSize)} kat). '
+          icon: Icons.brightness_3,
+          title: "Dünya'dan Venüs: ${view.phase.label.toLowerCase()}",
+          text:
+              'Aydınlık kısım %${(view.litFraction * 100).round()}, '
+              'boyu ${formatTr(view.relativeSize)} kat. '
               'Günleri ilerlet: Venüs yaklaştıkça büyüyüp inceliyor, '
               'uzaklaştıkça küçülüp doluyor.',
         ),
         LabInfoCard(
+          icon: Icons.public,
+          title: "Güneş'in etrafında bir tur",
           text: planets
               .map((p) => '${p.name}: ${formatTr(p.periodDays, digits: 0)} gün')
               .join(' · '),

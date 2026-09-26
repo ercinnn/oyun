@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/tap_visible.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -167,16 +169,16 @@ void main() {
 
       await _openFleming(tester);
       expect(find.text('Fleming\'in Laboratuvarı'), findsOneWidget);
-      await tester.tap(find.text('1 Kişi'));
+      await tapVisible(tester, find.text('1 Kişi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < flemingRoundsPerPlayer; i++) {
         expect(find.textContaining('Görev ${i + 1} /'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistOption_0')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_0')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('scientistExplanation')), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       expect(find.textContaining('Tebrikler'), findsOneWidget);
@@ -189,25 +191,25 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await _openFleming(tester);
-      await tester.tap(find.byKey(const Key('scientistExplore')));
+      await tapVisible(tester, find.byKey(const Key('scientistExplore')));
       await tester.pumpAndSettle();
       for (var i = 0; i < 5; i++) {
-        await tester.tap(find.byKey(const Key('flemingNextDay')));
+        await tapVisible(tester, find.byKey(const Key('flemingNextDay')));
         await tester.pumpAndSettle();
       }
       expect(find.textContaining('temiz bir halka'), findsOneWidget);
 
-      await tester.tap(find.text('Temizlik'));
+      await tapVisible(tester, find.text('Temizlik'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('flemingHand_unwashed')));
+      await tapVisible(tester, find.byKey(const Key('flemingHand_unwashed')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('flemingIncubate')));
+      await tapVisible(tester, find.byKey(const Key('flemingIncubate')));
       await tester.pumpAndSettle();
       expect(find.textContaining('${HandTouch.unwashed.colonies} koloni üredi'), findsOneWidget);
 
-      await tester.tap(find.text('Doğru İlaç'));
+      await tapVisible(tester, find.text('Doğru İlaç'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('flemingRunCourse')));
+      await tapVisible(tester, find.byKey(const Key('flemingRunCourse')));
       await tester.pumpAndSettle();
       expect(find.textContaining('İlaç erken bırakıldı'), findsOneWidget);
       _controllerOf(tester).setTreatmentDays(fullCourseDays);
@@ -215,7 +217,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('bakteri kalmadı'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Geri'));
+      await tapVisible(tester, find.byTooltip('Geri'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scientistStart')), findsOneWidget);
     });
@@ -230,14 +232,14 @@ void main() {
       tester.view.physicalSize = const Size(320, 640);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('scientistStart')));
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < 3; i++) {
         await tester.ensureVisible(find.byKey(const Key('scientistOption_1')));
-        await tester.tap(find.byKey(const Key('scientistOption_1')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_1')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byKey(const Key('scientistContinue')));
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       final c = _controllerOf(tester);

@@ -9,4 +9,8 @@ class ScientistPlayerState {
   final String name;
   int correctCount = 0;
   int roundsPlayed = 0;
+
+  /// Oynanan turların sonuçları (sırayla; true = doğru). İlerleme
+  /// noktaları ve sonuç ekranındaki özet bundan çizilir.
+  final List<bool> results = [];
 }

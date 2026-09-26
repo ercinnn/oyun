@@ -9,6 +9,7 @@ import '../../models/einstein/spacetime.dart';
 import '../../models/einstein/time_dilation.dart';
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Einstein'ın laboratuvarının 3B görünümü. Modeller Blender'da üretilmiştir
 /// (`assets/models/einstein.glb`, üretici `tool/blender/build_einstein.py`);
@@ -331,6 +332,37 @@ class _EinsteinLab3DViewState extends Lab3DState<EinsteinLab3DView> {
   }
 
   // ─────────────────────────── Kamera ───────────────────────────
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels {
+    final s = _s;
+    switch (s.station) {
+      case EinsteinStation.sheet:
+        final center = _center;
+        final marble = _marble;
+        return [
+          if (center != null)
+            anchorAt(center, LabLabel(s.center.label), dy: s.center.radius + 0.3),
+          if (marble != null && marble.visible)
+            anchorAt(marble, const LabLabel.value('Bilye'), dy: 0.25),
+        ];
+      case EinsteinStation.clock:
+        final ship = _ship;
+        return [
+          anchor(const LabLabel("Dünya'daki saat", emoji: '🌍'), _clockX - 4, 1.55, 0),
+          if (ship != null)
+            anchorAt(ship, const LabLabel('Gemideki saat', emoji: '🚀'), dy: 1.3),
+        ];
+      case EinsteinStation.energy:
+        return [
+          anchor(LabLabel.value('${formatGrams(s.grams)} g kütle'), _energyX - 3, 1.75, 0.5),
+          anchor(const LabLabel('Kamp ateşi', emoji: '🔥'), _energyX - 5, 0.9, 1.5),
+          anchor(const LabLabel('Şehir: 100 ev', emoji: '🏘️'), _energyX + 2.4, 1.1, -1.9),
+        ];
+    }
+  }
 
   @override
   LabCameraShot get cameraShot => switch (_s.station) {

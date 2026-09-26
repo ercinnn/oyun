@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/tap_visible.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -331,7 +333,7 @@ void main() {
       expect(scientists.where((s) => s.available).map((s) => s.id), ['arsimet', 'galileo', 'newton', 'tesla', 'curie', 'einstein', 'fleming']);
       expect(find.text('Yakında'), findsNothing);
 
-      await tester.tap(find.byKey(const Key('scientist_arsimet')));
+      await tapVisible(tester, find.byKey(const Key('scientist_arsimet')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scientistStart')), findsOneWidget);
     });
@@ -343,17 +345,17 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await _openArchimedes(tester);
-      await tester.tap(find.text('1 Kişi'));
+      await tapVisible(tester, find.text('1 Kişi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
 
       for (var i = 0; i < archimedesRoundsPerPlayer; i++) {
         expect(find.textContaining('Görev ${i + 1} /'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistOption_0')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_0')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('scientistExplanation')), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       expect(find.textContaining('Tebrikler'), findsOneWidget);
@@ -368,28 +370,40 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await _openArchimedes(tester);
-      await tester.tap(find.byKey(const Key('scientistExplore')));
+      await tapVisible(tester, find.byKey(const Key('scientistExplore')));
       await tester.pumpAndSettle();
 
       expect(find.text('Su seviyesi: 10 cm (başta 10 cm)'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('archObj_stone')));
+      await tester.ensureVisible(find.byKey(const Key('archObj_stone')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('archObj_stone')));
       await tester.pump();
-      await tester.tap(find.byKey(const Key('archimedesDrop')));
+      await tester.ensureVisible(find.byKey(const Key('archimedesDrop')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('archimedesDrop')));
       await tester.pumpAndSettle();
       expect(find.text('Su seviyesi: 11,5 cm (başta 10 cm)'), findsOneWidget);
       expect(find.textContaining('battı'), findsOneWidget);
 
-      await tester.tap(find.text('Gemi'));
+      await tester.ensureVisible(find.text('Gemi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('archimedesCratePlus')));
+      await tapVisible(tester, find.text('Gemi'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('archimedesCratePlus')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('archimedesCratePlus')));
       await tester.pumpAndSettle();
       expect(find.text('1 sandık'), findsOneWidget);
 
-      await tester.tap(find.text('Arşimet Vidası'));
+      await tester.ensureVisible(find.text('Arşimet Vidası'));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text('Arşimet Vidası'));
       await tester.pumpAndSettle();
       expect(find.text('Tarla: 0 / 20 litre'), findsOneWidget);
       // Kolu saat yönünde iki tam tur çevir.
       final crank = find.byKey(const Key('archimedesCrank'));
+      await tester.ensureVisible(crank);
+      await tester.pumpAndSettle();
       final center = tester.getCenter(crank);
       final gesture = await tester.startGesture(center + const Offset(50, 0));
       for (var step = 1; step <= 48; step++) {
@@ -402,7 +416,7 @@ void main() {
           reason: 'kol çevrilince tarlaya su gitmeli (30°)');
 
       // Geri tuşu kurulum ekranına döner.
-      await tester.tap(find.byTooltip('Geri'));
+      await tapVisible(tester, find.byTooltip('Geri'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scientistStart')), findsOneWidget);
     });
@@ -419,14 +433,14 @@ void main() {
       tester.view.physicalSize = const Size(320, 640);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('scientistStart')));
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < 4; i++) {
         await tester.ensureVisible(find.byKey(const Key('scientistOption_1')));
-        await tester.tap(find.byKey(const Key('scientistOption_1')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_1')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byKey(const Key('scientistContinue')));
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       // Keşif ekranı da dar ekranda açılabilmeli.

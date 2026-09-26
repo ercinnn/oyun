@@ -8,6 +8,7 @@ import '../models/einstein/spacetime.dart';
 import '../models/einstein/time_dilation.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/einstein/einstein_scene_view.dart';
+import '../widgets/science_lab/lab_guide.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
 import '../widgets/science_lab/scientist_sound_toggle.dart';
 
@@ -15,21 +16,38 @@ import '../widgets/science_lab/scientist_sound_toggle.dart';
 class EinsteinExploreScreen extends StatelessWidget {
   const EinsteinExploreScreen({super.key});
 
+  static const _stations = [
+    LabStation(
+      EinsteinStation.sheet,
+      'Uzay-Zaman',
+      '🕳️',
+      'Kütle örtüyü büker: bilye düşecek mi, dönecek mi, kaçacak mı?',
+    ),
+    LabStation(
+      EinsteinStation.clock,
+      'Işık Saati',
+      '⏱️',
+      'Çok hızlı giden gemide zaman nasıl akıyor?',
+    ),
+    LabStation(
+      EinsteinStation.energy,
+      'E=mc²',
+      '⚡',
+      'Minik bir kütle ne kadar enerji eder? (düşünce deneyi)',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<EinsteinController>();
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<EinsteinStation>(
+        LabStationPicker<EinsteinStation>(
           key: const Key('einsteinStation'),
-          segments: [
-            for (final s in EinsteinStation.values)
-              ButtonSegment(value: s, label: Text(s.label)),
-          ],
-          selected: {controller.station},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => controller.setStation(v.first),
+          stations: _stations,
+          selected: controller.station,
+          onSelected: controller.setStation,
         ),
         const SizedBox(height: 12),
         switch (controller.station) {
@@ -73,7 +91,7 @@ Widget _chips<T>({
     for (final v in values)
       ChoiceChip(
         key: Key(keyOf(v)),
-        label: Text(label(v)),
+        label: Text(label(v), style: const TextStyle(fontSize: 15)),
         selected: v == selected,
         onSelected: (_) => onSelected(v),
         visualDensity: VisualDensity.compact,
@@ -92,8 +110,31 @@ class _SheetControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Örtünün ortasına ne koyalım?'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              'Bilyeyi fırlat ve yolunu izle.',
+              done: controller.fatesSeen.isNotEmpty,
+            ),
+            LabStep(
+              'Bilyeyi yörüngeye oturtan hızı bul.',
+              done: controller.fatesSeen.contains(MarbleFate.orbits),
+            ),
+            LabStep(
+              'Ortadaki kütleyi değiştirip yeniden fırlat.',
+              done: controller.centersLaunched.length >= 2,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('einsteinLaunch'),
+          onPressed: controller.launch,
+          icon: Icons.sports_baseball,
+          label: controller.launched ? 'Yeniden fırlat' : 'Bilyeyi fırlat',
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Örtünün ortasına ne koyalım?'),
         _chips<CentralMass>(
           values: CentralMass.values,
           selected: controller.center,
@@ -101,9 +142,8 @@ class _SheetControls extends StatelessWidget {
           onSelected: controller.setCenter,
           keyOf: (c) => 'einsteinCenter_${c.name}',
         ),
-        const SizedBox(height: 8),
-        const Text('Bilyeyi ne hızla fırlatalım?'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
+        const LabSectionTitle('Bilyeyi ne hızla fırlatalım?'),
         _chips<LaunchSpeed>(
           values: LaunchSpeed.values,
           selected: controller.speed,
@@ -111,17 +151,11 @@ class _SheetControls extends StatelessWidget {
           onSelected: controller.setSpeed,
           keyOf: (s) => 'einsteinSpeed_${s.name}',
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('einsteinLaunch'),
-          onPressed: controller.launch,
-          icon: const Icon(Icons.sports_baseball),
-          label: Text(controller.launched ? 'Yeniden fırlat' : 'Bilyeyi fırlat'),
-        ),
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('einsteinSheetInfo'),
           color: Colors.indigo.shade50,
+          icon: Icons.blur_circular,
           text: controller.launched
               ? 'Bilye ${fate.label.toLowerCase()}. Ağır kütle örtüyü daha derin '
                     'çukurlaştırır; bilyenin kurtulması için daha hızlı olması gerekir.'
@@ -143,8 +177,31 @@ class _ClockControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Geminin hızı (ışık hızına göre):'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              '"Yolculuğa çık"a bas, iki saati karşılaştır.',
+              done: controller.voyageSpeeds.isNotEmpty,
+            ),
+            LabStep(
+              'Geminin hızını değiştirip yeniden yolculuğa çık.',
+              done: controller.voyageSpeeds.length >= 2,
+            ),
+            LabStep(
+              'En hızlı gemiyle yolculuk yap.',
+              done: controller.voyageSpeeds.contains(shipSpeeds.last),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('einsteinVoyage'),
+          onPressed: controller.startVoyage,
+          icon: Icons.rocket_launch,
+          label: '10 yıllık yolculuğa çık',
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Geminin hızı (ışık hızına göre)'),
         _chips<double>(
           values: shipSpeeds,
           selected: v,
@@ -152,18 +209,13 @@ class _ClockControls extends StatelessWidget {
           onSelected: controller.setShipSpeed,
           keyOf: (s) => 'einsteinShip_${(s * 100).round()}',
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('einsteinVoyage'),
-          onPressed: controller.startVoyage,
-          icon: const Icon(Icons.rocket_launch),
-          label: const Text('10 yıllık yolculuğa çık'),
-        ),
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('einsteinClockInfo'),
           color: Colors.amber.shade50,
-          text: 'Dünya\'da 10 yıl geçerken gemide ${formatTr(shipYears(10, v))} yıl '
+          icon: Icons.timer,
+          text:
+              'Dünya\'da 10 yıl geçerken gemide ${formatTr(shipYears(10, v))} yıl '
               'geçer. ${v == 0 ? 'Gemi dururken iki saat aynı işler.' : 'Hızlı giden saat yavaş işler: gemideki ışık daha uzun, çapraz bir yol gider.'} '
               '(Işık hızına hiçbir şey ulaşamaz; bu yüzden en fazla %99.)',
         ),
@@ -187,8 +239,27 @@ class _EnergyControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Hangi minik kütle?'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              'Bir kütle seç ve enerjiye çevir.',
+              done: controller.massesConverted.isNotEmpty,
+            ),
+            LabStep(
+              'Başka bir kütleyle karşılaştır.',
+              done: controller.massesConverted.length >= 2,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('einsteinConvert'),
+          onPressed: controller.convert,
+          icon: Icons.bolt,
+          label: 'Enerjiye çevir',
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Hangi minik kütle?'),
         _chips<TinyMass>(
           values: tinyMasses,
           selected: selected,
@@ -196,18 +267,14 @@ class _EnergyControls extends StatelessWidget {
           onSelected: (m) => controller.setGrams(m.grams),
           keyOf: (m) => 'einsteinMass_${m.id}',
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('einsteinConvert'),
-          onPressed: controller.convert,
-          icon: const Icon(Icons.bolt),
-          label: const Text('Enerjiye çevir (düşünce deneyi)'),
-        ),
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('einsteinEnergyInfo'),
           color: Colors.yellow.shade50,
-          text: '${selected.name}: ${friendlyNumber(homesPowered(g))} evin bir yıllık '
+          icon: Icons.lightbulb_outline,
+          title: 'Bu bir düşünce deneyi',
+          text:
+              '${selected.name}: ${friendlyNumber(homesPowered(g))} evin bir yıllık '
               'elektriği! Aynı kütleyi odun gibi yaksaydık yalnızca '
               '${friendlyNumber(homesFromBurning(g))} evinkini verirdi. '
               'E = m·c²: ışık hızı (c) çok büyük olduğu için minik kütle dev '

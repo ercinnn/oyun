@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/tap_visible.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -175,16 +177,16 @@ void main() {
 
       await _openEinstein(tester);
       expect(find.text('Einstein\'ın Laboratuvarı'), findsOneWidget);
-      await tester.tap(find.text('1 Kişi'));
+      await tapVisible(tester, find.text('1 Kişi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < einsteinRoundsPerPlayer; i++) {
         expect(find.textContaining('Görev ${i + 1} /'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistOption_0')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_0')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('scientistExplanation')), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       expect(find.textContaining('Tebrikler'), findsOneWidget);
@@ -197,27 +199,27 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await _openEinstein(tester);
-      await tester.tap(find.byKey(const Key('scientistExplore')));
+      await tapVisible(tester, find.byKey(const Key('scientistExplore')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('einsteinLaunch')));
+      await tapVisible(tester, find.byKey(const Key('einsteinLaunch')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Bilye etrafında döner'), findsOneWidget);
 
-      await tester.tap(find.text('Işık Saati'));
+      await tapVisible(tester, find.text('Işık Saati'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('einsteinVoyage')));
+      await tapVisible(tester, find.byKey(const Key('einsteinVoyage')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Gemi: 6 yıl'), findsOneWidget);
 
-      await tester.tap(find.text('E=mc²'));
+      await tapVisible(tester, find.text('E=mc²'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('einsteinMass_clip')));
+      await tapVisible(tester, find.byKey(const Key('einsteinMass_clip')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('einsteinConvert')));
+      await tapVisible(tester, find.byKey(const Key('einsteinConvert')));
       await tester.pumpAndSettle();
       expect(find.textContaining('8 182 evin'), findsWidgets);
 
-      await tester.tap(find.byTooltip('Geri'));
+      await tapVisible(tester, find.byTooltip('Geri'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scientistStart')), findsOneWidget);
     });
@@ -232,14 +234,14 @@ void main() {
       tester.view.physicalSize = const Size(320, 640);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('scientistStart')));
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < 3; i++) {
         await tester.ensureVisible(find.byKey(const Key('scientistOption_1')));
-        await tester.tap(find.byKey(const Key('scientistOption_1')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_1')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byKey(const Key('scientistContinue')));
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       final c = _controllerOf(tester);

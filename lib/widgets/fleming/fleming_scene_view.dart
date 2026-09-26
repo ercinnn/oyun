@@ -8,6 +8,8 @@ import '../../models/fleming/hygiene.dart';
 import '../../models/fleming/petri.dart';
 import '../../models/fleming/resistance.dart';
 import '../../models/science/science_task.dart' show formatTr;
+import '../science_lab/lab_labels.dart';
+import '../science_lab/lab_style.dart';
 import 'fleming_lab_3d_view.dart';
 
 /// Fleming laboratuvarı: 3B açıksa `FlemingLab3DView`, değilse 2B yedek;
@@ -40,8 +42,13 @@ class FlemingSceneView extends StatelessWidget {
           Positioned.fill(
             child: scientistsUse3d
                 ? FlemingLab3DView(scene: scene)
-                : animated(
-                    (d, m) => CustomPaint(painter: _Fleming2DPainter(scene, d, m)),
+                : ValueListenableBuilder<bool>(
+                    valueListenable: labLabelsOn,
+                    builder: (context, showLabels, _) => animated(
+                      (d, m) => CustomPaint(
+                        painter: _Fleming2DPainter(scene, d, m, showLabels: showLabels),
+                      ),
+                    ),
                   ),
           ),
           Positioned(left: 8, bottom: 8, child: animated(_inset)),
@@ -53,50 +60,84 @@ class FlemingSceneView extends StatelessWidget {
   Widget _inset(double day, double medDay) {
     switch (scene.station) {
       case FlemingStation.petri:
-        return _Panel(
+        return LabInset(
           key: const Key('flemingPetriMeter'),
           children: [
-            _line('Gün ${formatTr(day)}', 13),
-            _line(
-              'A (${scene.mold ? 'küflü' : 'küfsüz'}): ${livingColonies(day, mold: scene.mold)} koloni · '
+            LabInsetValue('Gün ${formatTr(day)}'),
+            const SizedBox(height: 2),
+            LabInsetCaption(
+              'A (${scene.mold ? 'küflü' : 'küfsüz'}): '
+              '${livingColonies(day, mold: scene.mold)} koloni',
+              color: const Color(0xFF90CAF9),
+            ),
+            LabInsetCaption(
               'B (kontrol): ${livingColonies(day, mold: false)} koloni',
-              12,
-              color: const Color(0xFFFFE082),
+              color: const Color(0xFFFFAB91),
             ),
           ],
         );
       case FlemingStation.hygiene:
-        return _Panel(
+        return LabInset(
           key: const Key('flemingHygieneMeter'),
           children: [
-            _line(scene.lidOpen ? 'Kapak açık' : 'Kapak kapalı', 13),
-            _line(scene.hand.label, 12),
-            _line(
+            LabInsetValue(
               scene.incubated
-                  ? '$hygieneDays gün sonra: ${scene.hygieneCount} koloni'
+                  ? '${scene.hygieneCount} koloni'
                   : 'Henüz bekletilmedi',
-              12,
               color: const Color(0xFFFFB74D),
+            ),
+            LabInsetCaption(
+              '${scene.lidOpen ? 'Kapak açık' : 'Kapak kapalı'} · ${scene.hand.label}'
+              '${scene.incubated ? ' · $hygieneDays gün sonra' : ''}',
             ),
           ],
         );
       case FlemingStation.medicine:
-        return _Panel(
+        return LabInset(
           key: const Key('flemingMedicineChart'),
           children: [
+            LabInsetCaption('Günlere göre bakteri · ilaç ${scene.treatmentDays} gün (mavi)'),
+            const SizedBox(height: 4),
             SizedBox(
               width: 220,
-              height: 90,
-              child: CustomPaint(painter: _CoursePainter(scene.course, medDay, scene.treatmentDays)),
+              height: 80,
+              child: CustomPaint(
+                painter: _CoursePainter(scene.course, medDay, scene.treatmentDays),
+              ),
             ),
-            _line('İlaç ${scene.treatmentDays} gün · yeşil duyarlı, kırmızı dayanıklı', 11),
+            const SizedBox(height: 4),
+            const Wrap(
+              spacing: 10,
+              children: [
+                _Legend(color: Color(0xFF66BB6A), text: 'duyarlı'),
+                _Legend(color: Color(0xFFE53935), text: 'dayanıklı'),
+              ],
+            ),
           ],
         );
     }
   }
+}
 
-  static Widget _line(String text, double size, {Color color = Colors.white}) =>
-      Text(text, style: TextStyle(color: color, fontSize: size));
+class _Legend extends StatelessWidget {
+  const _Legend({required this.color, required this.text});
+
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      LabInsetCaption(text),
+    ],
+  );
 }
 
 /// Günlere göre bakteri sayısı (yığılmış sütunlar): yeşil duyarlı, kırmızı
@@ -133,33 +174,20 @@ class _CoursePainter extends CustomPainter {
       old.shownDay != shownDay || old.treatmentDays != treatmentDays;
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel({super.key, required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: const Color(0xCC101418),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    ),
-  );
-}
-
 /// 2B yedek: kapların ve mikroskop görüntüsünün şeması.
 class _Fleming2DPainter extends CustomPainter {
-  _Fleming2DPainter(this.scene, this.day, this.medDay);
+  _Fleming2DPainter(this.scene, this.day, this.medDay, {required this.showLabels});
 
   final FlemingScene scene;
   final double day;
   final double medDay;
+
+  /// Sahne etiketleri (A/B kapları, küf, mikroskop).
+  final bool showLabels;
+
+  void _tag(Canvas canvas, Size size, Offset tip, LabLabel label) {
+    if (showLabels) paintLabLabel(canvas, tip, label, bounds: size);
+  }
 
   void _dish(Canvas canvas, Offset c, double r, {required bool mold}) {
     canvas.drawCircle(c, r, Paint()..color = const Color(0xFFC98A2E));
@@ -186,8 +214,18 @@ class _Fleming2DPainter extends CustomPainter {
     switch (scene.station) {
       case FlemingStation.petri:
         final r = min(size.width / 4.6, size.height / 2.4);
-        _dish(canvas, Offset(size.width * 0.28, size.height * 0.45), r, mold: scene.mold);
-        _dish(canvas, Offset(size.width * 0.72, size.height * 0.45), r, mold: false);
+        final a = Offset(size.width * 0.28, size.height * 0.45);
+        final b = Offset(size.width * 0.72, size.height * 0.45);
+        _dish(canvas, a, r, mold: scene.mold);
+        _dish(canvas, b, r, mold: false);
+        _tag(canvas, size, a - Offset(r * 0.75, r * 0.72), const LabLabel.tag('A'));
+        _tag(canvas, size, b - Offset(r * 0.75, r * 0.72), const LabLabel.tag('B'));
+        _tag(canvas, size, b - Offset(0, r + 2), const LabLabel('Kontrol kabı'));
+        if (scene.mold && day >= 1) {
+          final m = a + Offset(moldX, -moldY) * r;
+          _tag(canvas, size, m - Offset(0, moldRadius(day) * r),
+              const LabLabel('Küf', color: Color(0xFF00897B)));
+        }
       case FlemingStation.hygiene:
         final r = min(size.width, size.height) * 0.32;
         final c = Offset(size.width * 0.55, size.height * 0.42);
@@ -201,6 +239,7 @@ class _Fleming2DPainter extends CustomPainter {
                   ? const Color(0xFFECEFF1)
                   : const Color(0xFFFFB74D));
         }
+        _tag(canvas, size, c - Offset(0, r + 2), const LabLabel('Petri kabı'));
       case FlemingStation.medicine:
         final r = min(size.width, size.height) * 0.36;
         final c = Offset(size.width * 0.55, size.height * 0.42);
@@ -215,10 +254,15 @@ class _Fleming2DPainter extends CustomPainter {
           canvas.drawCircle(c + Offset(cos(a), sin(a)) * d, 3,
               Paint()..color = i < res ? const Color(0xFFE53935) : const Color(0xFF66BB6A));
         }
+        _tag(canvas, size, c - Offset(0, r + 2),
+            const LabLabel('Mikroskopta bakteriler', emoji: '🔬'));
     }
   }
 
   @override
   bool shouldRepaint(_Fleming2DPainter old) =>
-      old.scene != scene || old.day != day || old.medDay != medDay;
+      old.scene != scene ||
+      old.day != day ||
+      old.medDay != medDay ||
+      old.showLabels != showLabels;
 }

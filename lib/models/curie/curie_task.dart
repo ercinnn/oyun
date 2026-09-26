@@ -37,8 +37,17 @@ class FindSampleTask extends CurieTask {
   @override
   String get prompt =>
       'Masada üç numune var: ${samples.map((s) => '${s.emoji} ${s.name}').join(', ')}. '
-      'Görünüşleri bir şey söylemiyor. Sence Geiger sayacı hangisinin yanında '
-      'hızlı hızlı tıklar?';
+      'Görünüşleri bir şey söylemiyor.';
+
+  @override
+  String get ask => 'Geiger sayacı hangisinin yanında hızlı hızlı tıklar?';
+
+  @override
+  List<String> get optionEmojis => [for (final s in samples) s.emoji];
+
+  @override
+  String get takeaway => 'Radyoaktif maddeyi gözle ayıramayız; ancak sayaçla '
+      'ölçebiliriz.';
 
   @override
   List<String> get options => [for (final s in samples) s.name];
@@ -94,8 +103,14 @@ class DistanceTask extends CurieTask {
   String get prompt =>
       '${sample.name} numunesinden ${formatTr(referenceDistanceCm)} cm '
       'uzakta sayaç çok hızlı tıklıyor. Sayacı ${formatTr(toCm)} cm\'ye '
-      'çekersek (${formatTr(toCm / referenceDistanceCm)} kat uzak) tıklamalar '
-      'ne olur?';
+      'çekeceğiz (${formatTr(toCm / referenceDistanceCm)} kat uzak).';
+
+  @override
+  String get ask => 'Tıklamalar ne olur?';
+
+  @override
+  String get takeaway => 'Uzaklık iki katına çıkınca ışın dörtte birine iner; '
+      'uzak durmak en iyi korunmadır.';
 
   @override
   int get correctIndex {
@@ -146,8 +161,14 @@ class StopperTask extends CurieTask {
 
   @override
   String get prompt =>
-      'Kaynaktan ${ray.label} ışınları çıkıyor. Sayacı susturmak için en ince '
-      'hangi kalkan yeter?';
+      'Kaynaktan ${ray.label} ışınları çıkıyor.';
+
+  @override
+  String get ask => 'Sayacı susturmak için en ince hangi kalkan yeter?';
+
+  @override
+  String get takeaway => 'Alfa kâğıtta, beta alüminyumda durur; gama için '
+      'kalın kurşun gerekir.';
 
   @override
   List<String> get options => [for (final s in shields) s.label];
@@ -196,8 +217,14 @@ class IdentifyRayTask extends CurieTask {
       '${formatCps(shieldedCps(ray, Shield.none))}, kâğıtla '
       '${formatCps(shieldedCps(ray, Shield.paper))}, alüminyumla '
       '${formatCps(shieldedCps(ray, Shield.aluminum))}, kurşunla '
-      '${formatCps(shieldedCps(ray, Shield.lead))} tık/sn. Kaynak '
-      'hangi ışını yayıyor?';
+      '${formatCps(shieldedCps(ray, Shield.lead))} tık/sn.';
+
+  @override
+  String get ask => 'Kaynak hangi ışını yayıyor?';
+
+  @override
+  String get takeaway => 'Hangi kalkanın ışını durdurduğuna bakarak ışının '
+      'türünü bulabiliriz.';
 
   @override
   List<String> get options => [for (final r in RayType.values) r.label];
@@ -244,8 +271,15 @@ class BeamPlanTask extends CurieTask {
   @override
   String get prompt =>
       'Tümöre ${formatTr(targetDose, digits: 0)} birim ışın vermeliyiz ama '
-      'sağlıklı doku en fazla ${formatTr(safeHealthyDose)} birim alabilir. '
-      'Hangi plan hem tümörü tedavi eder hem sağlıklı dokuyu korur?';
+      'sağlıklı doku en fazla ${formatTr(safeHealthyDose)} birim alabilir.';
+
+  @override
+  String get ask => 'Hangi plan hem tümörü tedavi eder hem sağlıklı dokuyu '
+      'korur?';
+
+  @override
+  String get takeaway => 'Farklı yönlerden gelen zayıf ışınlar yalnızca '
+      'tümörde toplanır, sağlıklı doku az ışın alır.';
 
   @override
   List<String> get options => labels;
@@ -301,7 +335,13 @@ class DoseSumTask extends CurieTask {
   @override
   String get prompt =>
       '$count ışın farklı yönlerden geliyor, her biri ${formatTr(strength)} '
-      'birim. Hepsi tümörde kesişiyor. Tümör kaç birim ışın alır?';
+      'birim. Hepsi tümörde kesişiyor.';
+
+  @override
+  String get ask => 'Tümör kaç birim ışın alır?';
+
+  @override
+  String get takeaway => 'Işınların buluştuğu yerde dozlar toplanır.';
 
   @override
   List<String> get options => [for (final c in choices) '${formatTr(c)} birim'];

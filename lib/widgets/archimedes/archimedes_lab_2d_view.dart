@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/archimedes/archimedes_scene.dart';
 import '../../models/archimedes/archimedes_screw.dart';
 import '../../models/archimedes/buoyancy.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Arşimet atölyesinin 2B yan kesiti: 3B görünümün (`ArchimedesLab3DView`)
 /// yedeği. Testler ve 3B kapalı derlemeler bunu kullanır; aynı
@@ -20,35 +21,39 @@ class ArchimedesLab2DView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRect(
-      child: TweenAnimationBuilder<double>(
-        key: ValueKey('drop-${scene.station.name}-${scene.revision}'),
-        tween: Tween(begin: scene.revision == 0 ? 1 : 0, end: 1),
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeOutCubic,
-        builder: (context, drop, _) => TweenAnimationBuilder<double>(
-          tween: Tween(end: scene.screwTurns),
-          duration: const Duration(milliseconds: 1600),
-          builder: (context, turns, _) => TweenAnimationBuilder<double>(
-            tween: Tween(end: scene.fieldLitres),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: labLabelsOn,
+        builder: (context, showLabels, _) => TweenAnimationBuilder<double>(
+          key: ValueKey('drop-${scene.station.name}-${scene.revision}'),
+          tween: Tween(begin: scene.revision == 0 ? 1 : 0, end: 1),
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeOutCubic,
+          builder: (context, drop, _) => TweenAnimationBuilder<double>(
+            tween: Tween(end: scene.screwTurns),
             duration: const Duration(milliseconds: 1600),
-            builder: (context, litres, _) => TweenAnimationBuilder<double>(
-              tween: Tween(
-                end: scene.boat == null
-                    ? 0
-                    : scene.boat!.sinks(scene.crates)
-                    ? 1.6
-                    : scene.boat!.draftRatio(scene.crates),
-              ),
-              duration: const Duration(milliseconds: 900),
-              builder: (context, draft, _) => CustomPaint(
-                painter: _LabPainter(
-                  scene: scene,
-                  drop: drop,
-                  turns: turns,
-                  litres: litres,
-                  draft: draft,
+            builder: (context, turns, _) => TweenAnimationBuilder<double>(
+              tween: Tween(end: scene.fieldLitres),
+              duration: const Duration(milliseconds: 1600),
+              builder: (context, litres, _) => TweenAnimationBuilder<double>(
+                tween: Tween(
+                  end: scene.boat == null
+                      ? 0
+                      : scene.boat!.sinks(scene.crates)
+                      ? 1.6
+                      : scene.boat!.draftRatio(scene.crates),
                 ),
-                size: Size.infinite,
+                duration: const Duration(milliseconds: 900),
+                builder: (context, draft, _) => CustomPaint(
+                  painter: _LabPainter(
+                    scene: scene,
+                    drop: drop,
+                    turns: turns,
+                    litres: litres,
+                    draft: draft,
+                    showLabels: showLabels,
+                  ),
+                  size: Size.infinite,
+                ),
               ),
             ),
           ),
@@ -65,7 +70,12 @@ class _LabPainter extends CustomPainter {
     required this.turns,
     required this.litres,
     required this.draft,
+    required this.showLabels,
   });
+
+  /// Sahne etiketleri (A/B, cisim adları, ölçümler); sağ alttaki düğmeyle
+  /// kapatılabilir.
+  final bool showLabels;
 
   final ArchimedesScene scene;
   final double drop;
@@ -120,7 +130,9 @@ class _LabPainter extends CustomPainter {
 
     // Su: son cisim düşerken seviye eskisinden yenisine ilerler.
     final dropped = tank.dropped;
-    final before = dropped.isEmpty ? dropped : dropped.sublist(0, dropped.length - 1);
+    final before = dropped.isEmpty
+        ? dropped
+        : dropped.sublist(0, dropped.length - 1);
     final levelBefore = tank.brimFull ? tankHeightCm : tankWaterLevelCm(before);
     final level = levelBefore + (tank.waterLevelCm - levelBefore) * drop;
     final waterTop = bottom - level * pxPerCm;
@@ -137,8 +149,6 @@ class _LabPainter extends CustomPainter {
       final y = bottom - cm * pxPerCm;
       canvas.drawLine(Offset(box.left, y), Offset(box.left + 8, y), tick);
     }
-    _label(canvas, '${level.toStringAsFixed(1).replaceAll('.', ',')} cm',
-        Offset(box.left + 10, waterTop - 16), 11, _waterDeep);
 
     // Cisimler.
     for (var k = 0; k < dropped.length; k++) {
@@ -153,10 +163,29 @@ class _LabPainter extends CustomPainter {
       final cx = box.left + tankW * (0.3 + 0.4 * ((k % 2 == 0) ? 0.2 : 0.8));
       _emoji(canvas, o.emoji, Offset(cx, objBottom - d / 2), d);
     }
+    Offset? heldTop;
     if (tank.held != null) {
       final d = _objectSize(tank.held!, pxPerCm);
-      _emoji(canvas, tank.held!.emoji,
-          Offset(box.center.dx, box.top - d / 2 - 6), d);
+      _emoji(
+        canvas,
+        tank.held!.emoji,
+        Offset(box.center.dx, box.top - d / 2 - 6),
+        d,
+      );
+      heldTop = Offset(box.center.dx, box.top - d - 8);
+    }
+    Offset? lastTop;
+    if (dropped.isNotEmpty) {
+      final k = dropped.length - 1;
+      final o = dropped[k];
+      final d = _objectSize(o, pxPerCm);
+      final restBottom = o.floats
+          ? waterTop + d * o.submergedFraction
+          : bottom - 1;
+      final startBottom = box.top - 10;
+      final objBottom = startBottom + (restBottom - startBottom) * drop;
+      final cx = box.left + tankW * (0.3 + 0.4 * ((k % 2 == 0) ? 0.2 : 0.8));
+      lastTop = Offset(cx, objBottom - d - 2);
     }
 
     // Kap çerçevesi (yanlar + taban, ağız açık).
@@ -173,21 +202,61 @@ class _LabPainter extends CustomPainter {
       wall,
     );
 
-    if (tank.label != null) {
-      _label(canvas, tank.label!, Offset(box.center.dx - 6, bottom + 2), 14,
-          Colors.black87);
+    if (showLabels) {
+      if (tank.label != null) {
+        paintLabLabel(
+          canvas,
+          Offset(box.left, box.top + 4),
+          LabLabel.tag(tank.label!),
+        );
+      }
+      paintLabLabel(
+        canvas,
+        Offset(box.right - 4, waterTop),
+        LabLabel.value(
+          'Su: ${level.toStringAsFixed(1).replaceAll('.', ',')} cm',
+        ),
+      );
+      if (tank.held != null) {
+        paintLabLabel(
+          canvas,
+          heldTop!,
+          LabLabel(tank.held!.name, emoji: tank.held!.emoji),
+        );
+      } else if (lastTop != null) {
+        final o = dropped.last;
+        paintLabLabel(canvas, lastTop, LabLabel(o.name, emoji: o.emoji));
+      }
+    } else if (tank.label != null) {
+      _label(
+        canvas,
+        tank.label!,
+        Offset(box.center.dx - 6, bottom + 2),
+        16,
+        Colors.black87,
+      );
     }
 
     if (tank.brimFull) {
       // Ölçü kabı: taşan su (mL) burada toplanır.
       final bw = beakerRoom * 0.6;
       final bh = tankH * 0.45;
-      final beaker = Rect.fromLTWH(box.right + beakerRoom * 0.25, bottom - bh, bw, bh);
+      final beaker = Rect.fromLTWH(
+        box.right + beakerRoom * 0.25,
+        bottom - bh,
+        bw,
+        bh,
+      );
       final ml = tank.overflowMl * drop;
       // 80 mL kabı doldurur (taç deneyinde 52 / 65 mL farkı görünsün).
       final fillH = bh * (ml / 80).clamp(0.0, 1.0);
       canvas.drawRect(
-        Rect.fromLTRB(beaker.left, beaker.bottom - fillH, beaker.right, beaker.bottom),
+        Rect.fromLTRB(
+          beaker.left,
+          beaker.bottom - fillH,
+          beaker.right,
+          beaker.bottom,
+        ),
         Paint()..color = _water.withValues(alpha: 0.7),
       );
       canvas.drawPath(
@@ -198,8 +267,21 @@ class _LabPainter extends CustomPainter {
           ..lineTo(beaker.right, beaker.top),
         wall..strokeWidth = 2,
       );
-      _label(canvas, '${ml.round()} mL', Offset(beaker.left, beaker.top - 16),
-          11, _waterDeep);
+      if (showLabels) {
+        paintLabLabel(
+          canvas,
+          Offset(beaker.center.dx, beaker.top - 2),
+          LabLabel.value('Taşan: ${ml.round()} mL'),
+        );
+      } else {
+        _label(
+          canvas,
+          '${ml.round()} mL',
+          Offset(beaker.left, beaker.top - 18),
+          14,
+          _waterDeep,
+        );
+      }
     }
   }
 
@@ -222,7 +304,10 @@ class _LabPainter extends CustomPainter {
     final hullH = hullW * 0.22;
     final cx = size.width / 2;
     final sinking = draft > 1;
-    final hullBottom = waterY - hullH * (1 - min(draft, 1.0)) + hullH +
+    final hullBottom =
+        waterY -
+        hullH * (1 - min(draft, 1.0)) +
+        hullH +
         (sinking ? (draft - 1) * hullH * 2 : 0);
     final hullTop = hullBottom - hullH;
     final hull = Path()
@@ -268,12 +353,27 @@ class _LabPainter extends CustomPainter {
       canvas,
       sinking
           ? 'Battı!'
-          : '${boat.name}: ${scene.crates} sandık, '
+          : '${scene.crates} sandık, '
                 '${boat.draftCm(scene.crates).toStringAsFixed(1).replaceAll('.', ',')} cm gömüldü',
       const Offset(12, 10),
-      13,
+      16,
       sinking ? Colors.red.shade700 : Colors.black87,
     );
+    if (showLabels) {
+      final stack = scene.crates == 0 ? 0 : (scene.crates - 1) ~/ 3 + 1;
+      paintLabLabel(
+        canvas,
+        Offset(cx, hullTop - stack * (crate + 2) - 4),
+        LabLabel(boat.name, emoji: boat.emoji),
+        bounds: size,
+      );
+      paintLabLabel(
+        canvas,
+        Offset(size.width - 60, waterY),
+        const LabLabel.value('Su yüzeyi'),
+        bounds: size,
+      );
+    }
   }
 
   // ─────────────────────────── Vida ───────────────────────────
@@ -356,9 +456,30 @@ class _LabPainter extends CustomPainter {
       '${scene.screwAngle.round()}°  ·  Tarla: ${litres.round()} / '
       '${fieldNeedLitres.round()} litre',
       const Offset(12, 10),
-      13,
+      16,
       Colors.black87,
     );
+    if (showLabels) {
+      final mid = pivot + dir * (screwLengthM * unit * 0.5);
+      paintLabLabel(
+        canvas,
+        mid - normal * (r + 4),
+        const LabLabel('Arşimet vidası'),
+        bounds: size,
+      );
+      paintLabLabel(
+        canvas,
+        Offset(size.width * 0.06 + 30, riverY + 4),
+        const LabLabel('Nehir', emoji: '🌊'),
+        bounds: size,
+      );
+      paintLabLabel(
+        canvas,
+        Offset((fieldLeft + size.width) / 2, fieldTop - 30),
+        const LabLabel('Tarla', emoji: '🌱'),
+        bounds: size,
+      );
+    }
   }
 
   // ─────────────────────────── Yardımcılar ───────────────────────────
@@ -382,7 +503,10 @@ class _LabPainter extends CustomPainter {
   /// "Emoji tuzağı": CanvasKit emoji yazı tipini geç yükleyebilir).
   void _emoji(Canvas canvas, String emoji, Offset center, double size) {
     final tp = TextPainter(
-      text: TextSpan(text: emoji, style: TextStyle(fontSize: size * 0.85)),
+      text: TextSpan(
+        text: emoji,
+        style: TextStyle(fontSize: size * 0.85),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
@@ -394,5 +518,6 @@ class _LabPainter extends CustomPainter {
       old.drop != drop ||
       old.turns != turns ||
       old.litres != litres ||
-      old.draft != draft;
+      old.draft != draft ||
+      old.showLabels != showLabels;
 }

@@ -41,8 +41,14 @@ class ZoneTask extends FlemingTask {
   @override
   String get prompt =>
       '1928\'de Fleming tatile çıkarken bakteri ektiği bir kabı masada unuttu. '
-      'Döndüğünde kapta mavi-yeşil bir küf üremişti. Küfün çevresinde ne '
-      'gördü?';
+      'Döndüğünde kapta mavi-yeşil bir küf üremişti.';
+
+  @override
+  String get ask => 'Küfün çevresinde ne gördü?';
+
+  @override
+  String get takeaway => 'Küf, bakterileri durduran bir madde yapar: bu '
+      'madde ilk antibiyotik olan penisilindir.';
 
   @override
   int get correctIndex {
@@ -88,8 +94,14 @@ class ControlDishTask extends FlemingTask {
   @override
   String get prompt =>
       'İki kaba aynı bakteriyi ektik. A kabına küf de koyduk, B kabına '
-      'koymadık. ${formatTr(days)} gün sonra hangisinde daha az bakteri '
-      'kolonisi olur?';
+      'koymadık. ${formatTr(days)} gün bekliyoruz.';
+
+  @override
+  String get ask => 'Hangisinde daha az bakteri kolonisi olur?';
+
+  @override
+  String get takeaway => 'Kontrol kabı, farkı yaratanın gerçekten küf '
+      'olduğunu gösterir.';
 
   @override
   String? get hint => 'Soldaki kap A, sağdaki kap B.';
@@ -148,8 +160,14 @@ class DirtiestDishTask extends FlemingTask {
 
   @override
   String get prompt =>
-      'Üç temiz kabı farklı şekilde $hygieneDays gün beklettik. Hangisinde en '
-      'çok mikrop kolonisi ürer?';
+      'Üç temiz kabı farklı şekilde $hygieneDays gün beklettik.';
+
+  @override
+  String get ask => 'Hangisinde en çok mikrop kolonisi ürer?';
+
+  @override
+  String get takeaway => 'Mikroplar havadan ve ellerimizden bulaşır; el '
+      'yıkamak onları azaltır.';
 
   @override
   List<String> get options => [for (final s in setups) s.label];
@@ -202,8 +220,15 @@ class ColonyCountTask extends FlemingTask {
 
   @override
   String get prompt =>
-      'Temiz bir kap: ${setup.label.toLowerCase()}. $hygieneDays gün sonra '
-      'yaklaşık kaç mikrop kolonisi görürüz?';
+      'Temiz bir kap: ${setup.label.toLowerCase()}. $hygieneDays gün '
+      'bekliyoruz.';
+
+  @override
+  String get ask => 'Yaklaşık kaç mikrop kolonisi görürüz?';
+
+  @override
+  String get takeaway => 'Kapak kapalı ve eller temizse neredeyse hiç mikrop '
+      'üremez.';
 
   @override
   List<String> get options => [for (final c in choices) '$c koloni'];
@@ -259,8 +284,14 @@ class StopEarlyTask extends FlemingTask {
   @override
   String get prompt =>
       'Doktor antibiyotiği $fullCourseDays gün kullanmasını söyledi. Can '
-      '$stopDay. gün kendini iyi hissedip ilacı bıraktı. $observedDays. günde '
-      'ne olur?';
+      '$stopDay. gün kendini iyi hissedip ilacı bıraktı.';
+
+  @override
+  String get ask => '$observedDays. günde ne olur?';
+
+  @override
+  String get takeaway => 'Antibiyotik doktorun söylediği kadar kullanılır; '
+      'erken bırakınca en dayanıklı bakteriler kalır.';
 
   @override
   int get correctIndex {
@@ -313,8 +344,14 @@ class VirusTask extends FlemingTask {
 
   @override
   String get prompt =>
-      'Hastalığa yol açan mikrop: ${pathogen.label}. Antibiyotik bu hastalığa '
-      'işe yarar mı?';
+      'Hastalığa yol açan mikrop: ${pathogen.label}.';
+
+  @override
+  String get ask => 'Antibiyotik bu hastalığa işe yarar mı?';
+
+  @override
+  String get takeaway => 'Antibiyotik bakterilere işe yarar, virüslere yaramaz. '
+      'İlacı yalnızca doktor verir.';
 
   @override
   List<String> get options => const [yes, no];

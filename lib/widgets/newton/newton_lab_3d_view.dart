@@ -7,8 +7,10 @@ import '../../models/newton/cart.dart';
 import '../../models/newton/falling.dart';
 import '../../models/newton/newton_scene.dart';
 import '../../models/newton/prism.dart';
+import '../../models/science/science_task.dart' show formatTr;
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Newton'un laboratuvarının 3B görünümü. Modeller Blender'da üretilmiştir
 /// (`assets/models/newton.glb`, üretici `tool/blender/build_newton.py`).
@@ -428,6 +430,101 @@ class _NewtonLab3DViewState extends Lab3DState<NewtonLab3DView> {
         : 0.0;
     _plungerA?.position.x = kick;
     _plungerB?.position.x = kick;
+  }
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels => switch (_s.station) {
+    NewtonStation.fall => _fallLabels(),
+    NewtonStation.prism => _prismLabels(),
+    NewtonStation.cart => _cartLabels(),
+  };
+
+  List<LabAnchor> _fallLabels() {
+    final s = _s;
+    final out = <LabAnchor>[
+      anchor(
+        LabLabel.value('Kule: ${formatTr(towerHeightM)} m'),
+        _fallX + 1.35,
+        towerHeightM * 0.45,
+        0.3,
+      ),
+      if (s.environment == FallEnvironment.vacuum)
+        anchor(const LabLabel('Havası boşaltılmış tüp'), _fallX + 1.7, 1.2, 0.6),
+      if (s.environment == FallEnvironment.moon)
+        anchor(const LabLabel('Ay yüzeyi', emoji: '🌕'), _fallX + 3.2, 0.1, 1.6),
+    ];
+    for (var i = 0; i < _fallers.length; i++) {
+      final f = _fallers[i];
+      final tag = f.x < 0 ? 'A' : 'B';
+      final landedAt = fallTime(f.object, s.environment);
+      final landed = s.run > 0 && _t >= landedAt;
+      out.add(anchorAt(
+        f.node,
+        LabLabel(
+          landed
+              ? '$tag: ${formatTr(landedAt)} sn'
+              : '$tag: ${f.object.name}',
+          emoji: f.object.emoji,
+          color: labTagColor(tag),
+        ),
+        dy: f.height + 0.12,
+      ));
+    }
+    return out;
+  }
+
+  List<LabAnchor> _prismLabels() {
+    final s = _s;
+    return [
+      anchor(
+        LabLabel(
+          s.light.onlyColorId == null ? 'Fener' : 'Fener + renkli cam',
+          emoji: '🔦',
+        ),
+        _slit.x,
+        _beamY + 0.22,
+        _slit.z,
+      ),
+      anchor(const LabLabel('Prizma'), _entry.x, _tableTop + 0.42, _entry.z),
+      if (s.secondPrism)
+        anchor(const LabLabel('Ters prizma'), _q.x + 0.15, _tableTop + 0.62, _q.z),
+      anchor(
+        const LabLabel('Perde'),
+        _entry.x + _screenDistance,
+        _tableTop + 0.78,
+        0,
+      ),
+    ];
+  }
+
+  List<LabAnchor> _cartLabels() {
+    final s = _s;
+    final lanes = [s.laneA, s.laneB];
+    final out = <LabAnchor>[];
+    for (var i = 0; i < _carts.length && i < lanes.length; i++) {
+      final lane = lanes[i];
+      if (lane == null) continue;
+      final tag = i == 0 ? 'A' : 'B';
+      final z = i == 0 ? _laneAZ : _laneBZ;
+      final x = s.run > 0 ? cartPositionAt(lane, s.push, _t) : 0.0;
+      out.add(anchorAt(
+        _carts[i].holder,
+        LabLabel(
+          s.run > 0 ? '$tag: ${formatTr(x)} m' : '$tag arabası',
+          color: labTagColor(tag),
+        ),
+        dy: 0.35 + (lane.boxes > 0 ? 0.3 : 0),
+      ));
+      out.add(anchor(
+        LabLabel.value(lane.surface.label),
+        _trackStart + trackLengthM - 1.2,
+        0.05,
+        z,
+      ));
+    }
+    return out;
   }
 
   // ─────────────────────────── Kamera ───────────────────────────

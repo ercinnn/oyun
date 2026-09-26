@@ -96,6 +96,17 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   // ─────────────────────────── Keşif ───────────────────────────
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Küflü kapta en az bir gün geçti mi? Küfsüz (kontrol) hâli denendi mi?
+  bool sawMoldRing = false;
+  bool triedNoMold = false;
+
+  /// Bekletilen düzenekler ("kapak/el").
+  final Set<String> incubatedSetups = {};
+
+  /// Denenen tedavi süreleri (gün).
+  final Set<int> coursesRun = {};
+
   @override
   void resetExplore() {
     station = FlemingStation.petri;
@@ -106,6 +117,10 @@ class FlemingController extends ScientistGameController<FlemingTask> {
     incubated = false;
     treatmentDays = 3;
     medicineDay = 0;
+    sawMoldRing = false;
+    triedNoMold = false;
+    incubatedSetups.clear();
+    coursesRun.clear();
   }
 
   void setStation(FlemingStation value) {
@@ -117,12 +132,14 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   void setMold(bool value) {
     mold = value;
+    if (!value) triedNoMold = true;
     playSound(ScienceSound.clink);
     notifyListeners();
   }
 
   void setDay(double value) {
     day = value.clamp(0, petriMaxDays.toDouble()).toDouble();
+    if (mold && day >= 1) sawMoldRing = true;
     notifyListeners();
   }
 
@@ -147,6 +164,7 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   void incubate() {
     incubated = true;
+    incubatedSetups.add('$lidOpen/${hand.name}');
     playSound(ScienceSound.ding);
     notifyListeners();
   }
@@ -159,6 +177,7 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   void runCourse() {
     medicineDay = observedDays.toDouble();
+    coursesRun.add(treatmentDays);
     playSound(ScienceSound.ding);
     notifyListeners();
   }

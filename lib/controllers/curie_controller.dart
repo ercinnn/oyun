@@ -39,6 +39,48 @@ class CurieController extends ScientistGameController<CurieTask> {
   bool spread = true;
   bool beamsOn = false;
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Sayaçla taranan numuneler.
+  final Set<String> samplesScanned = {};
+
+  /// Işıma yapan bir numune bulundu mu?
+  bool foundRadioactive = false;
+
+  /// Işıyan numunedeyken sonda uzaklaştırıldı mı?
+  bool movedProbeAway = false;
+
+  /// Denenen kalkanlar ve ışınlar.
+  final Set<Shield> shieldsTried = {};
+  final Set<RayType> raysTried = {};
+
+  /// Bir ışın, onu durduran en ince kalkanla durduruldu mu?
+  bool stoppedWithThinnest = false;
+
+  /// Işınlar en az bir kez açıldı mı? Denenen ışın sayıları.
+  bool beamsTurnedOn = false;
+  final Set<int> beamCountsTried = {};
+
+  /// Işınlar açıkken güvenli bir plan görüldü mü?
+  bool sawSafePlan = false;
+
+  void _note() {
+    final smp = sample;
+    if (smp != null) {
+      samplesScanned.add(smp.id);
+      if (smp.radioactive) foundRadioactive = true;
+    }
+    shieldsTried.add(shield);
+    raysTried.add(ray);
+    if (shield != Shield.none && shield == thinnestStopper(ray)) {
+      stoppedWithThinnest = true;
+    }
+    beamCountsTried.add(beamCount);
+    if (beamsOn) {
+      beamsTurnedOn = true;
+      if (computeDose(plan).safe) sawSafePlan = true;
+    }
+  }
+
   @override
   int get roundsPerPlayer => curieRoundsPerPlayer;
 
@@ -110,6 +152,16 @@ class CurieController extends ScientistGameController<CurieTask> {
     beamCount = 1;
     spread = true;
     beamsOn = false;
+    samplesScanned.clear();
+    foundRadioactive = false;
+    movedProbeAway = false;
+    shieldsTried.clear();
+    raysTried.clear();
+    stoppedWithThinnest = false;
+    beamsTurnedOn = false;
+    beamCountsTried.clear();
+    sawSafePlan = false;
+    _note();
   }
 
   void setStation(CurieStation value) {
@@ -123,6 +175,7 @@ class CurieController extends ScientistGameController<CurieTask> {
   void pickSample(RadioSample value) {
     sample = sample?.id == value.id ? null : value;
     playSound(ScienceSound.click);
+    _note();
     notifyListeners();
   }
 
@@ -130,36 +183,45 @@ class CurieController extends ScientistGameController<CurieTask> {
   void geigerClick() => playSound(ScienceSound.geiger);
 
   void setDistance(double cm) {
+    final before = distanceCm;
     distanceCm = cm.clamp(counterMinCm, counterMaxCm).toDouble();
+    if (distanceCm > before && (sample?.radioactive ?? false)) {
+      movedProbeAway = true;
+    }
     notifyListeners();
   }
 
   void setRay(RayType value) {
     ray = value;
     playSound(ScienceSound.click);
+    _note();
     notifyListeners();
   }
 
   void setShield(Shield value) {
     shield = value;
     playSound(ScienceSound.knock);
+    _note();
     notifyListeners();
   }
 
   void setBeamCount(int n) {
     beamCount = n.clamp(1, curieMaxBeams);
+    _note();
     notifyListeners();
   }
 
   void setSpread(bool value) {
     spread = value;
     playSound(ScienceSound.click);
+    _note();
     notifyListeners();
   }
 
   void setBeamsOn(bool on) {
     beamsOn = on;
     playSound(on ? ScienceSound.powerUp : ScienceSound.click);
+    _note();
     notifyListeners();
   }
 

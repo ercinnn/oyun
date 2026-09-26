@@ -39,8 +39,14 @@ class MagnifyTask extends GalileoTask {
   @override
   String get prompt =>
       'Galileo mercekleri kendisi taşlayıp parlatırdı. Uzak odaklı objektif '
-      'uzağı toplar, kısa odaklı göz merceği görüntüyü büyütür. Hangi çift '
-      'Jüpiter\'i en büyük gösterir?';
+      'uzağı toplar, kısa odaklı göz merceği görüntüyü büyütür.';
+
+  @override
+  String get ask => "Hangi mercek çifti Jüpiter'i en büyük gösterir?";
+
+  @override
+  String get takeaway => 'Büyütme = objektifin odak uzaklığı ÷ göz merceğinin '
+      'odak uzaklığı.';
 
   @override
   List<String> get options => [for (final (fo, fe) in pairs) _lens(fo, fe)];
@@ -108,7 +114,14 @@ class FocusTask extends GalileoTask {
   String get prompt =>
       'Objektif ${formatTr(objectiveCm)} cm, içbükey göz merceği '
       '${formatTr(eyepieceCm)} cm. Galileo\'nun teleskobunda görüntü, tüp boyu '
-      'objektiften göz merceği kadar kısa olunca netleşir. Tüp kaç cm olmalı?';
+      'objektiften göz merceği kadar kısa olunca netleşir.';
+
+  @override
+  String get ask => 'Tüp kaç cm olmalı?';
+
+  @override
+  String get takeaway => "Galileo'nun teleskobunda tüp = objektif − göz "
+      'merceği; boy yanlışsa görüntü bulanık olur.';
 
   @override
   List<String> get options => [for (final c in choices) '${formatTr(c)} cm'];
@@ -160,7 +173,14 @@ class FastestMoonTask extends GalileoTask {
   String get prompt =>
       'Jüpiter\'in etrafında dönen uyduların uzaklıkları: '
       '${moons.map((m) => '${m.name} ${formatTr(m.distance)}').join(', ')} '
-      '(Jüpiter yarıçapı). Hangisi bir turunu en kısa sürede tamamlar?';
+      '(Jüpiter yarıçapı).';
+
+  @override
+  String get ask => 'Hangisi bir turunu en kısa sürede tamamlar?';
+
+  @override
+  String get takeaway => "Jüpiter'e en yakın uydu en hızlı döner, uzaktaki "
+      'daha yavaş.';
 
   @override
   List<String> get options => [for (final m in moons) m.name];
@@ -226,7 +246,14 @@ class MoonWhereTask extends GalileoTask {
   String get prompt =>
       'Bu gece ${moon.name} Jüpiter\'in en sağında görünüyor. ${moon.name} '
       'Jüpiter\'in etrafını yaklaşık ${formatTr(moon.periodDays, digits: 0)} '
-      'günde bir dolanır. $nightsLater gece sonra nerede görünür?';
+      'günde bir dolanır.';
+
+  @override
+  String get ask => '$nightsLater gece sonra nerede görünür?';
+
+  @override
+  String get takeaway => 'Uydu Jüpiter\'in etrafında döndüğü için bir sağda, '
+      'bir solda, bazen de arkasında görünür.';
 
   @override
   List<String> get options => _options;
@@ -280,8 +307,15 @@ class FastestPlanetTask extends GalileoTask {
   @override
   String get prompt =>
       'Galileo, Dünya\'nın ve gezegenlerin Güneş\'in etrafında döndüğünü '
-      'savundu. Bu gezegenlerden hangisi Güneş\'in etrafını en kısa sürede '
-      'dolanır?';
+      'savundu.';
+
+  @override
+  String get ask => "Bu gezegenlerden hangisi Güneş'in etrafını en kısa "
+      'sürede dolanır?';
+
+  @override
+  String get takeaway => "Güneş'e yakın gezegenin yolu kısadır ve daha hızlı "
+      'döner; bu yüzden yılı da kısadır.';
 
   @override
   List<String> get options => [for (final p in options3) p.name];
@@ -335,9 +369,15 @@ class VenusPhaseTask extends GalileoTask {
   @override
   String get prompt => _near
       ? 'Venüs şu an Dünya\'ya çok yakın, neredeyse Güneş ile Dünya\'nın '
-            'arasında. Galileo teleskopla bakınca Venüs\'ü nasıl gördü?'
-      : 'Venüs şu an Güneş\'in öbür yanında, Dünya\'dan çok uzakta. Galileo '
-            'teleskopla bakınca Venüs\'ü nasıl gördü?';
+            'arasında.'
+      : "Venüs şu an Güneş'in öbür yanında, Dünya'dan çok uzakta.";
+
+  @override
+  String get ask => "Galileo teleskopla bakınca Venüs'ü nasıl gördü?";
+
+  @override
+  String get takeaway => "Venüs'ün Ay gibi evreleri vardır; bu, Venüs'ün "
+      "Güneş'in etrafında döndüğünü kanıtlar.";
 
   @override
   List<String> get options => [for (final p in VenusPhase.values) p.label];

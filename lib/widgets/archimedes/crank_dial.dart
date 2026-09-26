@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// Arşimet vidasının çevrilebilir kolu: parmakla (ya da fareyle) daire
@@ -42,16 +43,37 @@ class _CrankDialState extends State<CrankDial> {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Vidanın kolu: çevirmek için daire çiz',
-      child: GestureDetector(
-        onPanStart: (d) => _lastPointerAngle = _pointerAngle(d.localPosition),
-        onPanUpdate: (d) => _update(d.localPosition),
-        onPanEnd: (_) => _lastPointerAngle = null,
+      // Kol kaydırılabilir panelin içinde: çember çizerken dikey hareket
+      // kaydırmaya kaptırılmasın diye dokunuş ilk temasta sahiplenilir.
+      child: RawGestureDetector(
+        gestures: {
+          _EagerPanRecognizer:
+              GestureRecognizerFactoryWithHandlers<_EagerPanRecognizer>(
+                _EagerPanRecognizer.new,
+                (r) {
+                  r.onStart = (d) {
+                    _lastPointerAngle = _pointerAngle(d.localPosition);
+                  };
+                  r.onUpdate = (d) => _update(d.localPosition);
+                  r.onEnd = (_) => _lastPointerAngle = null;
+                },
+              ),
+        },
         child: SizedBox.square(
           dimension: widget.size,
           child: CustomPaint(painter: _CrankPainter(_angle)),
         ),
       ),
     );
+  }
+}
+
+/// Parmak değer değmez kazanan pan tanıyıcısı (kaydırmayla yarışmaz).
+class _EagerPanRecognizer extends PanGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    resolve(GestureDisposition.accepted);
   }
 }
 

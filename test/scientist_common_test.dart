@@ -2,12 +2,19 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/tap_visible.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bombali_sayilar/controllers/archimedes_controller.dart';
 import 'package:bombali_sayilar/controllers/curie_controller.dart';
+import 'package:bombali_sayilar/controllers/einstein_controller.dart';
+import 'package:bombali_sayilar/controllers/fleming_controller.dart';
+import 'package:bombali_sayilar/controllers/galileo_controller.dart';
 import 'package:bombali_sayilar/controllers/newton_controller.dart';
+import 'package:bombali_sayilar/controllers/scientist_game_controller.dart';
+import 'package:bombali_sayilar/controllers/tesla_controller.dart';
 import 'package:bombali_sayilar/controllers/profile_controller.dart';
 import 'package:bombali_sayilar/data/archimedes_objects.dart';
 import 'package:bombali_sayilar/data/science_sound_clips.dart';
@@ -22,6 +29,7 @@ import 'package:bombali_sayilar/games/tesla_game.dart';
 import 'package:bombali_sayilar/models/science/scientist_phase.dart';
 import 'package:bombali_sayilar/services/audio/clip_synth.dart';
 import 'package:bombali_sayilar/services/scientist_sounds.dart';
+import 'package:bombali_sayilar/widgets/science_lab/lab_labels.dart';
 
 /// Çalınan sesleri kaydeden sahte ses servisi.
 class _FakeSounds implements ScientistSounds {
@@ -49,6 +57,22 @@ Future<void> _pumpNewton(WidgetTester tester, NewtonController controller) async
         ChangeNotifierProvider.value(value: controller),
       ],
       child: const MaterialApp(home: NewtonGameRoot()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpArchimedes(
+  WidgetTester tester,
+  ArchimedesController controller,
+) async {
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ProfileController()),
+        ChangeNotifierProvider.value(value: controller),
+      ],
+      child: const MaterialApp(home: ArchimedesGameRoot()),
     ),
   );
   await tester.pumpAndSettle();
@@ -181,9 +205,9 @@ void main() {
       );
       expect(badgeName(), findsOneWidget);
 
-      await tester.tap(find.text('1 Kişi'));
+      await tapVisible(tester, find.text('1 Kişi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       expect(badgeName(), findsOneWidget);
       // Etiket sahnenin sol üst köşesinde.
@@ -211,10 +235,133 @@ void main() {
       await _pumpNewton(tester, controller);
       expect(sounds.loaded, isTrue);
       expect(find.byIcon(Icons.volume_up), findsOneWidget);
-      await tester.tap(find.byKey(const Key('scientistSoundToggle')));
+      await tapVisible(tester, find.byKey(const Key('scientistSoundToggle')));
       await tester.pumpAndSettle();
       expect(sounds.enabled, isFalse);
       expect(find.byIcon(Icons.volume_off), findsOneWidget);
+    });
+  });
+
+  group('Görsel rehberlik', () {
+    test('her görevde kısa soru ve "Öğrendik" satırı var', () {
+      final controllers = <ScientistGameController>[
+        ArchimedesController(random: Random(1)),
+        NewtonController(random: Random(2)),
+        GalileoController(random: Random(3)),
+        TeslaController(random: Random(4)),
+        CurieController(random: Random(5)),
+        EinsteinController(random: Random(6)),
+        FlemingController(random: Random(7)),
+      ];
+      for (final c in controllers) {
+        c.startGame(['a']);
+        for (var r = 0; r < c.roundsPerPlayer; r++) {
+          final t = c.generateTask(r);
+          final name = '${c.runtimeType} tur $r';
+          expect(t.ask, isNotNull, reason: name);
+          expect(t.ask!.trim().endsWith('?'), isTrue, reason: '$name: ${t.ask}');
+          expect(t.takeaway, isNotNull, reason: name);
+          // Soru bağlam metninde tekrar edilmemeli.
+          expect(t.prompt.trim().endsWith('?'), isFalse, reason: '$name: ${t.prompt}');
+          final emojis = t.optionEmojis;
+          if (emojis != null) expect(emojis.length, t.options.length, reason: name);
+        }
+      }
+    });
+
+    testWidgets('görev: tur noktaları, akış şeridi; cevaptan sonra seçenekler '
+        'işaretli kalır ve "Öğrendik" görünür', (tester) async {
+      tester.view.physicalSize = const Size(1000, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final c = ArchimedesController(random: Random(3));
+      await _pumpArchimedes(tester, c);
+      c.startGame(['Ada']);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('scientistRoundDots')), findsOneWidget);
+      expect(find.byKey(const Key('scientistFlow')), findsOneWidget);
+      expect(find.byKey(const Key('scientistTakeaway')), findsNothing);
+
+      final task = c.currentTask;
+      final correct = task.correctIndex;
+      final wrong = (correct + 1) % task.options.length;
+      await tapVisible(tester, find.byKey(Key('scientistOption_$wrong')));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < task.options.length; i++) {
+        expect(find.byKey(Key('scientistOption_$i')), findsOneWidget);
+      }
+      expect(
+        find.descendant(
+          of: find.byKey(Key('scientistOption_$correct')),
+          matching: find.byIcon(Icons.check_circle),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(Key('scientistOption_$wrong')),
+          matching: find.byIcon(Icons.cancel),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('scientistTakeaway')), findsOneWidget);
+      expect(c.currentPlayer.results, [false]);
+
+      // Cevaplanmış soruya ikinci dokunuş hiçbir şey değiştirmez.
+      await tester.tap(find.byKey(Key('scientistOption_$correct')), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(c.currentPlayer.roundsPlayed, 1);
+      expect(c.currentPlayer.correctCount, 0);
+    });
+
+    testWidgets('keşif: adım listesi şimdiki adımı gösterir ve ilerler', (tester) async {
+      tester.view.physicalSize = const Size(1000, 1100);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final c = ArchimedesController(random: Random(3));
+      await _pumpArchimedes(tester, c);
+      c.startExplore();
+      await tester.pumpAndSettle();
+      expect(find.text('Şimdi'), findsOneWidget);
+      expect(find.text('Bir cisim seç ve "Suya bırak"a bas.'), findsOneWidget);
+      expect(find.text('0/4'), findsOneWidget);
+
+      await tapVisible(tester, find.byKey(const Key('archimedesDrop')));
+      await tester.pumpAndSettle();
+      expect(find.text('1/4'), findsOneWidget);
+      expect(find.text('Bir cisim daha bırak: su yine yükseliyor mu?'), findsOneWidget);
+
+      // Başlığa dokununca tüm adımlar açılır.
+      await tapVisible(tester, find.byKey(const Key('labStepsToggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('Bir cisim seç ve "Suya bırak"a bas.'), findsOneWidget);
+      expect(find.text('Kabı boşalt ve yeni bir deney kur.'), findsOneWidget);
+    });
+
+    testWidgets('etiket düğmesi etiketleri kapatıp açar', (tester) async {
+      tester.view.physicalSize = const Size(1000, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(() => labLabelsOn.value = true);
+
+      final c = ArchimedesController(random: Random(3));
+      await _pumpArchimedes(tester, c);
+      c.startExplore();
+      await tester.pumpAndSettle();
+      expect(labLabelsOn.value, isTrue);
+      await tapVisible(tester, find.byKey(const Key('labLabelsToggle')));
+      await tester.pumpAndSettle();
+      expect(labLabelsOn.value, isFalse);
+      expect(find.text('Etiketler kapalı'), findsOneWidget);
+      await tapVisible(tester, find.byKey(const Key('labLabelsToggle')));
+      await tester.pumpAndSettle();
+      expect(labLabelsOn.value, isTrue);
     });
   });
 }

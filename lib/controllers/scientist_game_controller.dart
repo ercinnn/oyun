@@ -93,6 +93,7 @@ abstract class ScientistGameController<T extends ScienceTask>
     lastAnswerCorrect = index == currentTask.correctIndex;
     if (lastAnswerCorrect) currentPlayer.correctCount++;
     currentPlayer.roundsPlayed++;
+    currentPlayer.results.add(lastAnswerCorrect);
     showingResult = true;
     playSound(lastAnswerCorrect ? ScienceSound.correct : ScienceSound.wrong);
     notifyListeners();

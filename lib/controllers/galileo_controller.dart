@@ -52,6 +52,31 @@ class GalileoController extends ScientistGameController<GalileoTask> {
   /// Galileo'nun defteri gibi: çizilen geceler (gece numarası + çizim).
   List<(double, String)> notebook = [];
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Görüntü en az bir kez netleşti mi?
+  bool sawSharp = false;
+
+  /// Denenen göz mercekleri (cm).
+  final Set<double> eyepiecesTried = {};
+
+  /// Teleskopla bakılan hedefler.
+  final Set<SkyTarget> targetsViewed = {};
+
+  /// Gece ilerletildi mi?
+  bool nightsAdvanced = false;
+
+  /// Günler ilerletildi mi?
+  bool daysAdvanced = false;
+
+  /// Dünya'dan görülen Venüs evreleri.
+  final Set<VenusPhase> venusPhasesSeen = {};
+
+  void _noteTelescope() {
+    eyepiecesTried.add(eyepieceCm);
+    targetsViewed.add(target);
+    if (isSharp(objectiveCm, eyepieceCm, tubeCm)) sawSharp = true;
+  }
+
   @override
   int get roundsPerPlayer => galileoRoundsPerPlayer;
 
@@ -136,6 +161,14 @@ class GalileoController extends ScientistGameController<GalileoTask> {
     nights = 0;
     day = 0;
     notebook = [];
+    sawSharp = false;
+    eyepiecesTried.clear();
+    targetsViewed.clear();
+    nightsAdvanced = false;
+    daysAdvanced = false;
+    venusPhasesSeen.clear();
+    _noteTelescope();
+    venusPhasesSeen.add(venusOnDay(day).phase);
   }
 
   void setStation(GalileoStation value) {
@@ -147,27 +180,32 @@ class GalileoController extends ScientistGameController<GalileoTask> {
 
   void setTarget(SkyTarget value) {
     target = value;
+    _noteTelescope();
     playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setObjective(double cm) {
     objectiveCm = cm;
+    _noteTelescope();
     notifyListeners();
   }
 
   void setEyepiece(double cm) {
     eyepieceCm = cm;
+    _noteTelescope();
     notifyListeners();
   }
 
   void setTube(double cm) {
     tubeCm = cm.clamp(tubeMinCm, tubeMaxCm).toDouble();
+    _noteTelescope();
     notifyListeners();
   }
 
   void setNights(double value) {
     nights = max(0, value);
+    if (nights > 0) nightsAdvanced = true;
     notifyListeners();
   }
 
@@ -194,6 +232,8 @@ class GalileoController extends ScientistGameController<GalileoTask> {
 
   void setDay(double value) {
     day = max(0, value);
+    if (day > 0) daysAdvanced = true;
+    venusPhasesSeen.add(venusOnDay(day).phase);
     notifyListeners();
   }
 

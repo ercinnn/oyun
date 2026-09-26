@@ -8,6 +8,7 @@ import '../../models/curie/curie_scene.dart';
 import '../../models/curie/shielding.dart';
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Marie Curie'nin laboratuvarının 3B görünümü. Modeller Blender'da
 /// üretilmiştir (`assets/models/curie.glb`, üretici `tool/blender/build_curie.py`).
@@ -298,6 +299,52 @@ class _CurieLab3DViewState extends Lab3DState<CurieLab3DView> {
   }
 
   // ─────────────────────────── Kamera ───────────────────────────
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels {
+    final s = _s;
+    switch (s.station) {
+      case CurieStation.geiger:
+        final probe = _probe;
+        return [
+          for (var i = 0; i < curieSamples.length; i++)
+            anchor(
+              LabLabel(
+                curieSamples[i].name,
+                color: curieSamples[i].id == s.sample?.id
+                    ? const Color(0xFFC62828)
+                    : null,
+              ),
+              _sampleX(i),
+              _bench + 0.2,
+              _sampleZ,
+            ),
+          anchor(const LabLabel('Geiger sayacı'), _labX + 1.3, _bench + 0.36, -0.25),
+          if (probe != null && s.sample != null)
+            anchorAt(probe, const LabLabel.value('Sonda'), dy: 0.06),
+        ];
+      case CurieStation.shield:
+        return [
+          anchor(
+            LabLabel('${s.ray.label} kaynağı', color: Color(0xFF000000 | s.ray.color)),
+            _shieldX - 1.2,
+            _bench + 0.34,
+            0,
+          ),
+          if (s.shield != Shield.none)
+            anchor(LabLabel(s.shield.label), _shieldX, _bench + 0.52, 0),
+          anchor(const LabLabel('Sayaç'), _shieldX + 1.25, _bench + 0.36, 0.1),
+        ];
+      case CurieStation.therapy:
+        return [
+          anchor(const LabLabel('Tümör', color: Color(0xFF6A1B9A)),
+              _therapyX - 0.15, 1.05, 0.1),
+          anchor(const LabLabel('Işın cihazı'), _therapyX - 0.15, 2.05, -0.3),
+        ];
+    }
+  }
 
   @override
   LabCameraShot get cameraShot => switch (_s.station) {

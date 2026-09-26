@@ -55,6 +55,34 @@ class NewtonController extends ScientistGameController<NewtonTask> {
   int _fallRun = 0;
   int _cartRun = 0;
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Cisimlerin bırakıldığı ortamlar.
+  final Set<FallEnvironment> droppedIn = {};
+
+  /// Bırakılan A/B çiftleri (kimlikler sıralı, "a+b").
+  final Set<String> droppedPairs = {};
+
+  /// Fener yanarken denenen ışıklar.
+  final Set<LightSource> litWith = {};
+
+  /// Fener yanarken ters prizma kondu mu?
+  bool sawRecombine = false;
+
+  /// Arabalar kaç kez itildi.
+  int pushes = 0;
+
+  /// Aynı zeminde, farklı yükle itildi mi?
+  bool pushedLoadCompare = false;
+
+  /// Buz zeminli bir araba itildi mi?
+  bool pushedOnIce = false;
+
+  void _noteLight() {
+    if (!lampOn) return;
+    litWith.add(light);
+    if (secondPrism) sawRecombine = true;
+  }
+
   /// Son "Bırak!"/"İt!" deneyinin ayarları değişmeden duruyorsa true
   /// (sonuç kartı ancak o zaman gösterilir).
   bool get fallDone => _fallRun > 0;
@@ -154,6 +182,13 @@ class NewtonController extends ScientistGameController<NewtonTask> {
     push = PushStrength.medium;
     _fallRun = 0;
     _cartRun = 0;
+    droppedIn.clear();
+    droppedPairs.clear();
+    litWith.clear();
+    sawRecombine = false;
+    pushes = 0;
+    pushedLoadCompare = false;
+    pushedOnIce = false;
   }
 
   void setStation(NewtonStation value) {
@@ -185,24 +220,29 @@ class NewtonController extends ScientistGameController<NewtonTask> {
   /// Cisimleri bırakır; tekrar basmak deneyi baştan oynatır.
   void dropObjects() {
     _fallRun++;
+    droppedIn.add(environment);
+    droppedPairs.add(([fallA.id, fallB.id]..sort()).join('+'));
     playSound(ScienceSound.whoosh);
     notifyListeners();
   }
 
   void setLight(LightSource value) {
     light = value;
+    _noteLight();
     playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setSecondPrism(bool value) {
     secondPrism = value;
+    _noteLight();
     playSound(ScienceSound.clink);
     notifyListeners();
   }
 
   void setLamp(bool on) {
     lampOn = on;
+    _noteLight();
     playSound(ScienceSound.click);
     notifyListeners();
   }
@@ -227,6 +267,13 @@ class NewtonController extends ScientistGameController<NewtonTask> {
 
   void pushCarts() {
     _cartRun++;
+    pushes++;
+    if (laneA.surface == laneB.surface && laneA.boxes != laneB.boxes) {
+      pushedLoadCompare = true;
+    }
+    if (laneA.surface == CartSurface.ice || laneB.surface == CartSurface.ice) {
+      pushedOnIce = true;
+    }
     playSound(ScienceSound.boing);
     notifyListeners();
   }

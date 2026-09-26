@@ -52,6 +52,22 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   int _exploreRevision = 0;
   double _crankSoundTurns = 0;
 
+  // Keşif adım listesinin (`LabStepList`) ilerlemesi: çocuk neleri denedi.
+  /// Suya en az bir kez bırakılan cisimler.
+  final Set<String> droppedIds = {};
+
+  /// Cisim bıraktıktan sonra kabı en az bir kez boşalttı mı?
+  bool tankEmptiedOnce = false;
+
+  /// En az bir sandık yüklenen gemiler.
+  final Set<String> loadedBoats = {};
+
+  /// Bir gemi en az bir kez battı mı?
+  bool boatSankOnce = false;
+
+  /// Kolun çevrildiği açılar (derece, yuvarlanmış).
+  final Set<int> crankedAngles = {};
+
   @override
   int get roundsPerPlayer => archimedesRoundsPerPlayer;
 
@@ -140,6 +156,11 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
     screwAngle = 30;
     screwTurns = 0;
     fieldLitres = 0;
+    droppedIds.clear();
+    tankEmptiedOnce = false;
+    loadedBoats.clear();
+    boatSankOnce = false;
+    crankedAngles.clear();
   }
 
   void setStation(ArchimedesStation value) {
@@ -161,13 +182,17 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   void dropSelected() {
     if (tankFull || tankObjects.any((o) => o.id == selectedObject.id)) return;
     tankObjects = [...tankObjects, selectedObject];
+    droppedIds.add(selectedObject.id);
     _exploreRevision++;
     playSound(ScienceSound.splash);
     notifyListeners();
   }
 
   void emptyTank() {
-    if (tankObjects.isNotEmpty) playSound(ScienceSound.bubbles);
+    if (tankObjects.isNotEmpty) {
+      playSound(ScienceSound.bubbles);
+      tankEmptiedOnce = true;
+    }
     tankObjects = [];
     _exploreRevision++;
     notifyListeners();
@@ -185,6 +210,8 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   void addCrate() {
     if (exploreBoat.sinks(exploreCrates)) return;
     exploreCrates++;
+    loadedBoats.add(exploreBoat.id);
+    if (exploreBoat.sinks(exploreCrates)) boatSankOnce = true;
     // Son sandık gemiyi batırdıysa kabarcıklar, yoksa tahtanın tok sesi.
     playSound(
       exploreBoat.sinks(exploreCrates)
@@ -211,6 +238,7 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
     if (turns <= 0) return;
     final before = fieldLitres;
     screwTurns += turns;
+    crankedAngles.add(screwAngle.round());
     fieldLitres = min(
       fieldNeedLitres,
       fieldLitres + screwLitresPerTurn(screwAngle) * turns,

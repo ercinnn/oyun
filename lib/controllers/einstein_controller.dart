@@ -103,6 +103,17 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   // ─────────────────────────── Keşif ───────────────────────────
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Fırlatışlarda görülen bilye sonuçları ve kullanılan merkez kütleler.
+  final Set<MarbleFate> fatesSeen = {};
+  final Set<CentralMass> centersLaunched = {};
+
+  /// Yolculuk yapılan gemi hızları.
+  final Set<double> voyageSpeeds = {};
+
+  /// Enerjiye çevrilen kütleler (g).
+  final Set<double> massesConverted = {};
+
   @override
   void resetExplore() {
     station = EinsteinStation.sheet;
@@ -113,6 +124,10 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
     _launches = 0;
     _voyages = 0;
     _conversions = 0;
+    fatesSeen.clear();
+    centersLaunched.clear();
+    voyageSpeeds.clear();
+    massesConverted.clear();
   }
 
   void setStation(EinsteinStation value) {
@@ -137,6 +152,8 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void launch() {
     _launches++;
+    fatesSeen.add(simulateMarble(center, speed).fate);
+    centersLaunched.add(center);
     playSound(ScienceSound.whoosh);
     notifyListeners();
   }
@@ -149,6 +166,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void startVoyage() {
     _voyages++;
+    voyageSpeeds.add(shipSpeed);
     playSound(ScienceSound.rumble);
     notifyListeners();
   }
@@ -161,6 +179,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void convert() {
     _conversions++;
+    massesConverted.add(grams);
     playSound(ScienceSound.powerUp);
     notifyListeners();
   }

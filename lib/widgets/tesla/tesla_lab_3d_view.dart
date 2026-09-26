@@ -3,11 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:three_js/three_js.dart' as three;
 
+import '../../models/science/science_task.dart' show formatTr;
 import '../../models/tesla/generator.dart';
 import '../../models/tesla/tesla_scene.dart';
 import '../../models/tesla/transmission.dart';
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Tesla'nın laboratuvarının 3B görünümü. Modeller Blender'da üretilmiştir
 /// (`assets/models/tesla.glb`, üretici `tool/blender/build_tesla.py`).
@@ -293,6 +295,45 @@ class _TeslaLab3DViewState extends Lab3DState<TeslaLab3DView> {
         )
         ..rotation.set(0, a, (_rng.nextDouble() - 0.5) * 0.8)
         ..scale.setValues(len, 0.015, 0.015);
+    }
+  }
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels {
+    final s = _s;
+    switch (s.station) {
+      case TeslaStation.generator:
+        return [
+          if (s.source == PowerSource.generator)
+            anchor(const LabLabel('Jeneratör', emoji: '🧲'),
+                _labX - 0.6, _bench + 0.42, -0.35)
+          else
+            anchor(const LabLabel('Pil', emoji: '🔋'),
+                _labX - 1.25, _bench + 0.3, -0.35),
+          anchor(const LabLabel('Ampul', emoji: '💡'), _labX + 0.2, _bench + 0.32, -0.35),
+          anchor(const LabLabel('İki LED'), _labX + 0.6, _bench + 0.2, -0.3),
+        ];
+      case TeslaStation.transmission:
+        return [
+          anchor(const LabLabel('Santral', emoji: '🏭'), _cityX - 12.5, 3.4, -1),
+          anchor(const LabLabel('Trafo'), _cityX - 9.5, 1.7, 0.8),
+          anchor(LabLabel.value('${formatTr(s.distanceKm)} km tel'), _cityX - 1, 4.6, 0),
+          anchor(const LabLabel('Trafo'), _cityX + 7.5, 1.7, 0.8),
+          anchor(const LabLabel('Şehir', emoji: '🏘️'), _cityX + 12.1, 2.1, -0.2),
+        ];
+      case TeslaStation.wireless:
+        final lamp = _lamp;
+        return [
+          anchor(const LabLabel('Tesla bobini (verici)'), _coilX, 2.7, 0),
+          if (lamp != null)
+            anchorAt(
+              lamp,
+              LabLabel('Lamba: ${formatTr(s.lampDistanceM)} m', emoji: '💡'),
+              dy: 1.25,
+            ),
+        ];
     }
   }
 

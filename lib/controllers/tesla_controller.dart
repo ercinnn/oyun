@@ -54,6 +54,47 @@ class TeslaController extends ScientistGameController<TeslaTask> {
   double receiverKHz = 120;
   double lampDistanceM = 1;
 
+  // Keşif adım listesinin ilerlemesi (çocuk neleri denedi).
+  /// Denenen kol hızları (tur/sn).
+  final Set<double> speedsTried = {};
+
+  /// Devreye bağlanan kaynaklar.
+  final Set<PowerSource> sourcesTried = {};
+
+  /// Jeneratör dururken (hız 0) ampul görüldü mü?
+  bool sawStopped = false;
+
+  /// Denenen şehir uzaklıkları ve sarım sayıları.
+  final Set<double> distancesTried = {};
+  final Set<int> turnsTried = {};
+
+  /// Şehrin bütün evleri yandı mı?
+  bool sawAllLit = false;
+
+  /// Bobin en az bir kez çalıştırıldı mı?
+  bool coilStarted = false;
+
+  /// Bobin açıkken alıcı vericiye ayarlandı mı?
+  bool sawTuned = false;
+
+  /// Bobin açıkken lamba yeri değiştirildi mi?
+  bool lampMovedWhileOn = false;
+
+  void _note() {
+    speedsTried.add(turnsPerSecond);
+    sourcesTried.add(source);
+    if (source == PowerSource.generator && turnsPerSecond == 0) sawStopped = true;
+    distancesTried.add(distanceKm);
+    turnsTried.add(secondaryTurns);
+    if (housesLit(lineVolts(secondaryTurns), distanceKm) >= cityHouses) {
+      sawAllLit = true;
+    }
+    if (coilOn) {
+      coilStarted = true;
+      if (resonance(transmitterKHz, receiverKHz) > 0.9) sawTuned = true;
+    }
+  }
+
   @override
   int get roundsPerPlayer => teslaRoundsPerPlayer;
 
@@ -135,6 +176,16 @@ class TeslaController extends ScientistGameController<TeslaTask> {
     transmitterKHz = 200;
     receiverKHz = 120;
     lampDistanceM = 1;
+    speedsTried.clear();
+    sourcesTried.clear();
+    sawStopped = false;
+    distancesTried.clear();
+    turnsTried.clear();
+    sawAllLit = false;
+    coilStarted = false;
+    sawTuned = false;
+    lampMovedWhileOn = false;
+    _note();
   }
 
   void setStation(TeslaStation value) {
@@ -147,43 +198,51 @@ class TeslaController extends ScientistGameController<TeslaTask> {
   void setSource(PowerSource value) {
     source = value;
     playSound(ScienceSound.click);
+    _note();
     notifyListeners();
   }
 
   void setSpeed(double value) {
     turnsPerSecond = value.clamp(0, maxTurnsPerSecond).toDouble();
+    _note();
     notifyListeners();
   }
 
   void setDistance(double km) {
     distanceKm = km;
+    _note();
     notifyListeners();
   }
 
   void setSecondaryTurns(int turns) {
     if (turns != secondaryTurns) playSound(ScienceSound.click);
     secondaryTurns = turns;
+    _note();
     notifyListeners();
   }
 
   void setCoil(bool on) {
     coilOn = on;
     playSound(on ? ScienceSound.zap : ScienceSound.click);
+    _note();
     notifyListeners();
   }
 
   void setTransmitter(double kHz) {
     transmitterKHz = kHz;
+    _note();
     notifyListeners();
   }
 
   void setReceiver(double kHz) {
     receiverKHz = kHz.clamp(receiverMinKHz, receiverMaxKHz).toDouble();
+    _note();
     notifyListeners();
   }
 
   void setLampDistance(double m) {
     lampDistanceM = m.clamp(lampMinM, lampMaxM).toDouble();
+    if (coilOn) lampMovedWhileOn = true;
     notifyListeners();
   }
 

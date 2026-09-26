@@ -34,7 +34,14 @@ class FateTask extends EinsteinTask {
   @override
   String get prompt =>
       'Örtünün ortasında ${center.label} var ve örtüyü çukurlaştırıyor. '
-      'Kenardan bir bilyeyi ${speed.label.toLowerCase()} fırlatıyoruz. Bilye ne yapar?';
+      'Kenardan bir bilyeyi ${speed.label.toLowerCase()} fırlatıyoruz.';
+
+  @override
+  String get ask => 'Bilye ne yapar?';
+
+  @override
+  String get takeaway => 'Kütle uzay-zamanı büker; bilye hızına göre çukura '
+      'düşer, etrafında döner ya da kaçar.';
 
   @override
   List<String> get options => [for (final f in MarbleFate.values) f.label];
@@ -86,8 +93,15 @@ class OrbitWhichTask extends EinsteinTask {
 
   @override
   String get prompt =>
-      'Bilyeyi hep aynı hızla (${speed.label.toLowerCase()}) fırlatıyoruz. Örtünün '
-      'ortasına hangisini koyarsak bilye düşmeden etrafında döner?';
+      'Bilyeyi hep aynı hızla (${speed.label.toLowerCase()}) fırlatıyoruz.';
+
+  @override
+  String get ask => 'Örtünün ortasına hangisini koyarsak bilye düşmeden '
+      'etrafında döner?';
+
+  @override
+  String get takeaway => 'Kütle ne kadar büyükse çukur o kadar derin olur ve '
+      'çekim o kadar güçlenir.';
 
   @override
   List<String> get options => [for (final c in CentralMass.values) c.label];
@@ -142,7 +156,14 @@ class ShipAgeTask extends EinsteinTask {
   String get prompt =>
       'Ayşe ile Ali ikiz. Ayşe ışık hızının ${percentOfC(speed)}\'iyle giden bir '
       'gemiyle yolculuğa çıkıyor, Ali Dünya\'da kalıyor. Dünya\'da '
-      '${formatTr(earthYears)} yıl geçtiğinde Ayşe kaç yaş büyümüş olur?';
+      '${formatTr(earthYears)} yıl geçiyor.';
+
+  @override
+  String get ask => 'Bu sürede Ayşe kaç yaş büyümüş olur?';
+
+  @override
+  String get takeaway => 'Çok hızlı giden birinin zamanı daha yavaş akar; '
+      'yolcu ikiz daha az yaşlanır.';
 
   @override
   List<String> get options => [for (final c in choices) '${formatTr(c, digits: 0)} yıl'];
@@ -187,8 +208,14 @@ class SlowestClockTask extends EinsteinTask {
 
   @override
   String get prompt =>
-      'Üç gemi farklı hızlarla gidiyor. Dünya\'dan bakınca hangisinin ışık '
-      'saati en yavaş tıklar?';
+      'Üç gemi farklı hızlarla gidiyor; her birinde bir ışık saati var.';
+
+  @override
+  String get ask => "Dünya'dan bakınca hangisinin saati en yavaş tıklar?";
+
+  @override
+  String get takeaway => 'Işık hızına ne kadar yaklaşılırsa zaman o kadar '
+      'yavaşlar.';
 
   @override
   List<String> get options => [
@@ -251,8 +278,14 @@ class MassVsWoodTask extends EinsteinTask {
 
   @override
   String get prompt =>
-      'E = m·c²: enerji, kütle çarpı ışık hızının karesi. Hangisi daha çok '
-      'enerji verir?';
+      'E = m·c²: enerji, kütle çarpı ışık hızının karesi.';
+
+  @override
+  String get ask => 'Hangisi daha çok enerji verir?';
+
+  @override
+  String get takeaway => 'Işık hızının karesi çok büyük olduğu için küçücük bir '
+      'kütle bile kocaman bir enerjiye eşittir.';
 
   @override
   int get correctIndex {
@@ -300,8 +333,15 @@ class ScaleMassTask extends EinsteinTask {
 
   @override
   String get prompt =>
-      'E = m·c² formülünde kütleyi $factor katına çıkarırsak (ışık hızı hep aynı) '
-      'enerji kaç katına çıkar?';
+      'E = m·c² formülünde kütleyi $factor katına çıkarıyoruz (ışık hızı hep '
+      'aynı).';
+
+  @override
+  String get ask => 'Enerji kaç katına çıkar?';
+
+  @override
+  String get takeaway => 'Enerji kütleyle aynı oranda artar: kütle kaç katına '
+      'çıkarsa enerji de o kadar.';
 
   @override
   int get correctIndex {

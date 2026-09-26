@@ -8,6 +8,8 @@ import '../../models/tesla/generator.dart';
 import '../../models/tesla/tesla_scene.dart';
 import '../../models/tesla/transmission.dart';
 import '../../models/tesla/wireless.dart';
+import '../science_lab/lab_labels.dart';
+import '../science_lab/lab_style.dart';
 import 'tesla_lab_3d_view.dart';
 
 /// Tesla laboratuvarı: 3B açıksa `TeslaLab3DView`, değilse 2B yedek; ikisinin
@@ -30,7 +32,12 @@ class TeslaSceneView extends StatelessWidget {
           Positioned.fill(
             child: scientistsUse3d
                 ? TeslaLab3DView(scene: scene)
-                : CustomPaint(painter: _Tesla2DPainter(scene)),
+                : ValueListenableBuilder<bool>(
+                    valueListenable: labLabelsOn,
+                    builder: (context, showLabels, _) => CustomPaint(
+                      painter: _Tesla2DPainter(scene, showLabels: showLabels),
+                    ),
+                  ),
           ),
           Positioned(left: 8, bottom: 8, child: _inset()),
         ],
@@ -62,21 +69,28 @@ class OscilloscopeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pattern = ledPattern(source, turnsPerSecond);
-    return _Panel(
+    return LabInset(
       key: const Key('teslaScope'),
       children: [
+        const LabInsetCaption('Osiloskop (gerilim)'),
+        const SizedBox(height: 4),
         SizedBox(
           width: 220,
-          height: 90,
+          height: 80,
           child: CustomPaint(painter: _ScopePainter(source, turnsPerSecond)),
         ),
-        const SizedBox(height: 4),
-        Text(
+        const SizedBox(height: 6),
+        LabInsetValue(
           source == PowerSource.battery
-              ? 'Sabit ${formatTr(batteryVolts)} V · LED: ${pattern.label.toLowerCase()}'
-              : 'Tepe ${formatTr(peakVolts(turnsPerSecond))} V · saniyede '
-                    '${formatTr(turnsPerSecond)} dalga · LED: ${pattern.label.toLowerCase()}',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
+              ? 'Sabit ${formatTr(batteryVolts)} V'
+              : 'En çok ${formatTr(peakVolts(turnsPerSecond))} V',
+          color: const Color(0xFF69F0AE),
+        ),
+        LabInsetCaption(
+          source == PowerSource.battery
+              ? 'LED: ${pattern.label.toLowerCase()}'
+              : 'Saniyede ${formatTr(turnsPerSecond)} dalga · LED: '
+                    '${pattern.label.toLowerCase()}',
         ),
       ],
     );
@@ -133,26 +147,27 @@ class CityMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lit = scene.houses;
-    return _Panel(
+    return LabInset(
       key: const Key('teslaCity'),
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        Wrap(
           children: [
             for (var i = 0; i < cityHouses; i++)
               Icon(
                 Icons.home,
-                size: 18,
+                size: 20,
                 color: i < lit ? const Color(0xFFFFE082) : const Color(0xFF546E7A),
               ),
           ],
         ),
         const SizedBox(height: 4),
-        Text(
+        LabInsetValue(
+          'Şehirde $lit / $cityHouses ev',
+          color: lit > 0 ? const Color(0xFFFFE082) : Colors.white,
+        ),
+        LabInsetCaption(
           '${formatTr(scene.lineV, digits: 0)} V · ${formatTr(scene.distanceKm)} km · '
-          'ulaşan %${formatTr(deliveredPercent(scene.lineV, scene.distanceKm), digits: 0)} · '
-          '$lit/$cityHouses ev',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
+          'ulaşan enerji %${formatTr(deliveredPercent(scene.lineV, scene.distanceKm), digits: 0)}',
         ),
       ],
     );
@@ -168,53 +183,45 @@ class LampMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lit = lampLit(level);
-    return _Panel(
+    return LabInset(
       key: const Key('teslaLampMeter'),
       children: [
+        LabInsetValue(
+          'Lamba ${lit ? 'yanıyor' : 'sönük'}',
+          color: lit ? const Color(0xFF80DEEA) : Colors.white,
+        ),
+        const SizedBox(height: 6),
         SizedBox(
           width: 180,
-          child: LinearProgressIndicator(
-            value: level,
-            minHeight: 8,
-            color: const Color(0xFF80DEEA),
-            backgroundColor: const Color(0xFF37474F),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: level,
+              minHeight: 10,
+              color: const Color(0xFF80DEEA),
+              backgroundColor: const Color(0xFF37474F),
+            ),
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          'Lamba ${lit ? 'yanıyor' : 'sönük'} · parlaklık %${(level * 100).round()}',
-          style: const TextStyle(color: Colors.white, fontSize: 11),
-        ),
+        LabInsetCaption('Parlaklık %${(level * 100).round()}'),
       ],
     );
   }
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel({super.key, required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: const Color(0xCC101418),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    ),
-  );
-}
-
 /// 2B yedek: istasyonun durağan şeması.
 class _Tesla2DPainter extends CustomPainter {
-  _Tesla2DPainter(this.scene);
+  _Tesla2DPainter(this.scene, {required this.showLabels});
 
   final TeslaScene scene;
+
+  /// Sahne etiketleri (mıknatıs, bobin, santral, lamba…).
+  final bool showLabels;
+
+  void _tag(Canvas canvas, Size size, Offset tip, LabLabel label) {
+    if (showLabels) paintLabLabel(canvas, tip, label, bounds: size);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -253,6 +260,13 @@ class _Tesla2DPainter extends CustomPainter {
         Paint()..color = Color.lerp(const Color(0x00FFF59D), const Color(0x99FFF59D), glow)!);
     canvas.drawCircle(bulb, 16,
         Paint()..color = Color.lerp(const Color(0xFF9E9A8A), const Color(0xFFFFF59D), glow)!);
+    if (scene.source == PowerSource.generator) {
+      _tag(canvas, size, c - const Offset(0, 60), const LabLabel('Mıknatıs', emoji: '🧲'));
+      _tag(canvas, size, c + const Offset(0, 36), const LabLabel('Dönen bobin'));
+    } else {
+      _tag(canvas, size, c - const Offset(0, 42), const LabLabel('Pil', emoji: '🔋'));
+    }
+    _tag(canvas, size, bulb - const Offset(0, 24), const LabLabel('Ampul', emoji: '💡'));
   }
 
   void _city(Canvas canvas, Size size) {
@@ -274,6 +288,11 @@ class _Tesla2DPainter extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(x + 5, y + 4, 8, 7),
           Paint()..color = i < lit ? const Color(0xFFFFE082) : const Color(0xFF37474F));
     }
+    _tag(canvas, size, Offset(35, ground - 52), const LabLabel('Santral', emoji: '🏭'));
+    _tag(canvas, size, Offset(size.width * 0.35, ground - 62),
+        LabLabel.value('${formatTr(scene.distanceKm)} km tel'));
+    _tag(canvas, size, Offset(size.width * 0.66 + 58, ground - 36),
+        const LabLabel('Şehir', emoji: '🏘️'));
   }
 
   void _coil(Canvas canvas, Size size) {
@@ -299,8 +318,12 @@ class _Tesla2DPainter extends CustomPainter {
       Rect.fromLTWH(x - 5, base.dy - 90, 10, 60),
       Paint()..color = Color.lerp(const Color(0xFF90A4AE), const Color(0xFFE0F7FF), (level * 1.4).clamp(0.0, 1.0))!,
     );
+    _tag(canvas, size, base - const Offset(0, 140), const LabLabel('Tesla bobini (verici)'));
+    _tag(canvas, size, Offset(x, base.dy - 94),
+        LabLabel('Lamba: ${formatTr(scene.lampDistanceM)} m', emoji: '💡'));
   }
 
   @override
-  bool shouldRepaint(_Tesla2DPainter old) => old.scene != scene;
+  bool shouldRepaint(_Tesla2DPainter old) =>
+      old.scene != scene || old.showLabels != showLabels;
 }

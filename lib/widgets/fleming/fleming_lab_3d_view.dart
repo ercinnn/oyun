@@ -9,6 +9,7 @@ import '../../models/fleming/petri.dart';
 import '../../models/fleming/resistance.dart';
 import '../glb_model_library.dart';
 import '../science_lab/lab_3d_state.dart';
+import '../science_lab/lab_labels.dart';
 
 /// Fleming'in laboratuvarının 3B görünümü. Modeller Blender'da üretilmiştir
 /// (`assets/models/fleming.glb`, üretici `tool/blender/build_fleming.py`);
@@ -287,6 +288,44 @@ class _FlemingLab3DViewState extends Lab3DState<FlemingLab3DView> {
   }
 
   // ─────────────────────────── Kamera ───────────────────────────
+
+  // ─────────────────────────── Etiketler ───────────────────────────
+
+  @override
+  List<LabAnchor> get labels {
+    final s = _s;
+    switch (s.station) {
+      case FlemingStation.petri:
+        return [
+          anchor(const LabLabel.tag('A'), _dishA.$1 - _agarR - 0.05, _bench + 0.12, _dishA.$2),
+          anchor(const LabLabel.tag('B'), _dishB.$1 + _agarR + 0.05, _bench + 0.12, _dishB.$2),
+          anchor(const LabLabel('Kontrol kabı'), _dishB.$1, _bench + 0.1, _dishB.$2 - _agarR),
+          if (s.mold && s.day >= 1)
+            anchor(
+              const LabLabel('Küf', color: Color(0xFF00897B)),
+              _dishA.$1 + moldX * _agarR,
+              _bench + _agarTop + 0.03,
+              _dishA.$2 - moldY * _agarR,
+            ),
+        ];
+      case FlemingStation.hygiene:
+        return [
+          anchor(
+            LabLabel(s.lidOpen ? 'Kapak açık' : 'Kapak kapalı'),
+            _hygieneX,
+            _bench + 0.16,
+            -0.05 - _agarR,
+          ),
+          anchor(const LabLabel('Lavabo', emoji: '🧼'), _hygieneX + 2.4, 1.15, 1.0),
+        ];
+      case FlemingStation.medicine:
+        return [
+          anchor(const LabLabel('Mikroskopta bakteriler', emoji: '🔬'),
+              _medicineX, 3.6, -0.47),
+          anchor(const LabLabel('İlaç şişesi'), _medicineX + 2.2, 1.25, 0.6),
+        ];
+    }
+  }
 
   @override
   LabCameraShot get cameraShot => switch (_s.station) {

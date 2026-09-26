@@ -38,11 +38,20 @@ class FloatSinkTask extends ArchimedesTask {
 
   @override
   String get prompt => 'Arşimet bu cismi suya bırakacak: ${object.emoji} '
-      '${object.name} (${formatTr(object.massG, digits: 0)} gram). '
-      'Sence ne olacak?';
+      '${object.name} (${formatTr(object.massG, digits: 0)} gram).';
+
+  @override
+  String get ask => 'Sence yüzer mi, batar mı?';
 
   @override
   List<String> get options => const ['Yüzer', 'Batar'];
+
+  @override
+  List<String> get optionEmojis => const ['🦆', '⚓'];
+
+  @override
+  String get takeaway => 'Bir cisim, kapladığı yer kadar suyun ağırlığından '
+      'hafifse yüzer, ağırsa batar.';
 
   @override
   int get correctIndex => object.floats ? 0 : 1;
@@ -89,8 +98,14 @@ class DisplacementTask extends ArchimedesTask {
   @override
   String get prompt => 'İki cisim de dibe batar. A kabına ${a.emoji} '
       '${a.name} (${formatTr(a.massG, digits: 0)} g), B kabına ${b.emoji} '
-      '${b.name} (${formatTr(b.massG, digits: 0)} g) bırakılacak. Hangi '
-      'kaptaki su daha çok yükselir?';
+      '${b.name} (${formatTr(b.massG, digits: 0)} g) bırakılacak.';
+
+  @override
+  String get ask => 'Hangi kaptaki su daha çok yükselir?';
+
+  @override
+  String get takeaway => 'Batan bir cisim, ağırlığı kadar değil kendi '
+      'büyüklüğü kadar suyu yerinden iter.';
 
   @override
   List<String> get options => const ['A kabı', 'B kabı', 'İkisi aynı'];
@@ -147,8 +162,14 @@ class CrownTask extends ArchimedesTask {
   @override
   String get prompt => 'Kralın iki tacı var, ikisi de tam 1000 gram. '
       '${fakeIsA ? 'A tacına gümüş karıştırılmış, B tacı saf altın' : 'A tacı saf altın, B tacına gümüş karıştırılmış'}. '
-      'Arşimet ikisini de ağzına kadar dolu kaplara batıracak. Hangi kap '
-      'daha çok su taşırır?';
+      'Arşimet ikisini de ağzına kadar dolu kaplara batıracak.';
+
+  @override
+  String get ask => 'Hangi kap daha çok su taşırır?';
+
+  @override
+  String get takeaway => 'Aynı ağırlıkta, daha hafif bir maddeden yapılmış '
+      'cisim daha çok yer kaplar ve daha çok su taşırır.';
 
   @override
   List<String> get options => const ['A kabı', 'B kabı', 'İkisi aynı'];
@@ -216,8 +237,14 @@ class BoatTask extends ArchimedesTask {
   @override
   String get prompt => '${boat.emoji} ${boat.name} ${formatTr(boat.massG, digits: 0)} '
       'gram. Gövdesi tamamen suya gömülünce ${formatTr(boat.hullVolumeCm3, digits: 0)} '
-      'gram su iter. Her sandık ${formatTr(crateMassG, digits: 0)} gram. Batmadan '
-      'en çok kaç sandık taşır?';
+      'gram su iter. Her sandık ${formatTr(crateMassG, digits: 0)} gram.';
+
+  @override
+  String get ask => 'Gemi batmadan en çok kaç sandık taşır?';
+
+  @override
+  String get takeaway => 'Gemi, gövdesinin itebildiği suyun ağırlığı kadar '
+      'yük taşır; fazlası onu batırır.';
 
   @override
   List<String> get options => [for (final c in choices) '$c sandık'];
@@ -270,8 +297,14 @@ class ScrewTask extends ArchimedesTask {
 
   @override
   String get prompt => 'Tarla nehirden ${formatTr(fieldHeightM)} metre yüksekte, '
-      'vidanın boyu ${formatTr(screwLengthM)} metre. Vidayı hangi açıyla '
-      'kurarsan tarla en az turda sulanır?';
+      'vidanın boyu ${formatTr(screwLengthM)} metre.';
+
+  @override
+  String get ask => 'Vidayı hangi açıyla kurarsan tarla en az turda sulanır?';
+
+  @override
+  String get takeaway => 'Vida ne kadar yatıksa her turda o kadar çok su '
+      'taşır; ama tarlaya yetişecek kadar dik olmalı.';
 
   @override
   List<String> get options => [for (final a in angles) '${a.round()}°'];

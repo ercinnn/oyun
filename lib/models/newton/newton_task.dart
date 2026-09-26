@@ -46,8 +46,19 @@ class FallTask extends NewtonTask {
   @override
   String get prompt =>
       'Kule ${formatTr(towerHeightM)} metre. $_where A: ${a.emoji} ${a.name} '
-      've B: ${b.emoji} ${b.name} aynı anda bırakılıyor. Hangisi önce yere '
-      'değer?';
+      've B: ${b.emoji} ${b.name} aynı anda bırakılıyor.';
+
+  @override
+  String get ask => 'Hangisi önce yere değer?';
+
+  @override
+  List<String> get optionEmojis => [a.emoji, b.emoji, '🤝'];
+
+  @override
+  String get takeaway => environment.hasAir
+      ? 'Havada, havanın frenlediği cisim (hafif ve geniş) geç düşer; '
+            'ağırlık tek başına hızı belirlemez.'
+      : 'Hava yoksa hafif ya da ağır her şey aynı hızla düşer.';
 
   @override
   List<String> get options => const ['A önce', 'B önce', 'Aynı anda'];
@@ -141,16 +152,34 @@ class PrismTask extends NewtonTask {
   String get prompt => switch (question) {
     PrismQuestion.whiteSplits =>
       'Newton karanlık odasında, perdedeki küçük bir delikten gelen beyaz '
-          'güneş ışığını cam bir prizmadan geçirdi. Karşı duvarda ne gördü?',
+          'güneş ışığını cam bir prizmadan geçirdi.',
     PrismQuestion.mostBent =>
-      'Prizma her rengi biraz farklı büker. Bu üç renkten hangisi yolundan '
-          'en çok sapar (en çok bükülür)?',
+      'Prizma her rengi biraz farklı büker.',
     PrismQuestion.onlyRed =>
       'Lambanın önüne kırmızı bir cam koyduk: prizmaya yalnızca kırmızı ışık '
-          'giriyor. Duvarda ne görürüz?',
+          'giriyor.',
     PrismQuestion.recombine =>
       'Prizmadan çıkan renklerin önüne ikinci bir prizmayı ters çevirip '
-          'koyuyoruz. Ne olur?',
+          'koyuyoruz.',
+  };
+
+  @override
+  String get ask => switch (question) {
+    PrismQuestion.whiteSplits => 'Karşıdaki perdede ne görünür?',
+    PrismQuestion.mostBent =>
+      'Bu üç renkten hangisi yolundan en çok sapar (en çok bükülür)?',
+    PrismQuestion.onlyRed => 'Perdede ne görürüz?',
+    PrismQuestion.recombine => 'Perdede ne olur?',
+  };
+
+  @override
+  String get takeaway => switch (question) {
+    PrismQuestion.whiteSplits ||
+    PrismQuestion.onlyRed => 'Beyaz ışık renklerin karışımıdır; prizma renk '
+        'üretmez, var olanları ayırır.',
+    PrismQuestion.mostBent => 'Mor en çok, kırmızı en az bükülür.',
+    PrismQuestion.recombine => 'Bütün renkler yeniden birleşince beyaz ışık '
+        'olur.',
   };
 
   @override
@@ -248,11 +277,21 @@ class CartTask extends NewtonTask {
   @override
   String get prompt =>
       'İki araba da aynı yayla, aynı kuvvetle itiliyor. A arabası '
-      '${_describe(laneA)}; B arabası ${_describe(laneB)}. Hangisi daha '
-      'uzağa gider?';
+      '${_describe(laneA)}; B arabası ${_describe(laneB)}.';
+
+  @override
+  String get ask => 'Hangisi daha uzağa gider?';
 
   @override
   List<String> get options => const ['A arabası', 'B arabası', 'İkisi aynı'];
+
+  @override
+  String get takeaway => switch (question) {
+    CartQuestion.load => 'Aynı itme, ağır cismi daha az hızlandırır '
+        "(Newton'un 2. yasası).",
+    CartQuestion.surface => 'Sürtünme azaldıkça cisim daha uzun süre '
+        "hareket eder (Newton'un 1. yasası).",
+  };
 
   @override
   int get correctIndex {

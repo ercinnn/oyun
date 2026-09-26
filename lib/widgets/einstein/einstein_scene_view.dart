@@ -8,6 +8,8 @@ import '../../models/einstein/mass_energy.dart';
 import '../../models/einstein/spacetime.dart';
 import '../../models/einstein/time_dilation.dart';
 import '../../models/science/science_task.dart' show formatTr;
+import '../science_lab/lab_labels.dart';
+import '../science_lab/lab_style.dart';
 import 'einstein_lab_3d_view.dart';
 
 /// Einstein laboratuvarı: 3B açıksa `EinsteinLab3DView`, değilse 2B yedek;
@@ -37,8 +39,13 @@ class EinsteinSceneView extends StatelessWidget {
           Positioned.fill(
             child: scientistsUse3d
                 ? EinsteinLab3DView(scene: scene)
-                : progressive(
-                    (p) => CustomPaint(painter: _Einstein2DPainter(scene, p)),
+                : ValueListenableBuilder<bool>(
+                    valueListenable: labLabelsOn,
+                    builder: (context, showLabels, _) => progressive(
+                      (p) => CustomPaint(
+                        painter: _Einstein2DPainter(scene, p, showLabels: showLabels),
+                      ),
+                    ),
                   ),
           ),
           Positioned(left: 8, bottom: 8, child: progressive(_inset)),
@@ -50,71 +57,66 @@ class EinsteinSceneView extends StatelessWidget {
   Widget _inset(double progress) {
     switch (scene.station) {
       case EinsteinStation.sheet:
-        return _Panel(
+        return LabInset(
           key: const Key('einsteinSheetMeter'),
           children: [
-            _line('${scene.center.label} · ${scene.speed.label} fırlatış', 13),
-            if (scene.run > 0)
-              _line('Bilye: ${scene.marble.fate.label.toLowerCase()}', 12,
-                  color: const Color(0xFF80DEEA)),
+            LabInsetValue(
+              scene.run > 0
+                  ? 'Bilye: ${scene.marble.fate.label.toLowerCase()}'
+                  : scene.center.label,
+              color: scene.run > 0 ? const Color(0xFF80DEEA) : Colors.white,
+            ),
+            LabInsetCaption('${scene.center.label} · ${scene.speed.label} fırlatış'),
           ],
         );
       case EinsteinStation.clock:
         final earth = scene.earthYears * progress;
         final ship = shipYears(earth, scene.shipSpeed);
-        return _Panel(
+        return LabInset(
           key: const Key('einsteinTwins'),
           children: [
-            _line('Gemi: ışık hızının ${percentOfC(scene.shipSpeed)}\'i', 13),
-            _line('🌍 Dünya: ${formatTr(earth)} yıl   🚀 Gemi: ${formatTr(ship)} yıl', 12,
-                color: const Color(0xFFFFEB3B)),
-            _line('Gemide 1 sn = Dünya\'da ${formatTr(lorentzGamma(scene.shipSpeed), digits: 2)} sn', 11),
+            LabInsetValue('🌍 Dünya: ${formatTr(earth)} yıl'),
+            LabInsetValue(
+              '🚀 Gemi: ${formatTr(ship)} yıl',
+              color: const Color(0xFFFFEB3B),
+            ),
+            const SizedBox(height: 2),
+            LabInsetCaption(
+              'Gemi ışık hızının ${percentOfC(scene.shipSpeed)}\'iyle gidiyor. '
+              'Gemide 1 sn = Dünya\'da '
+              '${formatTr(lorentzGamma(scene.shipSpeed), digits: 2)} sn',
+            ),
           ],
         );
       case EinsteinStation.energy:
         final homes = homesPowered(scene.grams) * progress;
-        return _Panel(
+        return LabInset(
           key: const Key('einsteinEnergy'),
           children: [
-            _line('${formatGrams(scene.grams)} g kütle', 13),
-            _line('⚡ ${friendlyNumber(homes)} evin bir yıllık elektriği', 12,
-                color: const Color(0xFFFFE082)),
-            _line('🔥 Aynı kütleyi yakmak: ${burningPhrase(scene.grams)}', 11),
+            LabInsetValue(
+              '⚡ ${friendlyNumber(homes)} evin',
+              color: const Color(0xFFFFE082),
+            ),
+            LabInsetCaption(
+              'bir yıllık elektriği · ${formatGrams(scene.grams)} g kütleden',
+            ),
+            const SizedBox(height: 4),
+            LabInsetCaption('🔥 Aynı kütleyi yakmak: ${burningPhrase(scene.grams)}'),
           ],
         );
     }
   }
-
-  static Widget _line(String text, double size, {Color color = Colors.white}) =>
-      Text(text, style: TextStyle(color: color, fontSize: size));
-}
-
-class _Panel extends StatelessWidget {
-  const _Panel({super.key, required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: const Color(0xCC101418),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    ),
-  );
 }
 
 /// 2B yedek: istasyonun şeması; [progress] deneyin 0-1 ilerlemesi.
 class _Einstein2DPainter extends CustomPainter {
-  _Einstein2DPainter(this.scene, this.progress);
+  _Einstein2DPainter(this.scene, this.progress, {required this.showLabels});
 
   final EinsteinScene scene;
   final double progress;
+
+  /// Sahne etiketleri (merkezdeki kütle, bilye, saatler, şehir).
+  final bool showLabels;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -156,7 +158,14 @@ class _Einstein2DPainter extends CustomPainter {
     }
     canvas.drawPath(path, trail);
     final m = run.path[shown];
-    canvas.drawCircle(c + Offset(m.$1, -m.$2) * unit, 4, Paint()..color = Colors.white);
+    final marble = c + Offset(m.$1, -m.$2) * unit;
+    canvas.drawCircle(marble, 4, Paint()..color = Colors.white);
+    if (showLabels) {
+      paintLabLabel(canvas, c - Offset(0, scene.center.radius * unit * 1.6 + 2),
+          LabLabel(scene.center.label), bounds: size);
+      paintLabLabel(canvas, marble - const Offset(0, 6), const LabLabel.value('Bilye'),
+          bounds: size, scale: 0.85);
+    }
   }
 
   void _clock(Canvas canvas, Size size) {
@@ -173,15 +182,19 @@ class _Einstein2DPainter extends CustomPainter {
           Paint()
             ..color = const Color(0xFFFFEB3B)
             ..strokeWidth = 2);
-      final tp = TextPainter(
-        text: TextSpan(text: label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(x - tp.width / 2, bottom + 8));
+      if (showLabels) {
+        paintLabLabel(canvas, Offset(x, top - 6), LabLabel(label), bounds: size);
+      } else {
+        final tp = TextPainter(
+          text: TextSpan(text: label, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(x - tp.width / 2, bottom + 8));
+      }
     }
 
-    clock(size.width * 0.3, 'Dünya', 1);
-    clock(size.width * 0.7, 'Gemi', lorentzGamma(scene.shipSpeed));
+    clock(size.width * 0.3, "Dünya'daki saat", 1);
+    clock(size.width * 0.7, 'Gemideki saat', lorentzGamma(scene.shipSpeed));
   }
 
   void _energy(Canvas canvas, Size size) {
@@ -193,9 +206,17 @@ class _Einstein2DPainter extends CustomPainter {
           cell * 0.8, cell * 0.8);
       canvas.drawRect(r, Paint()..color = i < lit ? const Color(0xFFFFE082) : const Color(0xFF37474F));
     }
+    if (showLabels) {
+      paintLabLabel(canvas, Offset(origin.dx + cell * 5, origin.dy - 2),
+          const LabLabel('Şehir: 100 ev', emoji: '🏘️'), bounds: size);
+      paintLabLabel(canvas, Offset(size.width * 0.14, size.height * 0.55),
+          LabLabel.value('${formatGrams(scene.grams)} g'), bounds: size);
+    }
   }
 
   @override
   bool shouldRepaint(_Einstein2DPainter old) =>
-      old.scene != scene || old.progress != progress;
+      old.scene != scene ||
+      old.progress != progress ||
+      old.showLabels != showLabels;
 }

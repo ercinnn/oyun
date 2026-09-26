@@ -44,8 +44,14 @@ class SpeedTask extends TeslaTask {
 
   @override
   String get prompt =>
-      'Jeneratörün kolunu saniyede ${formatTr(slow)} tur çeviriyoruz. '
-      'Saniyede ${formatTr(fast)} tura çıkarsak ne olur?';
+      'Jeneratörün kolunu saniyede ${formatTr(slow)} tur çeviriyoruz.';
+
+  @override
+  String get ask => 'Saniyede ${formatTr(fast)} tura çıkarsak ampul ne olur?';
+
+  @override
+  String get takeaway => 'Mıknatısın yanında bobin ne kadar hızlı dönerse o '
+      'kadar çok elektrik üretir.';
 
   @override
   int get correctIndex {
@@ -91,7 +97,14 @@ class LedTask extends TeslaTask {
       'LED yalnızca tek yönde akan elektrikle yanar. Kırmızı ve yeşil iki LED\'i '
       'birbirine ters yönde bağladık. Devreye '
       '${source == PowerSource.battery ? 'bir pil' : 'dönen bir jeneratör'} '
-      'bağlarsak ne olur?';
+      'bağlıyoruz.';
+
+  @override
+  String get ask => 'LED\'lere ne olur?';
+
+  @override
+  String get takeaway => 'Pilin akımı hep tek yönde akar (DC); jeneratörün '
+      'akımı sürekli yön değiştirir (AC).';
 
   @override
   int get correctIndex => options.indexOf(ledPattern(source, 1).label);
@@ -133,8 +146,14 @@ class VoltageTask extends TeslaTask {
   @override
   String get prompt =>
       'Santral ${_volts(plantVolts)} üretiyor, şehir ${formatTr(distanceKm)} km '
-      'uzakta. Tellerde enerjinin bir kısmı ısıya dönüşüp kayboluyor. Hangi '
-      'gerilimle gönderirsek şehirde en çok ev yanar?';
+      'uzakta. Tellerde enerjinin bir kısmı ısıya dönüşüp kayboluyor.';
+
+  @override
+  String get ask => 'Hangi gerilimle gönderirsek şehirde en çok ev yanar?';
+
+  @override
+  String get takeaway => 'Elektriği yüksek gerilimle göndermek tellerdeki '
+      'kaybı azaltır; bu yüzden uzak şehirlere AC gönderilir.';
 
   @override
   List<String> get options => [for (final t in turnChoices) _volts(lineVolts(t))];
@@ -204,7 +223,14 @@ class TransformerTask extends TeslaTask {
   String get prompt =>
       'Transformatörde demir bir çekirdeğe iki bobin sarılı: birincide $primary, '
       'ikincide $secondary sarım var. Birinci bobine ${_volts(inputVolts)} '
-      'alternatif akım veriyoruz. İkinci bobinden kaç volt çıkar?';
+      'alternatif akım veriyoruz.';
+
+  @override
+  String get ask => 'İkinci bobinden kaç volt çıkar?';
+
+  @override
+  String get takeaway => 'Transformatör gerilimi sarım sayısı oranında '
+      'değiştirir: ikinci bobinde sarım çoksa gerilim artar.';
 
   @override
   List<String> get options => [for (final c in choices) _volts(c)];
@@ -270,7 +296,14 @@ class LampDistanceTask extends TeslaTask {
   String get prompt =>
       'Tesla bobini çalışıyor ve ${formatTr(fromM)} metre ötedeki floresan lamba '
       'hiçbir kabloya bağlı olmadan yanıyor. Lambayı ${formatTr(toM)} metreye '
-      '${toM > fromM ? 'uzaklaştırırsak' : 'yaklaştırırsak'} ne olur?';
+      '${toM > fromM ? 'uzaklaştıracağız' : 'yaklaştıracağız'}.';
+
+  @override
+  String get ask => 'Lamba ne olur?';
+
+  @override
+  String get takeaway => 'Kablosuz enerji, vericiden uzaklaştıkça hızla '
+      'zayıflar.';
 
   @override
   int get correctIndex {
@@ -316,8 +349,15 @@ class TuningTask extends TeslaTask {
   @override
   String get prompt =>
       'Tesla bobini saniyede ${formatTr(transmitterKHz, digits: 0)} bin kez '
-      'titreşiyor (${formatTr(transmitterKHz, digits: 0)} kHz). Lambanın alıcı '
-      'devresini hangi frekansa ayarlarsak lamba en parlak yanar?';
+      'titreşiyor (${formatTr(transmitterKHz, digits: 0)} kHz).';
+
+  @override
+  String get ask => 'Lambanın alıcısını hangi frekansa ayarlarsak lamba en '
+      'parlak yanar?';
+
+  @override
+  String get takeaway => 'Alıcı, vericiyle aynı frekansa ayarlanınca enerjiyi '
+      'en iyi alır (rezonans).';
 
   @override
   List<String> get options =>

@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/tap_visible.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -198,16 +200,16 @@ void main() {
 
       await _openGalileo(tester);
       expect(find.text('Galileo\'nun Gözlemevi'), findsOneWidget);
-      await tester.tap(find.text('1 Kişi'));
+      await tapVisible(tester, find.text('1 Kişi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < galileoRoundsPerPlayer; i++) {
         expect(find.textContaining('Görev ${i + 1} /'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistOption_0')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_0')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('scientistExplanation')), findsOneWidget);
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       expect(find.textContaining('Tebrikler'), findsOneWidget);
@@ -220,7 +222,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await _openGalileo(tester);
-      await tester.tap(find.byKey(const Key('scientistExplore')));
+      await tapVisible(tester, find.byKey(const Key('scientistExplore')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('galileoEyepiece')), findsOneWidget);
       expect(find.textContaining('Bulanık'), findsOneWidget);
@@ -233,24 +235,24 @@ void main() {
       expect(find.textContaining('Görüntü net!'), findsOneWidget);
       expect(find.textContaining('Net!'), findsWidgets);
 
-      await tester.tap(find.text('Jüpiter\'in Uyduları'));
+      await tapVisible(tester, find.text('Jüpiter\'in Uyduları'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('galileoStrip')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('galileoSketch')));
-      await tester.tap(find.byKey(const Key('galileoNextNight')));
-      await tester.tap(find.byKey(const Key('galileoSketch')));
+      await tapVisible(tester, find.byKey(const Key('galileoSketch')));
+      await tapVisible(tester, find.byKey(const Key('galileoNextNight')));
+      await tapVisible(tester, find.byKey(const Key('galileoSketch')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('galileoNote_0')), findsOneWidget);
       expect(find.byKey(const Key('galileoNote_1')), findsOneWidget);
 
-      await tester.tap(find.text('Güneş Sistemi'));
+      await tapVisible(tester, find.text('Güneş Sistemi'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('galileoVenusView')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('galileoPlus30')));
+      await tapVisible(tester, find.byKey(const Key('galileoPlus30')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Gün: 30'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Geri'));
+      await tapVisible(tester, find.byTooltip('Geri'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scientistStart')), findsOneWidget);
     });
@@ -265,14 +267,14 @@ void main() {
       tester.view.physicalSize = const Size(320, 640);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('scientistStart')));
-      await tester.tap(find.byKey(const Key('scientistStart')));
+      await tapVisible(tester, find.byKey(const Key('scientistStart')));
       await tester.pumpAndSettle();
       for (var i = 0; i < 3; i++) {
         await tester.ensureVisible(find.byKey(const Key('scientistOption_1')));
-        await tester.tap(find.byKey(const Key('scientistOption_1')));
+        await tapVisible(tester, find.byKey(const Key('scientistOption_1')));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.byKey(const Key('scientistContinue')));
-        await tester.tap(find.byKey(const Key('scientistContinue')));
+        await tapVisible(tester, find.byKey(const Key('scientistContinue')));
         await tester.pumpAndSettle();
       }
       final c = Provider.of<GalileoController>(

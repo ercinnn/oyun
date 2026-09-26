@@ -9,6 +9,7 @@ import '../models/newton/newton_scene.dart';
 import '../models/newton/prism.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/newton/newton_scene_view.dart';
+import '../widgets/science_lab/lab_guide.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
 import '../widgets/science_lab/scientist_sound_toggle.dart';
 
@@ -18,21 +19,38 @@ import '../widgets/science_lab/scientist_sound_toggle.dart';
 class NewtonExploreScreen extends StatelessWidget {
   const NewtonExploreScreen({super.key});
 
+  static const _stations = [
+    LabStation(
+      NewtonStation.fall,
+      'Düşme Kulesi',
+      '🍎',
+      'İki cismi aynı anda bırak: hangisi önce yere değiyor?',
+    ),
+    LabStation(
+      NewtonStation.prism,
+      'Prizma',
+      '🌈',
+      'Işığı camdan geçir: beyaz ışığın içinde ne saklı?',
+    ),
+    LabStation(
+      NewtonStation.cart,
+      'İtme Pisti',
+      '🚗',
+      'İki arabayı aynı yayla it: hangisi daha uzağa gidiyor?',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<NewtonController>();
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<NewtonStation>(
+        LabStationPicker<NewtonStation>(
           key: const Key('newtonStation'),
-          segments: [
-            for (final s in NewtonStation.values)
-              ButtonSegment(value: s, label: Text(s.label)),
-          ],
-          selected: {controller.station},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => controller.setStation(v.first),
+          stations: _stations,
+          selected: controller.station,
+          onSelected: controller.setStation,
         ),
         const SizedBox(height: 12),
         switch (controller.station) {
@@ -80,8 +98,7 @@ class _FallControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label),
-        const SizedBox(height: 4),
+        LabSectionTitle(label),
         Wrap(
           spacing: 4,
           runSpacing: 4,
@@ -89,7 +106,10 @@ class _FallControls extends StatelessWidget {
             for (final o in newtonFallingObjects)
               ChoiceChip(
                 key: Key('${keyPrefix}_${o.id}'),
-                label: Text('${o.emoji} ${o.name}'),
+                label: Text(
+                  '${o.emoji} ${o.name}',
+                  style: const TextStyle(fontSize: 15),
+                ),
                 selected: o.id == selected.id,
                 onSelected: (_) => onPick(o),
                 visualDensity: VisualDensity.compact,
@@ -109,48 +129,68 @@ class _FallControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Deney nerede?'),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 6,
-          children: [
-            for (final e in FallEnvironment.values)
-              ChoiceChip(
-                key: Key('newtonEnv_${e.name}'),
-                label: Text(e.label),
-                selected: e == env,
-                onSelected: (_) => controller.setEnvironment(e),
-              ),
+        LabStepList(
+          steps: [
+            LabStep(
+              'İki cisim seç ve "Aynı anda bırak!"a bas.',
+              done: controller.droppedIn.isNotEmpty,
+            ),
+            LabStep(
+              'Düz kâğıtla buruşuk kâğıdı yarıştır.',
+              done: controller.droppedPairs.contains('paper_ball+paper_flat'),
+            ),
+            LabStep(
+              "Aynı deneyi Ay'da ya da havasız tüpte tekrarla.",
+              done: controller.droppedIn.any((e) => !e.hasAir),
+            ),
           ],
         ),
         const SizedBox(height: 10),
-        _objectPicker('A (soldaki kanca):', a, controller.setFallA, 'newtonA'),
-        const SizedBox(height: 8),
-        _objectPicker('B (sağdaki kanca):', b, controller.setFallB, 'newtonB'),
-        const SizedBox(height: 12),
-        FilledButton.icon(
+        LabActionButton(
           key: const Key('newtonDrop'),
           onPressed: controller.dropObjects,
-          icon: const Icon(Icons.arrow_downward),
-          label: Text(controller.fallDone ? 'Yeniden bırak' : 'Aynı anda bırak!'),
+          icon: Icons.arrow_downward,
+          label: controller.fallDone ? 'Yeniden bırak' : 'Aynı anda bırak!',
         ),
         if (controller.fallDone) ...[
           const SizedBox(height: 8),
           LabInfoCard(
             key: const Key('newtonFallResult'),
             color: Colors.lightBlue.shade50,
-            text: '${a.emoji} A: ${formatTr(fallTime(a, env))} sn, '
+            icon: Icons.timer,
+            title: switch (winner) {
+              0 => 'A önce yere değdi.',
+              1 => 'B önce yere değdi.',
+              _ => 'İkisi aynı anda yere değdi!',
+            },
+            text:
+                '${a.emoji} A: ${formatTr(fallTime(a, env))} sn, '
                 '${b.emoji} B: ${formatTr(fallTime(b, env))} sn. '
-                '${switch (winner) {
-                  0 => 'A önce yere değdi.',
-                  1 => 'B önce yere değdi.',
-                  _ => 'İkisi aynı anda yere değdi!',
-                }} '
                 '${env.hasAir ? 'Havada hafif ve geniş cisimleri hava tutar.' : 'Hava yokken her şey aynı hızla düşer.'}',
           ),
-        ] else
+        ],
+        const SizedBox(height: 10),
+        const LabSectionTitle('Deney nerede?'),
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final e in FallEnvironment.values)
+              ChoiceChip(
+                key: Key('newtonEnv_${e.name}'),
+                label: Text(e.label, style: const TextStyle(fontSize: 15)),
+                selected: e == env,
+                onSelected: (_) => controller.setEnvironment(e),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _objectPicker('A (soldaki kanca)', a, controller.setFallA, 'newtonA'),
+        const SizedBox(height: 8),
+        _objectPicker('B (sağdaki kanca)', b, controller.setFallB, 'newtonB'),
+        if (!controller.fallDone)
           const LabInfoCard(
-            text: 'İpucu: Önce düz kâğıtla buruşuk kâğıdı dene. Sonra tüyle '
+            text:
+                'İpucu: Önce düz kâğıtla buruşuk kâğıdı dene. Sonra tüyle '
                 'çekici Ay\'da bırak!',
           ),
       ],
@@ -174,8 +214,31 @@ class _PrismControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Fenerin önüne ne koyalım?'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              'Feneri yak ve perdeye bak.',
+              done: controller.litWith.isNotEmpty,
+            ),
+            LabStep(
+              'Fenerin önüne renkli bir süzgeç koy.',
+              done: controller.litWith.any((l) => l != LightSource.white),
+            ),
+            LabStep(
+              'İkinci prizmayı ters çevirip koy.',
+              done: controller.sawRecombine,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('newtonLamp'),
+          onPressed: () => controller.setLamp(!controller.lampOn),
+          icon: controller.lampOn ? Icons.lightbulb : Icons.lightbulb_outline,
+          label: controller.lampOn ? 'Feneri kapat' : 'Feneri yak',
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Fenerin önüne ne koyalım?'),
         Wrap(
           spacing: 6,
           runSpacing: 4,
@@ -183,7 +246,7 @@ class _PrismControls extends StatelessWidget {
             for (final l in LightSource.values)
               ChoiceChip(
                 key: Key('newtonLight_${l.name}'),
-                label: Text(l.label),
+                label: Text(l.label, style: const TextStyle(fontSize: 15)),
                 selected: l == controller.light,
                 onSelected: (_) => controller.setLight(l),
               ),
@@ -193,21 +256,19 @@ class _PrismControls extends StatelessWidget {
         SwitchListTile(
           key: const Key('newtonSecondPrism'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('İkinci prizmayı ters çevirip koy'),
+          title: const Text(
+            'Ters prizma ekle',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
           value: controller.secondPrism,
           onChanged: controller.setSecondPrism,
         ),
-        FilledButton.icon(
-          key: const Key('newtonLamp'),
-          onPressed: () => controller.setLamp(!controller.lampOn),
-          icon: Icon(controller.lampOn ? Icons.lightbulb : Icons.lightbulb_outline),
-          label: Text(controller.lampOn ? 'Feneri kapat' : 'Feneri yak'),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         if (controller.lampOn)
           LabInfoCard(
             key: const Key('newtonPrismResult'),
             color: Colors.amber.shade50,
+            icon: Icons.wb_sunny_outlined,
             text: outcome.isRainbow
                 ? 'Perdede ${outcome.colors.length} renk var: '
                       '${outcome.colors.map((c) => c.name).join(', ')}. Beyaz ışık '
@@ -221,7 +282,8 @@ class _PrismControls extends StatelessWidget {
           )
         else
           const LabInfoCard(
-            text: 'Feneri yak ve perdeye bak. Sonra süzgeçleri ve ikinci '
+            text:
+                'Feneri yak ve perdeye bak. Sonra süzgeçleri ve ikinci '
                 'prizmayı dene.',
           ),
       ],
@@ -249,7 +311,10 @@ class _CartControls extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(label, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
@@ -266,7 +331,9 @@ class _CartControls extends StatelessWidget {
             ),
             Row(
               children: [
-                const Flexible(child: Text('Kutu:')),
+                const Flexible(
+                  child: Text('Kutu:', style: TextStyle(fontSize: 15)),
+                ),
                 IconButton(
                   key: Key('${keyPrefix}BoxMinus'),
                   onPressed: lane.boxes == 0
@@ -274,7 +341,13 @@ class _CartControls extends StatelessWidget {
                       : () => onChanged(lane.copyWith(boxes: lane.boxes - 1)),
                   icon: const Icon(Icons.remove),
                 ),
-                Text('${lane.boxes}'),
+                Text(
+                  '${lane.boxes}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 IconButton(
                   key: Key('${keyPrefix}BoxPlus'),
                   onPressed: lane.boxes >= maxBoxes
@@ -298,11 +371,61 @@ class _CartControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _lane(context, 'A (arkadaki pist)', a, controller.setLaneA, 'newtonLaneA'),
-        _lane(context, 'B (öndeki pist)', b, controller.setLaneB, 'newtonLaneB'),
+        LabStepList(
+          steps: [
+            LabStep(
+              '"İt!"e bas: iki araba nereye kadar gidiyor?',
+              done: controller.pushes > 0,
+            ),
+            LabStep(
+              'Aynı zeminde yalnızca birine kutu ekle, yeniden it.',
+              done: controller.pushedLoadCompare,
+            ),
+            LabStep(
+              'Bir pistin zeminini buz yap ve yeniden it.',
+              done: controller.pushedOnIce,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('newtonPush'),
+          onPressed: controller.pushCarts,
+          icon: Icons.double_arrow,
+          label: 'İt!',
+        ),
+        if (controller.cartDone) ...[
+          const SizedBox(height: 8),
+          LabInfoCard(
+            key: const Key('newtonCartResult'),
+            color: Colors.lightBlue.shade50,
+            icon: Icons.straighten,
+            title:
+                'A ${formatTr(cartDistance(a, push))} m, '
+                'B ${formatTr(cartDistance(b, push))} m gitti.',
+            text:
+                'Aynı itme, ağır arabayı daha az hızlandırır; sürtünme az '
+                'olan zeminde araba daha uzağa gider.'
+                '${cartStopDistance(a, push) > trackLengthM || cartStopDistance(b, push) > trackLengthM ? ' Buzdaki araba pistin sonundaki tampona kadar gitti: hiçbir şey durdurmasa sonsuza kadar giderdi!' : ''}',
+          ),
+        ],
+        const SizedBox(height: 8),
+        _lane(
+          context,
+          'A (arkadaki pist)',
+          a,
+          controller.setLaneA,
+          'newtonLaneA',
+        ),
+        _lane(
+          context,
+          'B (öndeki pist)',
+          b,
+          controller.setLaneB,
+          'newtonLaneB',
+        ),
         const SizedBox(height: 4),
-        const Text('Yayın gücü (ikisine de aynı):'),
-        const SizedBox(height: 4),
+        const LabSectionTitle('Yayın gücü (ikisine de aynı)'),
         SegmentedButton<PushStrength>(
           segments: [
             for (final p in PushStrength.values)
@@ -313,26 +436,10 @@ class _CartControls extends StatelessWidget {
           onSelectionChanged: (v) => controller.setPush(v.first),
         ),
         const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('newtonPush'),
-          onPressed: controller.pushCarts,
-          icon: const Icon(Icons.double_arrow),
-          label: const Text('İt!'),
-        ),
-        const SizedBox(height: 8),
-        if (controller.cartDone)
-          LabInfoCard(
-            key: const Key('newtonCartResult'),
-            color: Colors.lightBlue.shade50,
-            text: 'A ${formatTr(cartDistance(a, push))} m, '
-                'B ${formatTr(cartDistance(b, push))} m gitti. Aynı itme, ağır '
-                'arabayı daha az hızlandırır; sürtünme az olan zeminde araba '
-                'daha uzağa gider.'
-                '${cartStopDistance(a, push) > trackLengthM || cartStopDistance(b, push) > trackLengthM ? ' Buzdaki araba pistin sonundaki tampona kadar gitti: hiçbir şey durdurmasa sonsuza kadar giderdi!' : ''}',
-          )
-        else
+        if (!controller.cartDone)
           const LabInfoCard(
-            text: 'İpucu: İki arabayı aynı zeminde bırak, yalnızca birine kutu '
+            text:
+                'İpucu: İki arabayı aynı zeminde bırak, yalnızca birine kutu '
                 'ekle. Sonra kutuları eşitle ve zemini değiştir.',
           ),
       ],

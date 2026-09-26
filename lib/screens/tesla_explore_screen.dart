@@ -7,6 +7,7 @@ import '../models/tesla/generator.dart';
 import '../models/tesla/tesla_scene.dart';
 import '../models/tesla/transmission.dart';
 import '../models/tesla/wireless.dart';
+import '../widgets/science_lab/lab_guide.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
 import '../widgets/science_lab/scientist_sound_toggle.dart';
 import '../widgets/tesla/tesla_scene_view.dart';
@@ -16,21 +17,38 @@ import '../widgets/tesla/tesla_scene_view.dart';
 class TeslaExploreScreen extends StatelessWidget {
   const TeslaExploreScreen({super.key});
 
+  static const _stations = [
+    LabStation(
+      TeslaStation.generator,
+      'Jeneratör',
+      '🧲',
+      'Mıknatısın yanında bobini döndür: elektrik nasıl üretiliyor?',
+    ),
+    LabStation(
+      TeslaStation.transmission,
+      'Şehre Elektrik',
+      '🏙️',
+      'Elektriği uzak bir şehre gönder: kaç ev yanıyor?',
+    ),
+    LabStation(
+      TeslaStation.wireless,
+      'Tesla Bobini',
+      '⚡',
+      'Kablosuz lambayı yak: alıcıyı vericiye ayarla.',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<TeslaController>();
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<TeslaStation>(
+        LabStationPicker<TeslaStation>(
           key: const Key('teslaStation'),
-          segments: [
-            for (final s in TeslaStation.values)
-              ButtonSegment(value: s, label: Text(s.label)),
-          ],
-          selected: {controller.station},
-          showSelectedIcon: false,
-          onSelectionChanged: (v) => controller.setStation(v.first),
+          stations: _stations,
+          selected: controller.station,
+          onSelected: controller.setStation,
         ),
         const SizedBox(height: 12),
         switch (controller.station) {
@@ -74,7 +92,7 @@ Widget _chips<T>({
     for (final v in values)
       ChoiceChip(
         key: Key(keyOf(v)),
-        label: Text(label(v)),
+        label: Text(label(v), style: const TextStyle(fontSize: 15)),
         selected: v == selected,
         onSelected: (_) => onSelected(v),
         visualDensity: VisualDensity.compact,
@@ -98,8 +116,24 @@ class _GeneratorControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Devreye ne bağlayalım?'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              'Hız kaydırıcısını sürükle: ampul ne kadar parlıyor?',
+              done: controller.speedsTried.length >= 2,
+            ),
+            LabStep(
+              'Kolu durdur (hız 0): ampule ne oldu?',
+              done: controller.sawStopped,
+            ),
+            LabStep(
+              "Devreye pili bağla, LED'leri karşılaştır.",
+              done: controller.sourcesTried.contains(PowerSource.battery),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Devreye ne bağlayalım?'),
         _chips<PowerSource>(
           values: PowerSource.values,
           selected: source,
@@ -109,7 +143,7 @@ class _GeneratorControls extends StatelessWidget {
         ),
         if (ac) ...[
           const SizedBox(height: 8),
-          Text('Kolu çevirme hızı: saniyede ${formatTr(speed)} tur'),
+          LabSectionTitle('Kolu çevirme hızı: saniyede ${formatTr(speed)} tur'),
           Slider(
             key: const Key('teslaSpeed'),
             value: speed,
@@ -123,6 +157,7 @@ class _GeneratorControls extends StatelessWidget {
         LabInfoCard(
           key: const Key('teslaGeneratorInfo'),
           color: ac ? Colors.amber.shade50 : Colors.blueGrey.shade50,
+          icon: ac ? Icons.waves : Icons.battery_full,
           text: ac
               ? (speed == 0
                     ? 'Bobin durunca elektrik de durur: ampul ve LED\'ler söner.'
@@ -154,8 +189,24 @@ class _CityControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Şehir ne kadar uzakta?'),
-        const SizedBox(height: 4),
+        LabStepList(
+          steps: [
+            LabStep(
+              'Şehrin uzaklığını değiştir: kaç ev yanıyor?',
+              done: controller.distancesTried.length >= 2,
+            ),
+            LabStep(
+              'İkinci bobinin sarım sayısını artır.',
+              done: controller.turnsTried.length >= 2,
+            ),
+            LabStep(
+              'Şehirdeki bütün evleri yakmayı başar.',
+              done: controller.sawAllLit,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Şehir ne kadar uzakta?'),
         _chips<double>(
           values: cityDistancesKm,
           selected: d,
@@ -164,9 +215,10 @@ class _CityControls extends StatelessWidget {
           keyOf: (v) => 'teslaDistance_${v.round()}',
         ),
         const SizedBox(height: 10),
-        Text('Yükseltici transformatör: birinci bobin $primaryTurns sarım, '
-            'ikinci bobin kaç sarım?'),
-        const SizedBox(height: 4),
+        LabSectionTitle(
+          'Yükseltici transformatör: birinci bobin $primaryTurns '
+          'sarım, ikinci bobin kaç sarım?',
+        ),
         _chips<int>(
           values: secondaryTurnsOptions,
           selected: controller.secondaryTurns,
@@ -177,8 +229,12 @@ class _CityControls extends StatelessWidget {
         const SizedBox(height: 8),
         LabInfoCard(
           key: const Key('teslaCityInfo'),
-          color: lit == cityHouses ? Colors.green.shade50 : Colors.orange.shade50,
-          text: 'Hat gerilimi ${formatTr(lineV, digits: 0)} V. Şehre enerjinin '
+          color: lit == cityHouses
+              ? Colors.green.shade50
+              : Colors.orange.shade50,
+          icon: Icons.bolt,
+          text:
+              'Hat gerilimi ${formatTr(lineV, digits: 0)} V. Şehre enerjinin '
               '%${formatTr(deliveredPercent(lineV, d), digits: 0)}\'i ulaştı, '
               '$lit/$cityHouses ev yandı; gerisi tellerde ısıya dönüştü (kızaran '
               'teller). Gerilimi yükselt: aynı enerji daha küçük akımla taşınır, '
@@ -203,15 +259,28 @@ class _CoilControls extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          key: const Key('teslaCoilSwitch'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Tesla bobinini çalıştır'),
-          value: controller.coilOn,
-          onChanged: controller.setCoil,
+        LabStepList(
+          steps: [
+            LabStep('Tesla bobinini çalıştır.', done: controller.coilStarted),
+            LabStep(
+              'Alıcı ayarını vericiyle aynı frekansa getir.',
+              done: controller.sawTuned,
+            ),
+            LabStep(
+              'Lambayı uzaklaştırıp yaklaştır: ışık nasıl değişiyor?',
+              done: controller.lampMovedWhileOn,
+            ),
+          ],
         ),
-        const Text('Verici frekansı:'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 10),
+        LabActionButton(
+          key: const Key('teslaCoilSwitch'),
+          onPressed: () => controller.setCoil(!controller.coilOn),
+          icon: controller.coilOn ? Icons.power_settings_new : Icons.bolt,
+          label: controller.coilOn ? 'Bobini durdur' : 'Bobini çalıştır',
+        ),
+        const SizedBox(height: 10),
+        const LabSectionTitle('Verici frekansı'),
         _chips<double>(
           values: transmitterFrequenciesKHz,
           selected: controller.transmitterKHz,
@@ -220,7 +289,9 @@ class _CoilControls extends StatelessWidget {
           keyOf: (v) => 'teslaTx_${v.round()}',
         ),
         const SizedBox(height: 8),
-        Text('Lambanın alıcı ayarı: ${formatTr(controller.receiverKHz, digits: 0)} kHz'),
+        LabSectionTitle(
+          'Lambanın alıcı ayarı: ${formatTr(controller.receiverKHz, digits: 0)} kHz',
+        ),
         Slider(
           key: const Key('teslaReceiver'),
           value: controller.receiverKHz,
@@ -229,7 +300,9 @@ class _CoilControls extends StatelessWidget {
           divisions: 60,
           onChanged: controller.setReceiver,
         ),
-        Text('Lambanın uzaklığı: ${formatTr(controller.lampDistanceM)} m'),
+        LabSectionTitle(
+          'Lambanın uzaklığı: ${formatTr(controller.lampDistanceM)} m',
+        ),
         Slider(
           key: const Key('teslaLampDistance'),
           value: controller.lampDistanceM,
@@ -241,14 +314,18 @@ class _CoilControls extends StatelessWidget {
         LabInfoCard(
           key: const Key('teslaCoilInfo'),
           color: lampLit(level) ? Colors.cyan.shade50 : Colors.blueGrey.shade50,
+          icon: Icons.light,
           text: !controller.coilOn
               ? 'Bobini çalıştır: lamba hiçbir kabloya bağlı değil!'
               : 'Lamba ${lampLit(level) ? 'yanıyor' : 'sönük'} (%${(level * 100).round()}). '
                     'Ayar uyumu %${(tuned * 100).round()}: alıcıyı vericiyle aynı '
                     'frekansa getir (rezonans). Lambayı yaklaştırınca alan güçlenir.',
         ),
-        const LabInfoCard(
-          text: 'Dikkat: Gerçek Tesla bobini çok yüksek gerilim üretir ve '
+        LabInfoCard(
+          color: Colors.red.shade50,
+          icon: Icons.warning_amber,
+          text:
+              'Dikkat: Gerçek Tesla bobini çok yüksek gerilim üretir ve '
               'tehlikelidir. Bu deneyi yalnızca burada, oyunda yap!',
         ),
       ],
