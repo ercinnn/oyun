@@ -128,20 +128,24 @@ class ThreeSceneBasis {
 /// **Kaldırma.** Sahneye sonradan malzeme eklersen (oda yeniden kurulurken
 /// olduğu gibi) onu da bu fonksiyondan geçir.
 void isolateMaterialPrograms(three.Object3D root) {
-  void isolate(three.Material m) {
-    final key = StringBuffer(m.runtimeType)
-      ..write(m.color.getHex())
-      ..write('/${m.opacity}/${m.transparent}');
-    if (m is three.MeshStandardMaterial) {
-      key.write('/${m.roughness}/${m.metalness}');
-      key.write('/${m.emissive?.getHex()}/${m.emissiveIntensity}');
-    }
-    final k = key.toString();
-    m.customProgramCacheKey = () => k;
-  }
-
   root.traverse((o) {
     final m = o is three.Mesh ? o.material : null;
-    if (m != null) isolate(m);
+    if (m != null) isolateMaterialProgram(m);
   });
+}
+
+/// Tek bir malzemeye kendi programını verir (bkz. [isolateMaterialPrograms]).
+/// Sahneye sonradan, ilk kez oluşturulan malzemeler için de çağrılmalıdır;
+/// Bilim İnsanları görünümlerinin ortak `material()` yardımcısı bunu her yeni
+/// malzemede kendisi yapar.
+void isolateMaterialProgram(three.Material m) {
+  final key = StringBuffer(m.runtimeType)
+    ..write(m.color.getHex())
+    ..write('/${m.opacity}/${m.transparent}');
+  if (m is three.MeshStandardMaterial) {
+    key.write('/${m.roughness}/${m.metalness}');
+    key.write('/${m.emissive?.getHex()}/${m.emissiveIntensity}');
+  }
+  final k = key.toString();
+  m.customProgramCacheKey = () => k;
 }
