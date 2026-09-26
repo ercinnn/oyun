@@ -7,7 +7,12 @@ sekmesinde). `build()` sahneyi kurar, `preview(...)` bir kombinasyonu gösterir,
 Sözleşme (oyun kodu `lib/widgets/avatar_model.dart` buna dayanır):
 - Karakter **Blender -Y'ye bakar** (glTF/three'de +z), ayakları z=0'da, boyu ~1,35.
 - Pivot düğümleri: `Body`, `Head`, `ArmL`, `ArmR`, `ForearmL`, `ForearmR` (dirsek; her kıyafet
-  grubunun içinde), `LegL`, `LegR`, `WingL`, `WingR`.
+  grubunun içinde), `LegL`, `LegR`, `ShinL`, `ShinR` (diz; bacak pivotunun çocuğu, tek),
+  `WingL`, `WingR`.
+- Gövde eklemlidir (bilim insanlarındaki `human_body.py` gibi): şekilli gövde, konik
+  uzuvlar, dirsek/diz çıkıntıları, iki boğumlu parmaklar. Parçalar en sonda her grubun
+  içinde malzeme başına birleştirilir (`merge_by_material`): oyunda karakter başına çizim
+  çağrısı azalır.
 - Varyant grupları adı `hair_*`, `outfit_*`, `hat_*`, `acc_*` (mağaza kimlikleri);
   aynı varyantın farklı pivotlara ait parçaları `outfit_space@head` gibi
   `@parça` soneki taşır. Oyun `@`'ten önceki kısma bakar.
@@ -168,6 +173,60 @@ def arc(R, tube, arclen, seg=18, rseg=6):
     return v, f, caps
 
 
+def lathe_y(profile, seg=12):
+    """(yarıçap, y) profilini y ekseni etrafında döndürür; yarıçapı 0 olan uç
+    tek kutup noktasıdır (kapalı örgü)."""
+    v, f, rings = [], [], []
+    for (r, y) in profile:
+        if r < 1e-6:
+            v.append((0.0, y, 0.0))
+            rings.append([len(v) - 1])
+        else:
+            start = len(v)
+            for i in range(seg):
+                a = 2 * PI * i / seg
+                v.append((r * math.cos(a), y, r * math.sin(a)))
+            rings.append(list(range(start, start + seg)))
+    for A, B in zip(rings, rings[1:]):
+        if len(A) == 1 and len(B) == 1:
+            continue
+        for i in range(seg):
+            j = (i + 1) % seg
+            if len(A) == 1:
+                f.append((A[0], B[j], B[i]))
+            elif len(B) == 1:
+                f.append((A[i], A[j], B[0]))
+            else:
+                f.append((A[i], A[j], B[j], B[i]))
+    return v, f, []
+
+
+def capsule(p0, p1, r0, r1, seg=12, cap=3):
+    """[p0]'dan [p1]'e konik kapsül (uçları yarım küre); köşeler dünyada."""
+    p0, p1 = Vector(p0), Vector(p1)
+    d = p1 - p0
+    L = d.length
+    prof = []
+    for i in range(cap + 1):
+        t = -PI / 2 + PI / 2 * i / cap
+        prof.append((r0 * math.cos(t), r0 * math.sin(t)))
+    for i in range(cap + 1):
+        t = PI / 2 * i / cap
+        prof.append((r1 * math.cos(t), L + r1 * math.sin(t)))
+    prof = [(0.0 if r < 1e-6 else r, y) for r, y in prof]
+    v, f, c = lathe_y(prof, seg)
+    axis = d.normalized() if L > 1e-9 else Vector((0, 1, 0))
+    q = Vector((0, 1, 0)).rotation_difference(axis)
+    return [tuple(p0 + q @ Vector(p)) for p in v], f, c
+
+
+def ell(center, radii, seg=12, rings=8):
+    """Eksenlere hizalı elipsoit; köşeler dünyada."""
+    v, f, c = sphere(1.0, seg, rings)
+    cx, cy, cz = center
+    return [(cx + x * radii[0], cy + y * radii[1], cz + z * radii[2]) for x, y, z in v], f, c
+
+
 # ── Sahne yardımcıları ─────────────────────────────────────────────────────
 def empty(name, pos=(0, 0, 0), parent=None):
     e = bpy.data.objects.new(name, None)
@@ -259,29 +318,40 @@ def build():
               scale=(sx, sy, sz), rot=(0.55, 0, rz), parent=g)
 
     # ── Gövde: her kıyafetin kendi gövdesi
-    def torso(g, color, width, name):
-        P(name + "_torso", cyl(width * 0.95, width, 0.46, 18), color, pos=(0, 0.67, 0), scale=(1, 1, 0.66), parent=g)
-        P(name + "_shoulders", sphere(width * 0.95, 14, 8), color, pos=(0, 0.9, 0), scale=(1, 0.32, 0.66), parent=g)
+    def torso(g, color, width, name, pelvis=None):
+        """Kalça → bel → göğüs → eğimli omuz; derinlik genişliğin %66'sı.
+        [pelvis] verilirse kasık-kalça o malzemede (pantolon) kurulur."""
+        W = width
+        prof = [(0.0, 0.43), (0.9 * W, 0.44), (0.94 * W, 0.5), (0.86 * W, 0.6),
+                (0.9 * W, 0.7), (1.0 * W, 0.8), (0.99 * W, 0.87), (0.8 * W, 0.92),
+                (0.42 * W, 0.955), (0.0, 0.962)]
+        v, f, c = lathe_y(prof, 22)
+        P(name + "_torso", ([(x, y, z * 0.66) for x, y, z in v], f, c), color, parent=g)
+        if pelvis is not None:
+            prof = [(0.0, 0.345), (0.58 * W, 0.355), (0.8 * W, 0.4), (0.88 * W, 0.46),
+                    (0.0, 0.47)]
+            v, f, c = lathe_y(prof, 22)
+            P(name + "_pelvis", ([(x, y, z * 0.7) for x, y, z in v], f, c), pelvis, parent=g)
 
     for o in OUTFITS:
         g = E(f"outfit_{o}@body", (0, 0, 0), body)
         n = f"{o}_b"
         if o == "tee":
-            torso(g, "Outfit", 0.215, n)
+            torso(g, "Outfit", 0.215, n, pelvis="Pants")
             P(n + "_belt", cyl(0.215, 0.215, 0.05, 18), "Pants", pos=(0, 0.46, 0), scale=(1, 1, 0.68), parent=g)
         elif o == "dress":
             torso(g, "Outfit", 0.215, n)
             P(n + "_skirt", cyl(0.0, 0.34, 0.4, 24), "Outfit", pos=(0, 0.31, 0), parent=g, open_=False)
             P(n + "_hem", cyl(0.343, 0.343, 0.03, 24), "OutfitLight", pos=(0, 0.115, 0), parent=g)
         elif o == "hoodie":
-            torso(g, "Outfit", 0.245, n)
+            torso(g, "Outfit", 0.245, n, pelvis="Pants")
             P(n + "_belt", cyl(0.245, 0.245, 0.05, 18), "Pants", pos=(0, 0.46, 0), scale=(1, 1, 0.68), parent=g)
             P(n + "_hood", sphere(0.16, 12, 8), "OutfitLight", pos=(0, 0.93, -0.13), scale=(1, 0.7, 1), parent=g)
             P(n + "_pocket", box(0.2, 0.11, 0.03), "OutfitLight", pos=(0, 0.55, 0.155), parent=g)
             for sx in (-0.05, 0.05):
                 P(n + f"_string{sx}", cyl(0.012, 0.012, 0.13, 6), "White", pos=(sx, 0.8, 0.15), parent=g)
         elif o == "suit":
-            torso(g, "Outfit", 0.215, n)
+            torso(g, "Outfit", 0.215, n, pelvis="PantsSuit")
             P(n + "_belt", cyl(0.215, 0.215, 0.05, 18), "PantsSuit", pos=(0, 0.46, 0), scale=(1, 1, 0.68), parent=g)
             P(n + "_shirt", box(0.12, 0.34, 0.02), "White", pos=(0, 0.72, 0.15), parent=g)
             P(n + "_tie", box(0.035, 0.22, 0.022), "Red", pos=(0, 0.7, 0.16), parent=g)
@@ -289,7 +359,7 @@ def build():
             for s in (-1, 1):
                 P(n + f"_lapel{s}", box(0.05, 0.3, 0.02), "OutfitLight", pos=(s * 0.085, 0.72, 0.152), rot=(0, 0, s * 0.18), parent=g)
         elif o == "space":
-            torso(g, "White", 0.215, n)
+            torso(g, "White", 0.215, n, pelvis="White")
             P(n + "_panel", box(0.2, 0.17, 0.03), "Outfit", pos=(0, 0.72, 0.15), parent=g)
             P(n + "_btnA", cyl(0.022, 0.022, 0.03, 8), "Red", pos=(-0.05, 0.74, 0.168), rot=(PI / 2, 0, 0), parent=g)
             P(n + "_btnB", cyl(0.022, 0.022, 0.03, 8), "Green", pos=(0.05, 0.74, 0.168), rot=(PI / 2, 0, 0), parent=g)
@@ -299,14 +369,33 @@ def build():
         gg = [c for c in created if c.name == f"outfit_{o}@body"][0]
         P(f"{o}_collar", arc(0.085, 0.02, 2 * PI, 20, 6), "OutfitLight", pos=(0, 0.925, 0.005), rot=(PI / 2 - 0.15, 0, 0), parent=gg)
 
-    # ── Bacaklar
+    # ── Bacaklar: kalça pivotu (LegL/R) altında uyluk; diz pivotu (ShinL/R,
+    # tek, bacağın çocuğu) altında diz, baldır ve ayakkabı. Her kıyafetin iki
+    # grubu vardır: `outfit_x@legL` (uyluk) ve `outfit_x@shinL` (dizden aşağı).
     for s, leg in legs.items():
+        side = "L" if s < 0 else "R"
+        x = s * 0.1
+        shin_piv = E(f"Shin{side}", (x, 0.262, 0), leg)
+        hip, knee, ankle = (x, 0.44, 0), (x, 0.262, 0.004), (x, 0.1, 0)
         for o in OUTFITS:
-            g = E(f"outfit_{o}@leg{'L' if s < 0 else 'R'}", (0, 0, 0), leg)
+            up = E(f"outfit_{o}@leg{side}", (0, 0, 0), leg)
+            lo = E(f"outfit_{o}@shin{side}", (0, 0, 0), shin_piv)
             mat = {"dress": "Skin", "suit": "PantsSuit", "space": "White"}.get(o, "Pants")
             shoe = "ShoeLight" if o == "space" else "Shoe"
-            P(f"{o}_leg{s}", cyl(0.07, 0.062, 0.34, 10), mat, pos=(s * 0.1, 0.27, 0), parent=g)
-            P(f"{o}_shoe{s}", box(0.15, 0.09, 0.25), shoe, pos=(s * 0.1, 0.055, 0.04), parent=g, round_=True)
+            sole = "Gray" if o == "space" else "Dark"
+            P(f"{o}_thigh{s}", capsule(hip, knee, 0.079, 0.064, 14), mat, parent=up)
+            P(f"{o}_knee{s}", ell(knee, (0.064, 0.064, 0.066), 14, 8), mat, parent=lo)
+            P(f"{o}_kneecap{s}", ell((x, 0.264, 0.05), (0.034, 0.04, 0.02), 10, 6), mat, parent=lo)
+            P(f"{o}_shin{s}", capsule(knee, ankle, 0.062, 0.046, 14), mat, parent=lo)
+            P(f"{o}_calf{s}", ell((x, 0.195, -0.02), (0.054, 0.068, 0.048), 12, 8), mat, parent=lo)
+            if o == "dress":
+                # Beyaz kısa çorap.
+                P(f"{o}_sock{s}", capsule((x, 0.085, 0), (x, 0.13, 0), 0.049, 0.049, 14, 2), "White", parent=lo)
+            else:
+                P(f"{o}_hem{s}", arc(0.05, 0.011, 2 * PI, 16, 5), mat, pos=(x, 0.118, 0),
+                  rot=(PI / 2, 0, 0), parent=lo)
+            P(f"{o}_shoe{s}", ell((x, 0.056, 0.036), (0.068, 0.054, 0.125), 14, 8), shoe, parent=lo)
+            P(f"{o}_sole{s}", ell((x, 0.016, 0.036), (0.072, 0.017, 0.132), 14, 6), sole, parent=lo)
 
     # ── Kollar: omuz pivotu (ArmL/R) + dirsek pivotu (ForearmL/R, her kıyafet
     # grubunun içinde). Üst kol/dirsek omuza, önkol/el dirseğe bağlıdır.
@@ -323,28 +412,38 @@ def build():
             cuff = "Outfit" if space else ("White" if o == "suit" else "OutfitLight")
             hand_mat = "Outfit" if space else "Skin"
 
-            # üst kol
+            sh, el = (ax, 0.865, 0), (ax, 0.672, 0.0)
+            # üst kol (+ kısa kolda yen)
             if short:
-                P(n + "_up", cyl(0.055, 0.052, 0.2, 10), "Skin", pos=(ax, 0.77, 0), parent=g)
-                P(n + "_sleeve", cyl(0.07, 0.066, 0.13, 10), sleeve, pos=(ax, 0.805, 0), parent=g)
-                P(n + "_hem", arc(0.068, 0.012, 2 * PI, 14, 5), "OutfitLight", pos=(ax, 0.742, 0), rot=(PI / 2, 0, 0), parent=g)
-                P(n + "_elbow", sphere(0.055, 10, 8), "Skin", pos=(ax, 0.67, 0), parent=g)
+                P(n + "_up", capsule(sh, el, 0.056, 0.049, 12), "Skin", parent=g)
+                P(n + "_sleeve", cyl(0.072, 0.067, 0.13, 12), sleeve, pos=(ax, 0.805, 0), parent=g)
+                P(n + "_hem", arc(0.069, 0.012, 2 * PI, 14, 5), "OutfitLight", pos=(ax, 0.742, 0), rot=(PI / 2, 0, 0), parent=g)
+                P(n + "_elbow", ell(el, (0.05, 0.05, 0.05), 10, 8), "Skin", parent=g)
             else:
-                P(n + "_up", cyl(0.066, 0.06, 0.2, 10), sleeve, pos=(ax, 0.77, 0), parent=g)
-                P(n + "_elbow", sphere(0.06, 10, 8), sleeve, pos=(ax, 0.67, 0), parent=g)
-            P(n + "_ball", sphere(0.07, 10, 8), sleeve, pos=(ax, 0.87, 0), parent=g)
+                P(n + "_up", capsule(sh, el, 0.067, 0.058, 12), sleeve, parent=g)
+                P(n + "_elbow", ell(el, (0.06, 0.06, 0.06), 10, 8), sleeve, parent=g)
+            P(n + "_ball", sphere(0.071, 12, 8), sleeve, pos=(ax, 0.87, 0), parent=g)
 
-            # önkol + manşet
+            # önkol + manşet (dirsek pivotuna bağlı)
             if short:
-                P(n + "_fore", cyl(0.05, 0.044, 0.17, 10), "Skin", pos=(ax, 0.585, 0), parent=fore)
+                P(n + "_fore", capsule(el, (ax, 0.52, 0.004), 0.049, 0.039, 12), "Skin", parent=fore)
             else:
-                P(n + "_fore", cyl(0.058, 0.05, 0.17, 10), sleeve, pos=(ax, 0.585, 0), parent=fore)
-                P(n + "_cuff", arc(0.052, 0.011, 2 * PI, 14, 5), cuff, pos=(ax, 0.51, 0), rot=(PI / 2, 0, 0), parent=fore)
+                P(n + "_fore", capsule(el, (ax, 0.53, 0.004), 0.058, 0.05, 12), sleeve, parent=fore)
+                P(n + "_cuff", arc(0.053, 0.011, 2 * PI, 14, 5), cuff, pos=(ax, 0.512, 0), rot=(PI / 2, 0, 0), parent=fore)
 
-            # el: avuç + başparmak (gövdeye bakan iç yan)
-            P(n + "_hand", sphere(0.058, 12, 10), hand_mat, pos=(ax, 0.475, 0.005), scale=(1, 1.15, 0.85), parent=fore)
-            P(n + "_thumb", sphere(0.024, 8, 6), hand_mat, pos=(ax - s * 0.05, 0.5, 0.03),
-              scale=(0.8, 1.4, 0.9), rot=(0, 0, s * 0.3), parent=fore)
+            # el: bilek + avuç (içi gövdeye bakar) + iki boğumlu 4 parmak + başparmak
+            ix = -s  # avuç içinin yönü (gövdeye doğru)
+            P(n + "_wrist", capsule((ax, 0.53, 0.004), (ax, 0.485, 0.005), 0.035, 0.035, 10, 2), hand_mat, parent=fore)
+            P(n + "_palm", ell((ax + ix * 0.004, 0.458, 0.007), (0.025, 0.046, 0.041), 12, 8), hand_mat, parent=fore)
+            for k, (zz, ln) in enumerate(((-0.026, 0.027), (-0.009, 0.034), (0.008, 0.036), (0.025, 0.032))):
+                b = (ax + ix * 0.004, 0.424, 0.007 + zz)
+                m = (ax + ix * 0.009, 0.424 - ln * 0.55, 0.007 + zz)
+                t = (ax + ix * 0.019, 0.424 - ln, 0.007 + zz * 1.05)
+                P(n + f"_f{k}a", capsule(b, m, 0.0108, 0.0101, 8, 2), hand_mat, parent=fore)
+                P(n + f"_f{k}b", capsule(m, t, 0.0101, 0.009, 8, 2), hand_mat, parent=fore)
+            tb, tm, tt = (ax + ix * 0.014, 0.468, 0.038), (ax + ix * 0.028, 0.447, 0.053), (ax + ix * 0.037, 0.427, 0.059)
+            P(n + "_thumb", capsule(tb, tm, 0.0135, 0.0118, 8, 2), hand_mat, parent=fore)
+            P(n + "_thumb2", capsule(tm, tt, 0.0118, 0.0102, 8, 2), hand_mat, parent=fore)
 
     # ── Baş
     P("head", sphere(0.25, 24, 16), "Skin", pos=H(0, 0, 0), scale=(1, 0.96, 1), parent=head)
@@ -433,7 +532,44 @@ def build():
     g = E("outfit_space@head", (0, 0, 0), head)
     P("os_helmet", sphere(0.36, 22, 14), "Helmet", pos=H(0, 0.02, 0), parent=g)
     P("os_collar", cyl(0.2, 0.22, 0.05, 18), "White", pos=H(0, -0.27, 0), parent=g)
-    return created
+    return merge_by_material(created)
+
+
+def merge_by_material(created):
+    """Her grubun (ebeveyn düğümün) doğrudan örgü çocuklarını malzeme başına
+    tek örgüde birleştirir; değiştiriciler (SUBSURF) önce uygulanır. Pivot ve
+    varyant grupları olduğu gibi kalır. Birleşik örgünün adı `grup_Malzeme`
+    ('.' yerine '_'): oyun pivotları `.`'tan önceye bakarak aradığı için
+    `ForearmL.001` gibi bir adla karışmasın."""
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    groups = {}
+    for ob in created:
+        if ob.type == "MESH" and ob.parent is not None and ob.data.materials:
+            groups.setdefault((ob.parent.name, ob.data.materials[0].name), []).append(ob)
+    kept = [ob for ob in created if ob.type != "MESH"]
+    for (pname, mname), obs in groups.items():
+        parent = bpy.data.objects[pname]
+        bm = bmesh.new()
+        for ob in obs:
+            me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+            me.transform(ob.matrix_world)
+            bm.from_mesh(me)
+            bpy.data.meshes.remove(me)
+        name = f"{pname.replace('.', '_')}_{mname}"
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(bpy.data.materials[mname])
+        merged = bpy.data.objects.new(name, me)
+        coll.objects.link(merged)
+        merged.parent = parent
+        merged.matrix_parent_inverse = parent.matrix_world.inverted()
+        merged["_char"] = True
+        for ob in obs:
+            bpy.data.objects.remove(ob, do_unlink=True)
+        kept.append(merged)
+    return kept
 
 
 # ── Önizleme ve dışa aktarma ───────────────────────────────────────────────

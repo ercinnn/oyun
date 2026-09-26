@@ -15,11 +15,16 @@ import 'avatar_3d.dart' show AvatarRig;
 ///
 /// Varyant düğümleri `hair_*`/`outfit_*`/`hat_*`/`acc_*` adlıdır; aynı varyantın
 /// farklı pivota ait parçaları `outfit_space@head` gibi `@parça` taşır.
+///
+/// Gövde eklemlidir: omuz (`ArmL/R`), dirsek (`ForearmL/R`), kalça (`LegL/R`)
+/// ve diz (`ShinL/R`, bacak pivotunun çocuğu) pivotları [update]'te döner.
 class AvatarModel implements AvatarRig {
   AvatarModel._(
     this.root, {
     required three.Object3D? legL,
     required three.Object3D? legR,
+    required three.Object3D? shinL,
+    required three.Object3D? shinR,
     required three.Object3D? armL,
     required three.Object3D? armR,
     required three.Object3D? foreL,
@@ -30,6 +35,8 @@ class AvatarModel implements AvatarRig {
     required three.Object3D? wingR,
   }) : _legL = legL,
        _legR = legR,
+       _shinL = shinL,
+       _shinR = shinR,
        _armL = armL,
        _armR = armR,
        _foreL = foreL,
@@ -43,6 +50,8 @@ class AvatarModel implements AvatarRig {
   final three.Object3D root;
   final three.Object3D? _legL,
       _legR,
+      _shinL,
+      _shinR,
       _armL,
       _armR,
       _foreL,
@@ -174,6 +183,8 @@ class AvatarModel implements AvatarRig {
       root,
       legL: root.getObjectByName('LegL'),
       legR: root.getObjectByName('LegR'),
+      shinL: root.getObjectByName('ShinL'),
+      shinR: root.getObjectByName('ShinR'),
       armL: root.getObjectByName('ArmL'),
       armR: root.getObjectByName('ArmR'),
       // Dirsek pivotları her kıyafet grubunda ayrıdır (Blender aynı adları
@@ -189,9 +200,15 @@ class AvatarModel implements AvatarRig {
 
   @override
   void update(double time, bool moving, {double phase = 0}) {
-    final swing = moving ? sin(time * 11 + phase) : 0.0;
+    final step = time * 11 + phase;
+    final swing = moving ? sin(step) : 0.0;
     _legL?.rotation.x = swing * 0.75;
     _legR?.rotation.x = -swing * 0.75;
+    // Diz: bacak öne salınırken (açısı azalırken) bükülür, ayak yere
+    // basarken neredeyse düzdür. Negatif x = baldır geriye (diz bükümü).
+    final back = moving ? cos(step) : 0.0;
+    _shinL?.rotation.x = -(0.06 + (moving ? 0.95 * max(0.0, -back) : 0.0));
+    _shinR?.rotation.x = -(0.06 + (moving ? 0.95 * max(0.0, back) : 0.0));
     final breathe = sin(time * 2 + phase) * 0.03;
     _armL?.rotation.x = -swing * 0.85;
     _armR?.rotation.x = swing * 0.85;
