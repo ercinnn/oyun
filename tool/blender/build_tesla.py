@@ -30,6 +30,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 M = {}
 
@@ -84,30 +85,32 @@ def rotated(ob, loc, rot):
 
 
 def build_figure():
-    """Nikola Tesla: uzun boylu ve zayıf, koyu takım elbise, beyaz yaka,
-    mor kravat, ortadan ayrılmış siyah saç ve bıyık."""
-    begin("tesla_figure")
+    """Nikola Tesla — eklemli insan gövdesi (`human_body.py`): uzun boylu ve
+    zayıf; koyu takım elbise, beyaz gömlek ve yaka, mor kravat, ortadan
+    ayrılmış siyah saç ve bıyık. Sol eli öne uzanmış, avucu yukarıda."""
+    root = begin("tesla_figure")
+    info = human(
+        "tf", height=1.85, build=0.9, skin=M["skin"], top=M["suit"], pants=M["suit"],
+        shoe=M["shoe"], brow=M["hair"], collar=M["shirt"], cuff=M["shirt"],
+        coat=dict(m=M["suit"], bottom=0.9, flare=1.06, open=M["shirt"], open_w=0.07),
+        arm_l=dict(abd=14, flex=55, elbow=45, palm="up", curl=0.3),
+        arm_r=dict(abd=8, elbow=14, curl=0.35),
+        leg_l=dict(knee=4, turn=8), leg_r=dict(flex=4, knee=4, turn=8))
+    r, A = info["r"], info["attach_head"]
+    nf = info["neck_front"]
+    # Kravat: düğüm + gömleğin önünde inen şerit.
+    blob("tf_tie_knot", nf + Vector((0, -0.012, -0.03)),
+         (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))), (0.022, 0.016, 0.022),
+         M["tie"], 10, 6)
+    front_band("tf_tie", info, (0, nf.z - 0.05), (0, nf.z - 0.38), 0.05, M["tie"], 10,
+               lift=0.014)
+    # Ortadan ayrılmış saç: iki yarım kubbe + ense.
     for side in (-1, 1):
-        cyl(f"tf_leg{side}", side * 0.1, 0, 0.05, 0.065, 0.85, M["suit"], 10)
-        box(f"tf_shoe{side}", side * 0.1, -0.05, 0, 0.11, 0.26, 0.06, M["shoe"])
-    lathe("tf_body", [(0.0, 0.85), (0.22, 0.85), (0.24, 1.2), (0.25, 1.5),
-                      (0.13, 1.58), (0.0, 1.6)], M["suit"], 20)
-    # Gömlek ve kravat (önde).
-    box("tf_shirt", 0, -0.2, 1.3, 0.12, 0.04, 0.28, M["shirt"])
-    box("tf_tie", 0, -0.22, 1.25, 0.05, 0.03, 0.3, M["tie"])
-    cyl("tf_neck", 0, 0, 1.56, 0.06, 0.1, M["skin"], 10)
-    sphere("tf_head", 0, 0, 1.73, 0.14, M["skin"], 16, 10, sz=1.12)
-    sphere("tf_nose", 0, -0.14, 1.72, 0.025, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"tf_eye{side}", side * 0.05, -0.12, 1.76, 0.018, M["eye"], 8, 5)
-        # Ortadan ayrılmış saç: iki yarım kubbe.
-        sphere(f"tf_hair{side}", side * 0.06, 0.02, 1.83, 0.12, M["hair"], 12, 7,
-               sz=0.55, sx=0.9)
-    sphere("tf_moustache", 0, -0.13, 1.67, 0.06, M["hair"], 10, 6, sz=0.3, sx=1.5)
-    rotated(cyl("tf_arm_r", 0, 0, 0, 0.055, 0.62, M["suit"], 8), (0.27, 0, 0.9), (0, -0.08, 0))
-    sphere("tf_hand_r", 0.29, 0, 0.87, 0.05, M["skin"], 8, 5)
-    rotated(cyl("tf_arm_l", 0, 0, 0, 0.055, 0.55, M["suit"], 8), (-0.26, 0, 1.46), (1.9, 0, 0))
-    sphere("tf_hand_l", -0.26, -0.52, 1.28, 0.05, M["skin"], 8, 5)
+        A(sphere(f"tf_hair{side}", side * r * 0.4, r * 0.06, r * 0.78, r * 0.8, M["hair"],
+                 14, 8, sz=0.74, sx=0.95))
+    hair_cap("tf_hair_back", info, M["hair"], back=0.3, lift=0.15, size=1.06, sz=1.16)
+    A(sphere("tf_moustache", 0, -r * 1.02, -r * 0.6, r * 0.3, M["hair"], 10, 6, sz=0.35, sx=1.5))
+    join_by_material(root)
 
 
 def build_lab():

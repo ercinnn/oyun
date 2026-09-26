@@ -28,6 +28,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 TILT_DEG = 25
 
@@ -71,30 +72,29 @@ def rotated(ob, loc, rot):
 
 
 def build_figure():
-    begin("galileo_figure")
-    lathe("gf_robe", [(0.0, 0.0), (0.4, 0.0), (0.36, 0.5), (0.3, 1.0), (0.3, 1.3),
-                      (0.18, 1.42), (0.0, 1.44)], M["robe"], 22)
-    # Kürk yaka + beyaz iç yaka.
-    torus("gf_fur", 0, 0, 1.36, 0.24, 0.07, M["fur"], 24, 8)
-    lathe("gf_collar", [(0.0, 1.38), (0.14, 1.4), (0.15, 1.45), (0.0, 1.47)],
-          M["collar"], 14, 0, -0.04, 0)
-    # Cüppenin önünde koyu bir şerit ve düğmeler.
-    box("gf_front", 0, -0.33, 0.1, 0.06, 0.02, 1.15, M["fur"])
-    for side in (-1, 1):
-        box(f"gf_shoe{side}", side * 0.12, -0.1, 0, 0.12, 0.24, 0.06, M["shoe"])
-    sphere("gf_head", 0, 0, 1.6, 0.16, M["skin"], 16, 10)
-    sphere("gf_nose", 0, -0.16, 1.59, 0.03, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"gf_eye{side}", side * 0.06, -0.14, 1.63, 0.02, M["eye"], 8, 5)
-    # Kır sakal ve bıyık, arkaya taranmış seyrek saç.
-    sphere("gf_beard", 0, -0.08, 1.46, 0.15, M["beard"], 14, 8, sz=1.2, sy=0.8)
-    sphere("gf_moustache", 0, -0.15, 1.53, 0.07, M["beard"], 10, 6, sz=0.35, sx=1.4)
-    sphere("gf_hair", 0, 0.04, 1.63, 0.165, M["hair"], 14, 8, sz=0.8)
-    # Kollar: sağ yanda, sol eli öne uzanmış (teleskoba dokunur gibi).
-    rotated(cyl("gf_arm_r", 0, 0, 0, 0.07, 0.55, M["robe"], 8), (0.31, 0, 0.75), (0, -0.12, 0))
-    sphere("gf_hand_r", 0.34, 0, 0.72, 0.055, M["skin"], 8, 5)
-    rotated(cyl("gf_arm_l", 0, 0, 0, 0.07, 0.5, M["robe"], 8), (-0.3, 0, 1.28), (1.9, 0, 0))
-    sphere("gf_hand_l", -0.3, -0.47, 1.1, 0.055, M["skin"], 8, 5)
+    """Galileo — eklemli insan gövdesi (`human_body.py`): yere kadar siyah
+    cüppe, kürk yaka ve ön şerit, beyaz iç yaka, kır sakal; bir eli öne
+    uzanmış (teleskoba dokunur gibi). Yüzü -y, 1.75 boy."""
+    root = begin("galileo_figure")
+    info = human(
+        "gf", height=1.75, skin=M["skin"], top=M["robe"], pants=M["robe"],
+        shoe=M["shoe"], brow=M["beard"], collar=M["collar"], cuff=M["fur"],
+        coat=dict(m=M["robe"], bottom=0.03, flare=1.32, open=M["fur"], open_w=0.06),
+        # Bir kol öne uzanmış (sahnede figürün baktığı yöne gider).
+        arm_r=dict(abd=18, flex=68, elbow=28, palm="down", curl=0.45),
+        arm_l=dict(abd=9, elbow=18, curl=0.35),
+        leg_l=dict(knee=5), leg_r=dict(flex=6, knee=5))
+    r, A, u = info["r"], info["attach_head"], info["u"]
+    # Kürk yaka: omuzları saran kalın, yassı halka.
+    ring = torus("gf_fur", 0, 0, 0, 0.66 * u, 0.17 * u, M["fur"], 28, 8)
+    for v in ring.data.vertices:
+        v.co.y = v.co.y * 0.74 + 0.01
+        v.co.z += info["shoulder_z"] + 0.01
+    # Kır sakal ve bıyık, arkaya çekilmiş seyrek saç.
+    A(sphere("gf_beard", 0, -r * 0.7, -r * 0.95, r * 0.7, M["beard"], 14, 8, sz=1.1, sy=0.72))
+    A(sphere("gf_moustache", 0, -r * 1.02, -r * 0.6, r * 0.34, M["beard"], 10, 6, sz=0.4, sx=1.5))
+    hair_cap("gf_hair", info, M["hair"], back=0.32, lift=0.18, size=1.07, sz=1.16)
+    join_by_material(root)
 
 
 def build_telescope():

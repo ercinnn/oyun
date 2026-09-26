@@ -29,6 +29,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 M = {}
 
@@ -80,32 +81,29 @@ def rotated(ob, loc, rot):
 
 
 def build_figure():
-    """Marie Curie: yere kadar koyu etek, beyaz laboratuvar önlüğü, koyu
-    kahve saç topuzu; sağ elinde bir cam şişe."""
-    begin("curie_figure")
-    lathe("cf_skirt", [(0.0, 0.02), (0.3, 0.02), (0.24, 0.6), (0.18, 0.95), (0.0, 0.96)],
-          M["dress"], 20)
-    lathe("cf_coat", [(0.0, 0.4), (0.27, 0.4), (0.22, 0.9), (0.2, 1.2), (0.22, 1.33),
-                      (0.12, 1.41), (0.0, 1.42)], M["coat"], 20)
-    box("cf_opening", 0, -0.2, 0.42, 0.06, 0.03, 0.9, M["dress"])
-    for side in (-1, 1):
-        box(f"cf_shoe{side}", side * 0.09, -0.12, 0, 0.09, 0.16, 0.05, M["shoe"])
-    cyl("cf_neck", 0, 0, 1.38, 0.05, 0.1, M["skin"], 10)
-    sphere("cf_head", 0, 0, 1.53, 0.13, M["skin"], 16, 10, sz=1.1)
-    sphere("cf_nose", 0, -0.13, 1.52, 0.022, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"cf_eye{side}", side * 0.045, -0.115, 1.56, 0.016, M["eye"], 8, 5)
-    sphere("cf_hair", 0, 0.025, 1.6, 0.14, M["hair"], 14, 8, sz=0.75)
-    sphere("cf_bun", 0, 0.09, 1.7, 0.07, M["hair"], 12, 8)
-    # Kollar: sol yanda, sağ öne uzanmış elinde şişe.
-    rotated(cyl("cf_arm_l", 0, 0, 0, 0.05, 0.55, M["coat"], 8), (-0.24, 0, 0.8), (0, 0.08, 0))
-    sphere("cf_hand_l", -0.26, 0, 0.78, 0.045, M["skin"], 8, 5)
-    rotated(cyl("cf_arm_r", 0, 0, 0, 0.05, 0.45, M["coat"], 8), (0.23, 0, 1.3), (1.9, 0, 0))
-    sphere("cf_hand_r", 0.23, -0.42, 1.15, 0.045, M["skin"], 8, 5)
-    lathe("cf_flask", [(0.0, 1.12), (0.06, 1.13), (0.06, 1.2), (0.02, 1.26), (0.02, 1.32),
-                       (0.0, 1.32)], M["glass"], 14, 0.23, -0.47, 0)
-    lathe("cf_flask_liquid", [(0.0, 1.13), (0.055, 1.135), (0.055, 1.18), (0.0, 1.18)],
-          M["liquid_green"], 14, 0.23, -0.47, 0)
+    """Marie Curie — eklemli insan gövdesi (`human_body.py`): yere kadar koyu
+    etek, beyaz laboratuvar önlüğü, koyu kahve saç topuzu; sağ elinde bir cam
+    şişe. Yüzü -y, 1.65 boy."""
+    root = begin("curie_figure")
+    info = human(
+        "cf", height=1.65, female=True, skin=M["skin"], top=M["coat"], pants=M["dress"],
+        shoe=M["shoe"], brow=M["hair"], collar=M["dress"],
+        coat=dict(m=M["coat"], bottom=0.52, flare=1.2, open=M["dress"], open_w=0.06),
+        skirt=dict(m=M["dress"], bottom=0.02, flare=1.32),
+        arm_r=dict(abd=12, flex=55, elbow=50, palm="up", curl=0.45),
+        arm_l=dict(abd=10, elbow=16, curl=0.35),
+        leg_l=dict(knee=4), leg_r=dict(knee=4))
+    r, A = info["r"], info["attach_head"]
+    # Saç: başı saran koyu kahve saç + tepede arkada topuz.
+    hair_cap("cf_hair", info, M["hair"], back=0.1, lift=0.2, size=1.1, sz=1.18, sx=1.06)
+    A(sphere("cf_bun", 0, r * 0.8, r * 1.05, r * 0.45, M["hair"], 12, 8))
+    # Cam şişe: sağ avucun üstünde, içinde yeşil sıvı.
+    g = info["grip_r"]
+    lathe("cf_flask", [(0.0, 0.0), (0.045, 0.004), (0.045, 0.055), (0.016, 0.1),
+                       (0.016, 0.14), (0.0, 0.14)], M["glass"], 14, g.x, g.y, g.z - 0.01)
+    lathe("cf_flask_liquid", [(0.0, 0.002), (0.041, 0.006), (0.041, 0.045), (0.0, 0.045)],
+          M["liquid_green"], 14, g.x, g.y, g.z - 0.01)
+    join_by_material(root)
 
 
 def build_lab():

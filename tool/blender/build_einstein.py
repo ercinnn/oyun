@@ -28,6 +28,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 M = {}
 
@@ -71,34 +72,37 @@ def rotated(ob, loc, rot):
 
 
 def build_figure():
-    begin("einstein_figure")
-    for side in (-1, 1):
-        cyl(f"ef_leg{side}", side * 0.1, 0, 0.05, 0.075, 0.8, M["trousers"], 10)
-        box(f"ef_shoe{side}", side * 0.1, -0.05, 0, 0.11, 0.25, 0.06, M["shoe"])
-    lathe("ef_body", [(0.0, 0.8), (0.24, 0.8), (0.27, 1.1), (0.26, 1.42), (0.14, 1.5),
-                      (0.0, 1.52)], M["sweater"], 20)
-    box("ef_shirt", 0, -0.21, 1.3, 0.1, 0.04, 0.18, M["shirt"])
-    cyl("ef_neck", 0, 0, 1.48, 0.06, 0.08, M["skin"], 10)
-    sphere("ef_head", 0, 0, 1.64, 0.14, M["skin"], 16, 10, sz=1.1)
-    sphere("ef_nose", 0, -0.14, 1.62, 0.028, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"ef_eye{side}", side * 0.05, -0.12, 1.66, 0.017, M["eye"], 8, 5)
-        sphere(f"ef_brow{side}", side * 0.055, -0.125, 1.695, 0.03, M["hair"], 8, 4, sz=0.4, sx=1.4)
-    sphere("ef_moustache", 0, -0.13, 1.57, 0.065, M["hair"], 10, 6, sz=0.45, sx=1.5)
-    # Dağınık beyaz saç: başın arkasında ve yanlarında kabarık yumaklar.
-    tufts = [(0.0, 0.06, 1.74, 0.13), (-0.12, 0.04, 1.7, 0.1), (0.12, 0.04, 1.7, 0.1),
-             (-0.15, -0.01, 1.62, 0.08), (0.15, -0.01, 1.62, 0.08), (0.0, 0.12, 1.62, 0.11),
-             (-0.08, 0.1, 1.78, 0.08), (0.08, 0.1, 1.78, 0.08), (-0.17, 0.06, 1.55, 0.06),
-             (0.17, 0.06, 1.55, 0.06)]
-    for i, (x, y, z, r) in enumerate(tufts):
-        sphere(f"ef_tuft{i}", x, y, z, r, M["hair"], 10, 6)
-    rotated(cyl("ef_arm_r", 0, 0, 0, 0.065, 0.6, M["sweater"], 8), (0.29, 0, 0.85), (0, -0.1, 0))
-    sphere("ef_hand_r", 0.31, 0, 0.82, 0.05, M["skin"], 8, 5)
-    # Sol el tahtaya işaret eder gibi yukarıda.
-    # y ekseni etrafında −0.9: kol yukarı ve dışa (−x) uzanır.
-    rotated(cyl("ef_arm_l", 0, 0, 0, 0.065, 0.55, M["sweater"], 8), (-0.28, 0, 1.38), (0, -0.9, 0))
-    sphere("ef_hand_l", -0.71, 0, 1.73, 0.05, M["skin"], 8, 5)
-    box("ef_chalk", -0.78, 0, 1.75, 0.06, 0.015, 0.015, M["chalk"])
+    """Eklemli insan gövdesi (`human_body.py`): gri hırka, beyaz gömlek yakası,
+    dağınık beyaz saç, bıyık; sol eli tahtaya uzanmış, parmaklarında tebeşir."""
+    root = begin("einstein_figure")
+    info = human(
+        "ef", height=1.75, build=1.02, skin=M["skin"], top=M["sweater"],
+        pants=M["trousers"], shoe=M["shoe"], brow=M["hair"], collar=M["shirt"],
+        cuff=M["shirt"], belt=M["shoe"],
+        arm_l=dict(abd=38, flex=105, elbow=35, palm="forward", curl=0.65),
+        arm_r=dict(abd=9, elbow=18, curl=0.4),
+        leg_l=dict(knee=6, turn=12), leg_r=dict(flex=6, knee=3))
+    r, A = info["r"], info["attach_head"]
+    # Gömlek: hırkanın V yakasından görünen beyaz üçgen.
+    nf = info["neck_front"]
+    poly("ef_shirt", [(-0.07, nf.y - 0.004, nf.z + 0.01), (0.07, nf.y - 0.004, nf.z + 0.01),
+                      (0, nf.y - 0.03, nf.z - 0.16)], [(0, 1, 2), (2, 1, 0)], M["shirt"])
+    # Kalın, sarkık bıyık.
+    A(sphere("ef_moustache", 0, -r * 1.02, -r * 0.62, r * 0.32, M["hair"], 10, 6,
+             sz=0.45, sx=1.5))
+    # Dağınık beyaz saç: arkada ve yanlarda kabarık yumaklar, alın açık.
+    tufts = [(0, 0.35, 0.85, 0.75), (-0.75, 0.2, 0.55, 0.55), (0.75, 0.2, 0.55, 0.55),
+             (-0.98, 0.05, 0.05, 0.45), (0.98, 0.05, 0.05, 0.45), (0, 0.85, 0.2, 0.7),
+             (-0.55, 0.6, 0.9, 0.5), (0.55, 0.6, 0.9, 0.5), (-1.02, 0.35, -0.35, 0.36),
+             (1.02, 0.35, -0.35, 0.36), (-0.4, -0.15, 1.0, 0.4), (0.4, -0.15, 1.0, 0.4),
+             (0, 0.65, -0.3, 0.55)]
+    for k, (x, y, z, rad) in enumerate(tufts):
+        A(sphere(f"ef_tuft{k}", x * r, y * r, z * r, rad * r, M["hair"], 10, 6))
+    # Tebeşir: sol elin parmakları arasında, tahtaya dönük.
+    g = info["grip_l"]
+    wr, d, n, w = info["hand_frame_l"]
+    limb("ef_chalk", g - w * 0.03, g + w * 0.03 + d * 0.02, 0.006, 0.006, M["chalk"], 8, 1)
+    join_by_material(root)
 
 
 def _text(name, body, size, loc, m):

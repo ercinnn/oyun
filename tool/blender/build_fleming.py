@@ -28,6 +28,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 M = {}
 DISH_R = 0.35
@@ -70,35 +71,38 @@ def rotated(ob, loc, rot):
 
 
 def build_figure():
-    """Alexander Fleming: arkaya taranmış kır saç, yuvarlak gözlük, papyon,
-    beyaz laboratuvar önlüğü."""
-    begin("fleming_figure")
+    """Alexander Fleming — eklemli insan gövdesi (`human_body.py`): arkaya
+    taranmış kır saç, yuvarlak gözlük, mor papyon, beyaz laboratuvar önlüğü;
+    sol avucunda küçük bir petri kabı. Yüzü -y, 1.72 boy."""
+    root = begin("fleming_figure")
+    info = human(
+        "flf", height=1.72, skin=M["skin"], top=M["coat"], pants=M["trousers"],
+        shoe=M["shoe"], brow=M["hair"], collar=M["shirt"], cuff=M["coat"],
+        coat=dict(m=M["coat"], bottom=0.55, flare=1.15, open=M["trousers"], open_w=0.08),
+        arm_l=dict(abd=15, flex=50, elbow=58, palm="up", curl=0.35),
+        arm_r=dict(abd=9, elbow=16, curl=0.35),
+        leg_l=dict(knee=5, turn=10), leg_r=dict(flex=5, knee=4, turn=10))
+    r, A = info["r"], info["attach_head"]
+    nf = info["neck_front"]
+    # Papyon: iki kanat + düğüm, boynun önünde.
+    X, Y, Z = Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))
+    c = nf + Vector((0, -0.025, -0.03))
     for side in (-1, 1):
-        cyl(f"flf_leg{side}", side * 0.1, 0, 0.05, 0.07, 0.62, M["trousers"], 10)
-        box(f"flf_shoe{side}", side * 0.1, -0.05, 0, 0.11, 0.25, 0.06, M["shoe"])
-    lathe("flf_coat", [(0.0, 0.5), (0.3, 0.5), (0.26, 0.9), (0.25, 1.35), (0.14, 1.46),
-                       (0.0, 1.48)], M["coat"], 20)
-    box("flf_shirt", 0, -0.2, 1.28, 0.12, 0.04, 0.18, M["shirt"])
+        blob(f"flf_bow{side}", c + Vector((side * 0.035, 0, 0)), (X, Y, Z),
+             (0.035, 0.012, 0.025), M["bow"], 10, 6)
+    blob("flf_bow_knot", c + Vector((0, -0.006, 0)), (X, Y, Z), (0.014, 0.013, 0.016),
+         M["bow"], 8, 5)
+    # Yuvarlak gözlük: iki çerçeve + köprü.
     for side in (-1, 1):
-        poly(f"flf_bow{side}", [(0, -0.225, 1.4), (side * 0.07, -0.225, 1.44),
-                                (side * 0.07, -0.225, 1.36)],
-             [(0, 1, 2), (2, 1, 0)], M["bow"])
-    cyl("flf_neck", 0, 0, 1.44, 0.055, 0.08, M["skin"], 10)
-    sphere("flf_head", 0, 0, 1.6, 0.14, M["skin"], 16, 10, sz=1.1)
-    sphere("flf_nose", 0, -0.14, 1.58, 0.026, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"flf_eye{side}", side * 0.05, -0.125, 1.62, 0.016, M["eye"], 8, 5)
-        rotated(torus(f"flf_lens{side}", 0, 0, 0, 0.035, 0.006, M["glasses"], 16, 5),
-                (side * 0.05, -0.135, 1.62), (math.pi / 2, 0, 0))
-    box("flf_bridge", 0, -0.137, 1.62, 0.03, 0.006, 0.006, M["glasses"])
-    sphere("flf_hair", 0, 0.03, 1.68, 0.145, M["hair"], 14, 8, sz=0.65)
-    rotated(cyl("flf_arm_r", 0, 0, 0, 0.06, 0.58, M["coat"], 8), (0.28, 0, 0.8), (0, -0.1, 0))
-    sphere("flf_hand_r", 0.3, 0, 0.77, 0.05, M["skin"], 8, 5)
-    rotated(cyl("flf_arm_l", 0, 0, 0, 0.06, 0.5, M["coat"], 8), (-0.27, 0, 1.32), (1.9, 0, 0))
-    sphere("flf_hand_l", -0.27, -0.47, 1.15, 0.05, M["skin"], 8, 5)
-    # Elinde küçük bir petri kabı.
-    cyl("flf_dish", -0.27, -0.5, 1.19, 0.07, 0.015, M["glass"], 16)
-    cyl("flf_dish_agar", -0.27, -0.5, 1.195, 0.064, 0.008, M["agar"], 16)
+        face_ring(f"flf_lens{side}", info, side * 0.36, -1.1, 0.135, 0.2, 0.028, M["glasses"])
+    A(box("flf_bridge", 0, -r * 1.12, r * 0.12, r * 0.3, r * 0.04, r * 0.04, M["glasses"]))
+    # Arkaya taranmış kır saç.
+    hair_cap("flf_hair", info, M["hair"], back=0.14, lift=0.2, size=1.07, sz=1.14)
+    # Petri kabı: sol avucun üstünde.
+    g = info["grip_l"]
+    cyl("flf_dish", g.x, g.y, g.z, 0.055, 0.014, M["glass"], 18)
+    cyl("flf_dish_agar", g.x, g.y, g.z + 0.003, 0.05, 0.007, M["agar"], 18)
+    join_by_material(root)
 
 
 def build_lab():

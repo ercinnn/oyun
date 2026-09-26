@@ -33,6 +33,7 @@ import math
 
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 TOWER_HEIGHT = 6.0
 TABLE_TOP = 0.9
@@ -197,42 +198,46 @@ def build_tree():
 
 
 def build_newton_figure():
-    """Newton: omuzlarına dökülen uzun kıvırcık peruk, koyu ceket, beyaz
-    kravat, diz altı pantolon + beyaz çorap. Yüzü -y'ye bakar, 1.8 boy; sol
-    elinde bir elma."""
-    begin("newton_figure")
-    for side in (-1, 1):
-        cyl(f"nf_leg{side}", side * 0.11, 0, 0.05, 0.065, 0.5, M["stocking"], 10)
-        box(f"nf_shoe{side}", side * 0.11, -0.05, 0, 0.12, 0.24, 0.07, M["shoe"])
-        box(f"nf_buckle{side}", side * 0.11, -0.17, 0.035, 0.06, 0.01, 0.03, M["coat_trim"])
-    lathe("nf_coat", [(0.0, 0.5), (0.34, 0.5), (0.3, 0.8), (0.26, 1.2), (0.28, 1.36),
-                      (0.14, 1.44), (0.0, 1.45)], M["coat"], 20)
-    for i in range(5):
-        sphere(f"nf_button{i}", 0, -0.27 + i * 0.004, 0.72 + i * 0.13, 0.022,
-               M["coat_trim"], 8, 5)
-    # Kravat.
-    lathe("nf_cravat", [(0.0, 1.22), (0.09, 1.28), (0.1, 1.42), (0.0, 1.46)],
-          M["cravat"], 12, 0, -0.16, 0)
-    sphere("nf_head", 0, 0, 1.6, 0.16, M["skin"], 16, 10)
-    sphere("nf_nose", 0, -0.16, 1.58, 0.03, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"nf_eye{side}", side * 0.06, -0.14, 1.63, 0.02, M["eye"], 8, 5)
-    # Peruk: tepede başlık + iki yanda omuza inen kıvırcık lüleler.
-    sphere("nf_wig_top", 0, 0.02, 1.64, 0.18, M["wig"], 16, 9, sz=0.85)
+    """Newton — eklemli insan gövdesi (`human_body.py`): omuzlara dökülen
+    kıvırcık peruk, altın düğmeli uzun koyu ceket, beyaz dantel kravat, diz
+    altı pantolon + beyaz çorap. Yüzü -y, 1.8 boy; sol avucunda bir elma."""
+    root = begin("newton_figure")
+    info = human(
+        "nf", height=1.8, skin=M["skin"], top=M["coat"], pants=M["coat"],
+        shin=M["stocking"], shoe=M["shoe"], brow=M["wig"], cuff=M["cravat"],
+        coat=dict(m=M["coat"], bottom=0.52, flare=1.22, open=M["coat_trim"], open_w=0.02),
+        arm_l=dict(abd=16, flex=48, elbow=62, palm="up", curl=0.35),
+        arm_r=dict(abd=10, elbow=16, curl=0.35),
+        leg_l=dict(knee=5, turn=12), leg_r=dict(flex=5, knee=4, turn=10))
+    r, A, fy = info["r"], info["attach_head"], info["front_y"]
+    # Altın düğmeler: önlüğün ön şeridi boyunca.
+    for k in range(6):
+        zz = info["shoulder_z"] - 0.12 - k * 0.11
+        sphere(f"nf_button{k}", 0, fy(zz) - 0.012, zz, 0.018, M["coat_trim"], 8, 5)
+    # Dantel kravat: çenenin altında kabarık, göğse sarkan.
+    nf = info["neck_front"]
+    blob("nf_cravat_knot", nf + Vector((0, -0.02, -0.02)),
+         (Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))), (0.055, 0.035, 0.05),
+         M["cravat"], 12, 8)
+    front_band("nf_cravat", info, (0, nf.z - 0.04), (0, nf.z - 0.2), 0.08, M["cravat"],
+               6, lift=0.012)
+    # Peruk: tepede kabarık başlık + iki yanda omuza inen lüleler + arkada.
+    hair_cap("nf_wig_top", info, M["wig"], back=0.1, lift=0.2, size=1.14, sz=1.18, sx=1.06)
     k = 0
     for side in (-1, 1):
-        for j in range(4):
-            sphere(f"nf_curl{k}", side * 0.17, 0.02 + (j % 2) * 0.05, 1.55 - j * 0.1,
-                   0.075, M["wig"], 10, 6)
+        for j in range(5):
+            A(sphere(f"nf_curl{k}", side * r * (1.05 + 0.04 * (j % 2)), r * (0.15 + 0.12 * (j % 2)),
+                     r * (0.35 - 0.42 * j), r * 0.36, M["wig"], 10, 6))
             k += 1
-    for j in range(3):
-        sphere(f"nf_curl_back{j}", (j - 1) * 0.1, 0.13, 1.5 - j * 0.04, 0.08, M["wig"], 10, 6)
-    # Kollar: sağ yanda, sol öne uzanmış avucunda elma.
-    rotated(cyl("nf_arm_r", 0, 0, 0, 0.06, 0.55, M["coat"], 8), (0.31, 0, 0.75), (0, -0.12, 0))
-    sphere("nf_hand_r", 0.34, 0, 0.72, 0.055, M["skin"], 8, 5)
-    rotated(cyl("nf_arm_l", 0, 0, 0, 0.06, 0.5, M["coat"], 8), (-0.3, 0, 1.28), (1.9, 0, 0))
-    sphere("nf_hand_l", -0.34, -0.45, 1.1, 0.055, M["skin"], 8, 5)
-    sphere("nf_apple", -0.34, -0.47, 1.19, 0.07, M["apple"], 10, 6)
+    for j in range(4):
+        A(sphere(f"nf_curl_back{j}", (j - 1.5) * r * 0.5, r * 0.85, -r * (0.2 + 0.25 * (j % 2)),
+                 r * 0.42, M["wig"], 10, 6))
+    # Elma: sol avucun içinde.
+    g = info["grip_l"]
+    sphere("nf_apple", g.x, g.y, g.z + 0.02, 0.042, M["apple"], 12, 8, sz=0.92)
+    cyl("nf_apple_stem", g.x, g.y, g.z + 0.055, 0.004, 0.02, M["bark"], 6)
+    sphere("nf_apple_leaf", g.x + 0.012, g.y, g.z + 0.07, 0.012, M["leaf"], 6, 4, sz=0.4, sx=1.6)
+    join_by_material(root)
 
 
 # ─────────────────────────── Prizma odası ───────────────────────────

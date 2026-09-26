@@ -35,6 +35,7 @@ import math
 # `TOOL_DIR = r"...\tool\blender"` tanımlanmalı (`__file__` yoktur).
 _HERE = globals().get("TOOL_DIR") or os.path.dirname(os.path.abspath(__file__))
 exec(open(os.path.join(_HERE, "lab_helpers.py"), encoding="utf-8").read())
+exec(open(os.path.join(_HERE, "human_body.py"), encoding="utf-8").read())
 
 TANK_INNER = 1.6      # iç genişlik/derinlik (birim)
 TANK_HEIGHT = 2.0     # 20 cm
@@ -405,37 +406,40 @@ def build_lab():
 
 
 def build_archimedes():
-    """Sakallı, togalı Arşimet; yüzü -y'ye bakar, 1.75 boyunda, sağ eli
-    havada ("Evreka!")."""
-    begin("arch_archimedes")
-    lathe("arch_robe", [(0.0, 0.0), (0.42, 0.0), (0.36, 0.6), (0.28, 1.2),
-                        (0.2, 1.38), (0.0, 1.4)], M["robe"], 20)
-    torus("arch_robe_hem", 0, 0, 0.06, 0.41, 0.03, M["robe_trim"], 24, 6)
-    # Omuzdan çapraz şerit.
-    # Döndürülen parçalar orijinde kurulup sonra yerine taşınır (dönüş
-    # nesnenin orijini etrafında olur).
-    ob = box("arch_sash", 0, 0, -0.4, 0.12, 0.05, 0.8, M["robe_trim"])
-    ob.location = (0, -0.29, 1.0)
-    ob.rotation_euler = (0.12, 0.55, 0)
-    sphere("arch_head", 0, 0, 1.56, 0.18, M["skin"], 16, 10)
-    sphere("arch_nose", 0, -0.18, 1.55, 0.035, M["skin"], 8, 5)
-    for side in (-1, 1):
-        sphere(f"arch_eye{side}", side * 0.065, -0.155, 1.6, 0.022, M["eye"], 8, 5)
-        sphere(f"arch_brow{side}", side * 0.07, -0.16, 1.645, 0.045, M["beard"], 8, 4, sz=0.35)
-    sphere("arch_beard", 0, -0.08, 1.4, 0.17, M["beard"], 14, 8, sz=1.25, sy=0.8)
-    sphere("arch_hair", 0, 0.03, 1.6, 0.19, M["beard"], 14, 8, sz=0.85, sx=1.02)
-    torus("arch_laurel", 0, 0, 1.68, 0.18, 0.03, M["laurel"], 20, 6)
-    # Kollar: sol aşağıda, sağ yukarıda.
-    ob = cyl("arch_arm_l", 0, 0, 0, 0.06, 0.55, M["robe"], 8)
-    ob.location = (-0.3, 0, 0.72)
-    ob.rotation_euler = (0, -0.25, 0)
-    sphere("arch_hand_l", -0.36, 0, 0.68, 0.06, M["skin"], 8, 5)
-    ob = cyl("arch_arm_r", 0, 0, 0, 0.06, 0.55, M["robe"], 8)
-    ob.location = (0.3, 0, 1.22)
-    ob.rotation_euler = (0, 0.45, 0)
-    sphere("arch_hand_r", 0.54, 0, 1.72, 0.06, M["skin"], 8, 5)
-    for side in (-1, 1):
-        box(f"arch_sandal{side}", side * 0.12, -0.12, 0, 0.12, 0.24, 0.04, M["stem"])
+    """Eklemli insan gövdesi (`human_body.py`): yere kadar toga, omuzdan çapraz
+    mavi şerit, beyaz sakal, defne tacı, sandaletler; sağ eli havada
+    ("Evreka!"). Yüzü -y, 1.75 boy."""
+    root = begin("arch_archimedes")
+    info = human(
+        "arf", height=1.75, build=1.05, skin=M["skin"], top=M["robe"],
+        pants=M["robe"], shoe=M["stem"], brow=M["beard"], cuff=None,
+        skirt=dict(m=M["robe"], bottom=0.03, flare=1.3, hem=M["robe_trim"]),
+        arm_r=dict(abd=150, elbow=25, palm="forward", curl=0.1),
+        arm_l=dict(abd=14, elbow=20, curl=0.35),
+        leg_l=dict(knee=5, turn=10), leg_r=dict(flex=8, knee=8, turn=14))
+    r, A = info["r"], info["attach_head"]
+    # Togayla aynı kumaştan kısa kollar: dirseğe kadar geniş yen.
+    for s_ in ("l", "r"):
+        el = info[f"elbow_{s_}"]
+        side = -1 if s_ == "l" else 1
+        sh = Vector((side * 0.84 * info["u"] * 1.05, 0, info["shoulder_z"]))
+        limb(f"arf_sleeve_{s_}", sh, sh + (el - sh) * 0.6, 0.3 * info["u"],
+             0.27 * info["u"], M["robe"], 14)
+    # Omuzdan kalçaya çapraz inen şerit (gövdenin önüne yapışık).
+    front_band("arf_sash", info, (-0.17, info["shoulder_z"] - 0.04),
+               (0.17, info["waist_z"] - 0.14), 0.07, M["robe_trim"], 14)
+    # Beyaz sakal ve bıyık, arkaya taranmış saç, defne tacı.
+    A(sphere("arf_beard", 0, -r * 0.72, -r * 0.95, r * 0.72, M["beard"], 14, 8,
+             sz=1.15, sy=0.72))
+    A(sphere("arf_moustache", 0, -r * 1.02, -r * 0.6, r * 0.34, M["beard"], 10, 6,
+             sz=0.4, sx=1.5))
+    hair_cap("arf_hair", info, M["beard"], back=0.16, lift=0.2, size=1.08, sz=1.16)
+    A(torus("arf_laurel", 0, 0.06 * r, 0.62 * r, 1.0 * r, 0.12 * r, M["laurel"], 22, 6))
+    for k in range(8):
+        a = math.pi * (0.15 + 0.7 * k / 7)
+        A(sphere(f"arf_leaf{k}", math.cos(a) * r * 1.02, 0.06 * r - math.sin(a) * r * 1.02,
+                 0.7 * r, 0.16 * r, M["laurel"], 8, 4, sz=0.5))
+    join_by_material(root)
 
 
 # ─────────────────────────── Toplu işlemler ───────────────────────────
