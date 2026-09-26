@@ -7,6 +7,7 @@ import '../models/newton/newton_scene.dart';
 import '../models/newton/newton_task.dart';
 import '../models/newton/prism.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2. Diğer oyunların tur
@@ -158,6 +159,7 @@ class NewtonController extends ScientistGameController<NewtonTask> {
   void setStation(NewtonStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -183,21 +185,25 @@ class NewtonController extends ScientistGameController<NewtonTask> {
   /// Cisimleri bırakır; tekrar basmak deneyi baştan oynatır.
   void dropObjects() {
     _fallRun++;
+    playSound(ScienceSound.whoosh);
     notifyListeners();
   }
 
   void setLight(LightSource value) {
     light = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setSecondPrism(bool value) {
     secondPrism = value;
+    playSound(ScienceSound.clink);
     notifyListeners();
   }
 
   void setLamp(bool on) {
     lampOn = on;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -221,6 +227,7 @@ class NewtonController extends ScientistGameController<NewtonTask> {
 
   void pushCarts() {
     _cartRun++;
+    playSound(ScienceSound.boing);
     notifyListeners();
   }
 

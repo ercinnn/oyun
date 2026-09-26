@@ -7,6 +7,7 @@ import '../models/archimedes/archimedes_task.dart';
 import '../models/archimedes/boat.dart';
 import '../models/archimedes/buoyancy.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 4 görev türü × 2. Diğer oyunların tur
@@ -49,6 +50,7 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   double screwTurns = 0;
   double fieldLitres = 0;
   int _exploreRevision = 0;
+  double _crankSoundTurns = 0;
 
   @override
   int get roundsPerPlayer => archimedesRoundsPerPlayer;
@@ -143,11 +145,13 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   void setStation(ArchimedesStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void selectObject(BuoyancyObject object) {
     selectedObject = object;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -158,10 +162,12 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
     if (tankFull || tankObjects.any((o) => o.id == selectedObject.id)) return;
     tankObjects = [...tankObjects, selectedObject];
     _exploreRevision++;
+    playSound(ScienceSound.splash);
     notifyListeners();
   }
 
   void emptyTank() {
+    if (tankObjects.isNotEmpty) playSound(ScienceSound.bubbles);
     tankObjects = [];
     _exploreRevision++;
     notifyListeners();
@@ -170,6 +176,7 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   void selectBoat(BoatSpec boat) {
     exploreBoat = boat;
     exploreCrates = 0;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -178,12 +185,19 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   void addCrate() {
     if (exploreBoat.sinks(exploreCrates)) return;
     exploreCrates++;
+    // Son sandık gemiyi batırdıysa kabarcıklar, yoksa tahtanın tok sesi.
+    playSound(
+      exploreBoat.sinks(exploreCrates)
+          ? ScienceSound.bubbles
+          : ScienceSound.knock,
+    );
     notifyListeners();
   }
 
   void removeCrate() {
     if (exploreCrates == 0) return;
     exploreCrates--;
+    playSound(ScienceSound.knock);
     notifyListeners();
   }
 
@@ -195,11 +209,22 @@ class ArchimedesController extends ScientistGameController<ArchimedesTask> {
   /// Kol çevrildi ([turns] kadar tur, geri çevirmek suyu geri akıtmaz).
   void turnCrank(double turns) {
     if (turns <= 0) return;
+    final before = fieldLitres;
     screwTurns += turns;
     fieldLitres = min(
       fieldNeedLitres,
       fieldLitres + screwLitresPerTurn(screwAngle) * turns,
     );
+    // Kol sürüklenirken çok sık çağrılır: şırıltı yarım turda bir çalar,
+    // tarla ilk kez dolduğunda da bir zil.
+    _crankSoundTurns += turns;
+    if (fieldLitres >= fieldNeedLitres && before < fieldNeedLitres) {
+      playSound(ScienceSound.ding);
+      _crankSoundTurns = 0;
+    } else if (_crankSoundTurns >= 0.5) {
+      _crankSoundTurns = 0;
+      if (fieldLitres > before) playSound(ScienceSound.trickle);
+    }
     notifyListeners();
   }
 

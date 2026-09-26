@@ -9,6 +9,7 @@ import '../models/fleming/resistance.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/fleming/fleming_scene_view.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Fleming'in Laboratuvarı: petri kabı (küf ve kontrol), temizlik,
 /// doğru ilaç kullanımı.
@@ -42,6 +43,7 @@ class FlemingExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fleming\'in Laboratuvarı'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

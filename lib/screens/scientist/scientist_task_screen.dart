@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/scientist_game_controller.dart';
 import '../../widgets/science_lab/lab_split_layout.dart';
+import '../../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Görev turu: deney sahnesi + soru ya da sonuç paneli. Sahne widget'ı
 /// turlar boyunca aynı yerde kalır ki 3B görünüm her turda baştan kurulmasın.
@@ -25,6 +26,7 @@ class ScientistTaskScreen extends StatelessWidget {
               ? '${player.name} oynuyor'
               : 'Sıra: ${player.name}',
         ),
+        actions: [ScientistSoundToggle(controller: controller)],
       ),
       body: LabSplitLayout(
         scene: KeyedSubtree(key: const Key('scientistScene'), child: scene),

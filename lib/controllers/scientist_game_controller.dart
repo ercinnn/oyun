@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/science/science_task.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 
 /// Bilim İnsanları oyunlarının ortak durum makinesi: oyuncular, turlar,
 /// cevap → sonuç paneli → "Devam", sıra devri ve keşif atölyesine geçiş.
@@ -21,6 +22,38 @@ abstract class ScientistGameController<T extends ScienceTask>
   bool showingResult = false;
   bool lastAnswerCorrect = false;
   int? lastAnswerIndex;
+
+  /// Ses efektleri; verilmezse (testler) oyun tamamen sessizdir ve ses
+  /// düğmesi görünmez. [attachSounds] ile bağlanır.
+  ScientistSounds? sounds;
+  bool _disposed = false;
+
+  /// Ses servisini bağlar ve kayıtlı açık/kapalı tercihini okur (okuma
+  /// bitince düğme doğru simgeyi göstersin diye dinleyicilere bildirir).
+  void attachSounds(ScientistSounds value) {
+    sounds = value;
+    value.load().then((_) {
+      if (!_disposed) notifyListeners();
+    }).catchError((_) {});
+  }
+
+  bool get hasSounds => sounds != null;
+  bool get soundOn => sounds?.enabled ?? false;
+
+  void toggleSound() {
+    final s = sounds;
+    if (s == null) return;
+    s.enabled = !s.enabled;
+    notifyListeners();
+  }
+
+  /// Bir ses efekti çalar (ses yoksa ya da kapalıysa hiçbir şey olmaz).
+  /// Alt sınıflar deney eylemlerinde çağırır.
+  @protected
+  void playSound(ScienceSound sound) {
+    final s = sounds;
+    if (s != null && s.enabled) s.play(sound);
+  }
 
   /// Oyuncu başına görev sayısı.
   int get roundsPerPlayer;
@@ -61,6 +94,7 @@ abstract class ScientistGameController<T extends ScienceTask>
     if (lastAnswerCorrect) currentPlayer.correctCount++;
     currentPlayer.roundsPlayed++;
     showingResult = true;
+    playSound(lastAnswerCorrect ? ScienceSound.correct : ScienceSound.wrong);
     notifyListeners();
   }
 
@@ -71,12 +105,14 @@ abstract class ScientistGameController<T extends ScienceTask>
       final next = _findNextUnfinishedPlayerIndex();
       if (next == null) {
         phase = ScientistPhase.finished;
+        playSound(ScienceSound.fanfare);
         notifyListeners();
         return;
       }
       currentPlayerIndex = next;
       planForPlayer();
       phase = ScientistPhase.turnTransition;
+      playSound(ScienceSound.turn);
     }
     currentTask = generateTask(currentPlayer.roundsPlayed);
     notifyListeners();
@@ -104,6 +140,13 @@ abstract class ScientistGameController<T extends ScienceTask>
   void backToSetup() {
     phase = ScientistPhase.setup;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    sounds?.dispose();
+    super.dispose();
   }
 
   void _clearResult() {

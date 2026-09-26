@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/newton_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/newton_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/newton/newton_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Newton oyunu (kütleçekim ve düşen cisimler,
@@ -18,13 +20,14 @@ class NewtonGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => NewtonController(),
+      create: (_) => NewtonController()..attachSounds(createScientistSounds()),
       child: const NewtonGameRoot(),
     );
   }
 }
 
 const newtonConfig = ScientistGameConfig(
+  scientist: newtonScientist,
   title: 'Newton\'un Laboratuvarı',
   banner: '🍎 🌈 🛒',
   intro: 'Bir gün Newton\'un başına bir elma düştü ve düşündü: Elmayı yere '

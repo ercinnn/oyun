@@ -11,6 +11,7 @@ import '../models/archimedes/buoyancy.dart';
 import '../widgets/archimedes/archimedes_scene_view.dart';
 import '../widgets/archimedes/crank_dial.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Keşif Atölyesi: su kabı, gemi ve Arşimet vidası istasyonları.
 /// Hiçbir şey engellenmez; açıklamalar çocuğun o an yaptığı denemeye göre
@@ -47,6 +48,7 @@ class ArchimedesExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Keşif Atölyesi'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

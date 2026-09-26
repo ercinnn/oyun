@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../controllers/profile_controller.dart';
 import '../../controllers/scientist_game_controller.dart';
 import '../../widgets/player_count_selector.dart';
+import '../../widgets/science_lab/scientist_name_badge.dart';
+import '../../widgets/science_lab/scientist_sound_toggle.dart';
 import 'scientist_game_config.dart';
 
 /// Bilim insanı oyunlarının ortak kurulum ekranı: hikâye, oyuncu sayısı,
@@ -62,7 +64,10 @@ class _ScientistSetupScreenState extends State<ScientistSetupScreen> {
     final theme = Theme.of(context);
     final config = widget.config;
     return Scaffold(
-      appBar: AppBar(title: Text(config.title)),
+      appBar: AppBar(
+        title: Text(config.title),
+        actions: [ScientistSoundToggle(controller: widget.controller)],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
@@ -74,6 +79,11 @@ class _ScientistSetupScreenState extends State<ScientistSetupScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ScientistNameBadge(scientist: config.scientist),
+                  ),
+                  const SizedBox(height: 12),
                   Text(
                     config.banner,
                     textAlign: TextAlign.center,

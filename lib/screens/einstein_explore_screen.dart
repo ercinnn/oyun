@@ -9,6 +9,7 @@ import '../models/einstein/time_dilation.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/einstein/einstein_scene_view.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Einstein'ın Laboratuvarı: uzay-zaman örtüsü, ışık saati, E=mc².
 class EinsteinExploreScreen extends StatelessWidget {
@@ -41,6 +42,7 @@ class EinsteinExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Einstein\'ın Laboratuvarı'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

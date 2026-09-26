@@ -5,6 +5,7 @@ import '../models/einstein/einstein_task.dart';
 import '../models/einstein/spacetime.dart';
 import '../models/einstein/time_dilation.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2 ("ambiguous import" kuralı
@@ -117,6 +118,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
   void setStation(EinsteinStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -135,6 +137,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void launch() {
     _launches++;
+    playSound(ScienceSound.whoosh);
     notifyListeners();
   }
 
@@ -146,6 +149,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void startVoyage() {
     _voyages++;
+    playSound(ScienceSound.rumble);
     notifyListeners();
   }
 
@@ -157,6 +161,7 @@ class EinsteinController extends ScientistGameController<EinsteinTask> {
 
   void convert() {
     _conversions++;
+    playSound(ScienceSound.powerUp);
     notifyListeners();
   }
 

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/einstein_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/einstein_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/einstein/einstein_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Einstein oyunu (uzay-zamanın bükülmesi, hızla
@@ -17,13 +19,14 @@ class EinsteinGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => EinsteinController(),
+      create: (_) => EinsteinController()..attachSounds(createScientistSounds()),
       child: const EinsteinGameRoot(),
     );
   }
 }
 
 const einsteinConfig = ScientistGameConfig(
+  scientist: einsteinScientist,
   title: 'Einstein\'ın Laboratuvarı',
   banner: '🌌 ⏱️ ⚡',
   intro: 'Albert Einstein hayal gücüyle deney yapardı: "Bir ışık ışınının '

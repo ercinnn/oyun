@@ -10,6 +10,7 @@ import '../models/newton/prism.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/newton/newton_scene_view.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Keşif Laboratuvarı: düşme kulesi, prizma ve itme pisti. Her
 /// istasyonda iki şey yan yana denenir (A/B) ki çocuk tek bir farkı
@@ -45,6 +46,7 @@ class NewtonExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Keşif Laboratuvarı'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

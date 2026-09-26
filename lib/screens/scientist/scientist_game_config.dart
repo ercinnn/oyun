@@ -1,6 +1,9 @@
+import '../../data/scientists_catalog.dart';
+
 /// Bir bilim insanı oyununun ortak ekranlarda görünen metinleri.
 class ScientistGameConfig {
   const ScientistGameConfig({
+    required this.scientist,
     required this.title,
     required this.banner,
     required this.intro,
@@ -8,6 +11,10 @@ class ScientistGameConfig {
     required this.exploreHint,
     required this.moral,
   });
+
+  /// Oyunun bilim insanı: adı ve rengi ekranların sol üstündeki etikette
+  /// (`ScientistNameBadge`) görünür.
+  final Scientist scientist;
 
   /// Kurulum ekranının başlığı ("Arşimet'in Atölyesi").
   final String title;

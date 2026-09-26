@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +13,7 @@ import '../models/curie/therapy.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/curie/curie_scene_view.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Curie'nin Laboratuvarı: sayaçla numune tarama, kalkanlar,
 /// ışınla tedavi planı. Her istasyonda güvenlik notu vardır.
@@ -38,6 +42,9 @@ class CurieExploreScreen extends StatelessWidget {
           CurieStation.shield => _ShieldControls(controller: controller),
           CurieStation.therapy => _TherapyControls(controller: controller),
         },
+        // Sayaç istasyonunda ses açıksa gerçek bir Geiger sayacı gibi tıklar.
+        if (controller.station == CurieStation.geiger && controller.soundOn)
+          _GeigerClicker(controller: controller),
         const LabInfoCard(
           text: 'Güvenlik: Gerçek radyoaktif maddelere asla dokunulmaz; '
               'yalnızca uzmanlar, özel kalkanların arkasında çalışır. Marie '
@@ -49,6 +56,7 @@ class CurieExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Curie\'nin Laboratuvarı'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',
@@ -67,6 +75,50 @@ class CurieExploreScreen extends StatelessWidget {
 }
 
 // ─────────────────────────── Sayaç ───────────────────────────
+
+/// Görünmez bir yardımcı: her [_tick]'te, modeldeki sayım hızına göre
+/// (tık/sn × aralık olasılığıyla) bir Geiger tıkı çalar. Arka plan ışıması
+/// da tıklar, tıpkı gerçek sayaçta olduğu gibi. Hız [_maxCps]'te kesilir
+/// (çok hızlı tıklar Android'de aynı klibi sürekli baştan başlatırdı).
+/// Yalnızca ses açıkken kurulur; testlerde ses servisi olmadığı için
+/// zamanlayıcı hiç oluşmaz.
+class _GeigerClicker extends StatefulWidget {
+  const _GeigerClicker({required this.controller});
+
+  final CurieController controller;
+
+  @override
+  State<_GeigerClicker> createState() => _GeigerClickerState();
+}
+
+class _GeigerClickerState extends State<_GeigerClicker> {
+  static const _tick = Duration(milliseconds: 40);
+  static const _maxCps = 22.0;
+
+  final _rng = Random();
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_tick, (_) {
+      final c = widget.controller;
+      final cps = min(_maxCps, countsPerSecond(c.sample, c.distanceCm));
+      if (_rng.nextDouble() < cps * _tick.inMilliseconds / 1000) {
+        c.geigerClick();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
 
 class _GeigerControls extends StatelessWidget {
   const _GeigerControls({required this.controller});

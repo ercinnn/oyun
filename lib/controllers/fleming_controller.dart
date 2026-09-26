@@ -6,6 +6,7 @@ import '../models/fleming/hygiene.dart';
 import '../models/fleming/petri.dart';
 import '../models/fleming/resistance.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2 ("ambiguous import" kuralı
@@ -110,11 +111,13 @@ class FlemingController extends ScientistGameController<FlemingTask> {
   void setStation(FlemingStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setMold(bool value) {
     mold = value;
+    playSound(ScienceSound.clink);
     notifyListeners();
   }
 
@@ -123,12 +126,16 @@ class FlemingController extends ScientistGameController<FlemingTask> {
     notifyListeners();
   }
 
-  void nextDay() => setDay(day.floorToDouble() + 1);
+  void nextDay() {
+    playSound(ScienceSound.tick);
+    setDay(day.floorToDouble() + 1);
+  }
 
   /// Ayar değişince kap temizlenir (yeniden bekletilmeli).
   void setLid(bool open) {
     lidOpen = open;
     incubated = false;
+    playSound(ScienceSound.clink);
     notifyListeners();
   }
 
@@ -140,6 +147,7 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   void incubate() {
     incubated = true;
+    playSound(ScienceSound.ding);
     notifyListeners();
   }
 
@@ -151,6 +159,7 @@ class FlemingController extends ScientistGameController<FlemingTask> {
 
   void runCourse() {
     medicineDay = observedDays.toDouble();
+    playSound(ScienceSound.ding);
     notifyListeners();
   }
 

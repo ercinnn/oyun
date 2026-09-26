@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/tesla_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
 import '../screens/tesla_explore_screen.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/tesla/tesla_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Tesla oyunu (alternatif akım, transformatör ve
@@ -17,13 +19,14 @@ class TeslaGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => TeslaController(),
+      create: (_) => TeslaController()..attachSounds(createScientistSounds()),
       child: const TeslaGameRoot(),
     );
   }
 }
 
 const teslaConfig = ScientistGameConfig(
+  scientist: teslaScientist,
   title: 'Tesla\'nın Laboratuvarı',
   banner: '⚡ 💡 🏙️',
   intro: 'Nikola Tesla, evlerimize gelen alternatif akımı geliştirdi. Niagara '

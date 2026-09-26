@@ -6,6 +6,7 @@ import '../models/galileo/jupiter.dart';
 import '../models/galileo/solar.dart';
 import '../models/galileo/telescope.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2 ("ambiguous import" kuralı
@@ -140,11 +141,13 @@ class GalileoController extends ScientistGameController<GalileoTask> {
   void setStation(GalileoStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setTarget(SkyTarget value) {
     target = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -168,12 +171,16 @@ class GalileoController extends ScientistGameController<GalileoTask> {
     notifyListeners();
   }
 
-  void nextNight() => setNights(nights.floorToDouble() + 1);
+  void nextNight() {
+    playSound(ScienceSound.tick);
+    setNights(nights.floorToDouble() + 1);
+  }
 
   /// Bu gecenin görünüşünü deftere çizer (aynı gece iki kez çizilmez).
   void sketchTonight() {
     if (notebook.any((e) => e.$1 == nights)) return;
     notebook = [...notebook, (nights, notebookSketch(nights))];
+    playSound(ScienceSound.scratch);
     if (notebook.length > galileoNotebookLimit) {
       notebook = notebook.sublist(notebook.length - galileoNotebookLimit);
     }
@@ -190,7 +197,10 @@ class GalileoController extends ScientistGameController<GalileoTask> {
     notifyListeners();
   }
 
-  void advanceDays(double days) => setDay(day + days);
+  void advanceDays(double days) {
+    playSound(ScienceSound.tick);
+    setDay(day + days);
+  }
 
   GalileoScene get _exploreScene => GalileoScene(
     station: station,

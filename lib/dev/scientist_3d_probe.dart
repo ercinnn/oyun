@@ -36,6 +36,7 @@ import '../models/fleming/fleming_scene.dart';
 import '../models/galileo/galileo_scene.dart';
 import '../models/newton/newton_scene.dart';
 import '../models/tesla/tesla_scene.dart';
+import '../services/scientist_sounds.dart';
 
 void main() {
   final params = Uri.base.queryParameters;
@@ -60,7 +61,7 @@ void main() {
         home: switch (who) {
           'newton' => ChangeNotifierProvider(
             create: (_) {
-              final c = NewtonController();
+              final c = NewtonController()..attachSounds(createScientistSounds());
               open(c);
               final s = NewtonStation.values
                   .where((s) => s.name == station)
@@ -72,7 +73,7 @@ void main() {
           ),
           'galileo' => ChangeNotifierProvider(
             create: (_) {
-              final c = GalileoController();
+              final c = GalileoController()..attachSounds(createScientistSounds());
               open(c);
               final s = GalileoStation.values
                   .where((s) => s.name == station)
@@ -84,7 +85,7 @@ void main() {
           ),
           'tesla' => ChangeNotifierProvider(
             create: (_) {
-              final c = TeslaController();
+              final c = TeslaController()..attachSounds(createScientistSounds());
               open(c);
               final s = TeslaStation.values
                   .where((s) => s.name == station)
@@ -96,7 +97,7 @@ void main() {
           ),
           'curie' => ChangeNotifierProvider(
             create: (_) {
-              final c = CurieController();
+              final c = CurieController()..attachSounds(createScientistSounds());
               open(c);
               final s = CurieStation.values
                   .where((s) => s.name == station)
@@ -108,7 +109,7 @@ void main() {
           ),
           'einstein' => ChangeNotifierProvider(
             create: (_) {
-              final c = EinsteinController();
+              final c = EinsteinController()..attachSounds(createScientistSounds());
               open(c);
               final s = EinsteinStation.values
                   .where((s) => s.name == station)
@@ -120,7 +121,7 @@ void main() {
           ),
           'fleming' => ChangeNotifierProvider(
             create: (_) {
-              final c = FlemingController();
+              final c = FlemingController()..attachSounds(createScientistSounds());
               open(c);
               final s = FlemingStation.values
                   .where((s) => s.name == station)
@@ -132,7 +133,7 @@ void main() {
           ),
           _ => ChangeNotifierProvider(
             create: (_) {
-              final c = ArchimedesController();
+              final c = ArchimedesController()..attachSounds(createScientistSounds());
               open(c);
               final s = ArchimedesStation.values
                   .where((s) => s.name == station)

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/curie_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/curie_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/curie/curie_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Marie Curie oyunu (radyoaktiviteyi sayaçla
@@ -17,13 +19,14 @@ class CurieGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => CurieController(),
+      create: (_) => CurieController()..attachSounds(createScientistSounds()),
       child: const CurieGameRoot(),
     );
   }
 }
 
 const curieConfig = ScientistGameConfig(
+  scientist: curieScientist,
   title: 'Curie\'nin Laboratuvarı',
   banner: '⚗️ ☢️ 🏅',
   intro: 'Marie Curie, bazı taşların görünmez ışınlar yaydığını ölçtü ve buna '

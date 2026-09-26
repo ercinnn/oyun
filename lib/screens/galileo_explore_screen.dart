@@ -9,6 +9,7 @@ import '../models/galileo/telescope.dart';
 import '../models/science/science_task.dart' show formatTr;
 import '../widgets/galileo/galileo_scene_view.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 
 /// Puansız Gözlemevi: teleskobu kur ve odakla, Jüpiter'in uydularını gece
 /// gece izleyip deftere çiz, Güneş sisteminde günleri ilerletip Venüs'ün
@@ -43,6 +44,7 @@ class GalileoExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gözlemevi'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

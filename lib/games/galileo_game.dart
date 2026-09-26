@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/galileo_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/galileo_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/galileo/galileo_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Galileo oyunu (teleskop, Jüpiter'in uyduları,
@@ -17,13 +19,14 @@ class GalileoGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => GalileoController(),
+      create: (_) => GalileoController()..attachSounds(createScientistSounds()),
       child: const GalileoGameRoot(),
     );
   }
 }
 
 const galileoConfig = ScientistGameConfig(
+  scientist: galileoScientist,
   title: 'Galileo\'nun Gözlemevi',
   banner: '🔭 🪐 🌖',
   intro: 'Galileo 1609\'da kendi teleskobunu yaptı ve gökyüzüne çevirdi. '

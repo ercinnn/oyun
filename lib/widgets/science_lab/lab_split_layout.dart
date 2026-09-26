@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'scientist_name_badge.dart';
+
 /// Bilim İnsanları ekranlarının ortak düzeni: geniş ekranda sahne solda,
 /// panel sağda; telefonda sahne üstte (yüksekliğin ~%42'si), panel altta
 /// kaydırılır. Sahne widget'ı aynı konumda kaldığı sürece 3B görünüm yeniden
@@ -14,6 +16,26 @@ class LabSplitLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scientist = ScientistIdentity.maybeOf(context);
+    // Bilim insanının adı sahnenin sol üstünde (sağ üstte yakınlaştırma
+    // düğmeleri olduğu için sağdan pay bırakılır). Yapı oyun boyunca aynı
+    // kaldığı için 3B görünüm yeniden kurulmaz.
+    final scene = scientist == null
+        ? this.scene
+        : Stack(
+            children: [
+              Positioned.fill(child: this.scene),
+              Positioned(
+                left: 8,
+                top: 8,
+                right: 56,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: ScientistNameBadge(scientist: scientist),
+                ),
+              ),
+            ],
+          );
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= sideBySideWidth) {

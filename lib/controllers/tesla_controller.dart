@@ -6,6 +6,7 @@ import '../models/tesla/tesla_scene.dart';
 import '../models/tesla/tesla_task.dart';
 import '../models/tesla/transmission.dart';
 import '../models/tesla/wireless.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2 ("ambiguous import" kuralı
@@ -139,11 +140,13 @@ class TeslaController extends ScientistGameController<TeslaTask> {
   void setStation(TeslaStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setSource(PowerSource value) {
     source = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
@@ -158,12 +161,14 @@ class TeslaController extends ScientistGameController<TeslaTask> {
   }
 
   void setSecondaryTurns(int turns) {
+    if (turns != secondaryTurns) playSound(ScienceSound.click);
     secondaryTurns = turns;
     notifyListeners();
   }
 
   void setCoil(bool on) {
     coilOn = on;
+    playSound(on ? ScienceSound.zap : ScienceSound.click);
     notifyListeners();
   }
 

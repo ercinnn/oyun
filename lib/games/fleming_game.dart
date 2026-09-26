@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/fleming_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/fleming_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/fleming/fleming_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Alexander Fleming oyunu (penisilinin keşfi,
@@ -17,13 +19,14 @@ class FlemingGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => FlemingController(),
+      create: (_) => FlemingController()..attachSounds(createScientistSounds()),
       child: const FlemingGameRoot(),
     );
   }
 }
 
 const flemingConfig = ScientistGameConfig(
+  scientist: flemingScientist,
   title: 'Fleming\'in Laboratuvarı',
   banner: '🧫 🔬 💊',
   intro: 'Alexander Fleming tatilden döndüğünde, bakteri ektiği bir kapta küf '

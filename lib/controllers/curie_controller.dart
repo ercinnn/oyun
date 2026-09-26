@@ -7,6 +7,7 @@ import '../models/curie/geiger.dart';
 import '../models/curie/shielding.dart';
 import '../models/curie/therapy.dart';
 import '../models/science/scientist_phase.dart';
+import '../services/scientist_sounds.dart';
 import 'scientist_game_controller.dart';
 
 /// Her oyuncunun görev sayısı: 3 görev türü × 2 ("ambiguous import" kuralı
@@ -114,14 +115,19 @@ class CurieController extends ScientistGameController<CurieTask> {
   void setStation(CurieStation value) {
     if (station == value) return;
     station = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   /// Sayacı bir numuneye götürür; aynı numuneye tekrar basmak sayacı kaldırır.
   void pickSample(RadioSample value) {
     sample = sample?.id == value.id ? null : value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
+
+  /// Geiger sayacının tek tıkı (keşif ekranındaki zamanlayıcı çağırır).
+  void geigerClick() => playSound(ScienceSound.geiger);
 
   void setDistance(double cm) {
     distanceCm = cm.clamp(counterMinCm, counterMaxCm).toDouble();
@@ -130,11 +136,13 @@ class CurieController extends ScientistGameController<CurieTask> {
 
   void setRay(RayType value) {
     ray = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setShield(Shield value) {
     shield = value;
+    playSound(ScienceSound.knock);
     notifyListeners();
   }
 
@@ -145,11 +153,13 @@ class CurieController extends ScientistGameController<CurieTask> {
 
   void setSpread(bool value) {
     spread = value;
+    playSound(ScienceSound.click);
     notifyListeners();
   }
 
   void setBeamsOn(bool on) {
     beamsOn = on;
+    playSound(on ? ScienceSound.powerUp : ScienceSound.click);
     notifyListeners();
   }
 

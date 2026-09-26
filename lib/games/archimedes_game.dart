@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/archimedes_controller.dart';
+import '../data/scientists_catalog.dart';
 import '../screens/archimedes_explore_screen.dart';
 import '../screens/scientist/scientist_game_config.dart';
 import '../screens/scientist/scientist_game_root.dart';
+import '../services/scientist_sounds.dart';
 import '../widgets/archimedes/archimedes_scene_view.dart';
 
 /// "Bilim İnsanları" altındaki Arşimet oyunu (kaldırma kuvveti, taç deneyi,
@@ -18,13 +20,14 @@ class ArchimedesGame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ArchimedesController(),
+      create: (_) => ArchimedesController()..attachSounds(createScientistSounds()),
       child: const ArchimedesGameRoot(),
     );
   }
 }
 
 const archimedesConfig = ScientistGameConfig(
+  scientist: archimedesScientist,
   title: 'Arşimet\'in Atölyesi',
   banner: '🛁 💧 ⛵',
   intro: 'Arşimet banyoya girince suyun yükseldiğini fark etti ve '

@@ -8,6 +8,7 @@ import '../models/tesla/tesla_scene.dart';
 import '../models/tesla/transmission.dart';
 import '../models/tesla/wireless.dart';
 import '../widgets/science_lab/lab_split_layout.dart';
+import '../widgets/science_lab/scientist_sound_toggle.dart';
 import '../widgets/tesla/tesla_scene_view.dart';
 
 /// Puansız Tesla'nın Laboratuvarı: jeneratör (AC/DC), şehre elektrik
@@ -42,6 +43,7 @@ class TeslaExploreScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tesla\'nın Laboratuvarı'),
+        actions: [ScientistSoundToggle(controller: controller)],
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: 'Geri',

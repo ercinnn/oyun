@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/scientist_game_controller.dart';
 import '../../models/science/scientist_phase.dart';
+import '../../widgets/science_lab/scientist_name_badge.dart';
 import 'scientist_game_config.dart';
 import 'scientist_setup_screen.dart';
 import 'scientist_task_screen.dart';
@@ -27,21 +28,20 @@ class ScientistGameRoot<C extends ScientistGameController>
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<C>();
-    switch (controller.phase) {
-      case ScientistPhase.setup:
-        return ScientistSetupScreen(controller: controller, config: config);
-      case ScientistPhase.playing:
-        return ScientistTaskScreen(
-          controller: controller,
-          scene: sceneBuilder(controller),
-        );
-      case ScientistPhase.turnTransition:
-        return _TurnTransition(controller: controller);
-      case ScientistPhase.finished:
-        return _Results(controller: controller, config: config);
-      case ScientistPhase.explore:
-        return exploreBuilder(controller);
-    }
+    final Widget screen = switch (controller.phase) {
+      ScientistPhase.setup =>
+        ScientistSetupScreen(controller: controller, config: config),
+      ScientistPhase.playing => ScientistTaskScreen(
+        controller: controller,
+        scene: sceneBuilder(controller),
+      ),
+      ScientistPhase.turnTransition => _TurnTransition(controller: controller),
+      ScientistPhase.finished => _Results(controller: controller, config: config),
+      ScientistPhase.explore => exploreBuilder(controller),
+    };
+    // Sahneli ekranlar (görev, keşif) bilim insanının adını buradan okuyup
+    // sol üste yazar (`LabSplitLayout`).
+    return ScientistIdentity(scientist: config.scientist, child: screen);
   }
 }
 
@@ -113,6 +113,8 @@ class _Results extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                ScientistNameBadge(scientist: config.scientist),
+                const SizedBox(height: 16),
                 Icon(Icons.emoji_events, size: 64, color: Colors.amber.shade700),
                 const SizedBox(height: 12),
                 Text(
