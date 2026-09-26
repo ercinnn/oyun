@@ -5,19 +5,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/profile_controller.dart';
+import 'games/archimedes_game.dart';
 import 'games/bombali_sayilar_game.dart';
 import 'games/chess_game.dart';
+import 'games/curie_game.dart';
+import 'games/einstein_game.dart';
 import 'games/electricity_game.dart';
+import 'games/fleming_game.dart';
+import 'games/galileo_game.dart';
 import 'games/memory_match_game.dart';
 import 'games/multiplication_game.dart';
+import 'games/newton_game.dart';
 import 'games/pattern_game.dart';
 import 'games/plant_lab_game.dart';
 import 'games/puzzle_game.dart';
 import 'games/reflex_game.dart';
+import 'games/scientists_game.dart';
 import 'games/sequence_memory_game.dart';
 import 'games/simon_game.dart';
 import 'games/stroop_game.dart';
 import 'games/sudoku_game.dart';
+import 'games/tesla_game.dart';
 import 'games/town_game.dart';
 import 'screens/auth_gate.dart';
 import 'screens/game_catalog_screen.dart';
@@ -105,6 +113,16 @@ class GamePlatformApp extends StatelessWidget {
             ElectricityGame.routeName => (BuildContext _) =>
                 const ElectricityGame(),
             TownGame.routeName => (BuildContext _) => const TownGame(),
+            ScientistsGame.routeName => (BuildContext _) =>
+                const ScientistsGame(),
+            ArchimedesGame.routeName => (BuildContext _) =>
+                const ArchimedesGame(),
+            NewtonGame.routeName => (BuildContext _) => const NewtonGame(),
+            GalileoGame.routeName => (BuildContext _) => const GalileoGame(),
+            TeslaGame.routeName => (BuildContext _) => const TeslaGame(),
+            CurieGame.routeName => (BuildContext _) => const CurieGame(),
+            EinsteinGame.routeName => (BuildContext _) => const EinsteinGame(),
+            FlemingGame.routeName => (BuildContext _) => const FlemingGame(),
             ProfileScreen.routeName => (BuildContext _) =>
                 const ProfileScreen(),
             _ => (BuildContext _) => const AuthGate(),

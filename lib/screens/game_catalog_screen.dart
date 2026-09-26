@@ -11,6 +11,7 @@ import '../games/pattern_game.dart';
 import '../games/plant_lab_game.dart';
 import '../games/puzzle_game.dart';
 import '../games/reflex_game.dart';
+import '../games/scientists_game.dart';
 import '../games/sequence_memory_game.dart';
 import '../games/simon_game.dart';
 import '../games/stroop_game.dart';
@@ -166,6 +167,17 @@ const List<GameCatalogEntry> gameCatalog = [
     color: Colors.lightBlue,
     routeName: TownGame.routeName,
     skills: GameSkillRatings(zeka: 2, ingilizce: 0, iq: 1, hafiza: 2, dikkat: 4),
+  ),
+  GameCatalogEntry(
+    title: 'Bilim İnsanları',
+    description:
+        "Arşimet'ten Einstein'a ünlü "
+        'bilim insanlarından birini seç, '
+        'buluşunu 3B atölyede kendin deneyerek keşfet!',
+    icon: Icons.biotech,
+    color: Colors.cyan,
+    routeName: ScientistsGame.routeName,
+    skills: GameSkillRatings(zeka: 4, ingilizce: 0, iq: 3, hafiza: 2, dikkat: 3),
   ),
 ];
 
