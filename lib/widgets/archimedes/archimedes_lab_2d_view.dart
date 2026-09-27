@@ -138,7 +138,7 @@ class _LabPainter extends CustomPainter {
     final waterTop = bottom - level * pxPerCm;
     canvas.drawRect(
       Rect.fromLTRB(box.left, waterTop, box.right, bottom),
-      Paint()..color = _water.withValues(alpha: 0.55),
+      Paint()..color = _water.withValues(alpha: 0.3),
     );
 
     // Cetvel: her 5 cm'de bir çizgi.
@@ -187,6 +187,20 @@ class _LabPainter extends CustomPainter {
       final cx = box.left + tankW * (0.3 + 0.4 * ((k % 2 == 0) ? 0.2 : 0.8));
       lastTop = Offset(cx, objBottom - d - 2);
     }
+
+    // Suyun önü: cisimlerin su altındaki kısmı suyun içinde görünsün (yüzen
+    // cismin bir kısmı suyun üstünde, bir kısmı içinde kalır).
+    canvas.drawRect(
+      Rect.fromLTRB(box.left, waterTop, box.right, bottom),
+      Paint()..color = _water.withValues(alpha: 0.35),
+    );
+    canvas.drawLine(
+      Offset(box.left, waterTop),
+      Offset(box.right, waterTop),
+      Paint()
+        ..color = _waterDeep
+        ..strokeWidth = 1.5,
+    );
 
     // Kap çerçevesi (yanlar + taban, ağız açık).
     final wall = Paint()

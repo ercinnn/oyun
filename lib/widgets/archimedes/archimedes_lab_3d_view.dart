@@ -203,6 +203,7 @@ class _ArchimedesLab3DViewState extends Lab3DState<ArchimedesLab3DView> {
         wanted.add(key);
         _objects.putIfAbsent(key, () {
           final model = _model(o.modelId, fallbackColor: 0xFF7043, size: 0.35);
+          if (o.id == 'clay_bowl') model.add(_bowlAirMask());
           final holder = three.Object3D()..add(model);
           _tanks[i].root.add(holder);
           final box = three.BoundingBox().setFromObject(model);
@@ -219,6 +220,21 @@ class _ArchimedesLab3DViewState extends Lab3DState<ArchimedesLab3DView> {
       }
     }
     isolate(root);
+  }
+
+  /// Hamur kasenin ağzını kapatan görünmez disk: renk yazmaz, yalnızca
+  /// derinlik yazar ve opak parçalardan sonra, saydam sudan önce çizilir
+  /// (`renderOrder`). Böylece kabın suyu kasenin içinde görünmez; kase içi
+  /// boş (havalı) bir kap olarak suyun yüzeyinde yüzer. Ölçüler Blender'daki
+  /// kase profiliyle aynı (`build_archimedes.py`: iç ağız yarıçapı 0.51,
+  /// ağız yüksekliği 0.32).
+  three.Mesh _bowlAirMask() {
+    final mask = three.Mesh(
+      three.CylinderGeometry(0.505, 0.505, 0.004, 26),
+      three.MeshBasicMaterial.fromMap({'colorWrite': false}),
+    )..position.setValues(0, 0.316, 0);
+    mask.renderOrder = 1;
+    return mask;
   }
 
   _TankNodes _makeTank(three.Object3D root, double x, bool brimFull) {
@@ -329,8 +345,13 @@ class _ArchimedesLab3DViewState extends Lab3DState<ArchimedesLab3DView> {
         p.x += (sx - p.x) * min(1.0, dt * 3);
         p.z += (sz - p.z) * min(1.0, dt * 3);
         // Yerçekimi benzeri düşüş, suya girince yavaşlar; yüzen cisim salınır.
+        // Suda yüzen cisme yerçekimi eklenmez: kaldırma kuvveti onu dengeler
+        // ve yay onu tam [target]'a (batma oranı kadar gömülü) oturtur.
+        // (Eskiden eklenen yerçekimi dengeyi 4/12 birim aşağı kaydırıyor,
+        // yüzen cisimler olması gerekenden derin, kase tamamen suyun altında
+        // görünüyordu.)
         final inWater = p.y - node.baseOffset < nodes.level;
-        node.velocity -= (inWater ? 4 : 18) * dt;
+        node.velocity -= (inWater ? (o.floats ? 0 : 4) : 18) * dt;
         if (inWater) {
           node.velocity += (target - p.y) * 12 * dt;
           node.velocity *= pow(0.12, dt).toDouble();
