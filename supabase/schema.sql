@@ -12,16 +12,18 @@ create table if not exists public.game_results (
 
 alter table public.game_results enable row level security;
 
--- Uygulamanın henüz kullanıcı girişi (auth) yok; anon anahtarla oynayan
--- herkes sonuç yazabilsin ve skor tablosunu okuyabilsin.
+-- `to anon, authenticated`: AuthGate herkesi Google ile giriş yaptırdığı
+-- için Supabase istekleri fiilen hep `authenticated` rolüyle gidiyor —
+-- yalnızca `anon`'a izin vermek RLS'in isteği sessizce reddetmesine yol
+-- açıyordu (kayıt hataları yutulduğu için fark edilmemişti).
 create policy "Anyone can insert game results"
   on public.game_results for insert
-  to anon
+  to anon, authenticated
   with check (true);
 
 create policy "Anyone can read game results"
   on public.game_results for select
-  to anon
+  to anon, authenticated
   using (true);
 
 -- Satranç: internetten (oda kodu ile) oynanan iki kişilik maçlar.
