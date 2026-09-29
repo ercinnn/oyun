@@ -9,6 +9,7 @@ import '../models/chess_piece.dart';
 import '../models/chess_time_control.dart';
 import '../widgets/player_count_selector.dart';
 import 'chess_lesson_list_screen.dart';
+import 'chess_online_setup_screen.dart';
 
 class ChessSetupScreen extends StatefulWidget {
   const ChessSetupScreen({super.key});
@@ -200,6 +201,21 @@ class _ChessSetupScreenState extends State<ChessSetupScreen> {
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text('Oyunu Başlat'),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('chessOnlineButton'),
+                    onPressed: () {
+                      final controller = context.read<ChessController>();
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ChessOnlineSetupScreen(controller: controller),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.public),
+                    label: const Text('İnternetten Oyna'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(

@@ -47,6 +47,20 @@ class ChessController extends ChangeNotifier {
     : _moveSounds = moveSounds,
       _random = random ?? Random();
 
+  /// [ChessMode.online]'da yerel oyuncu bir hamle oynadığında tetiklenir;
+  /// odaya bağlı üst seviye ekran (bkz. `ChessOnlineSetupScreen`) bunu
+  /// dinleyip hamleyi karşı tarafa gönderir. Controller Supabase'i hiç
+  /// bilmez, yalnızca bu geri çağrıyı çağırır.
+  void Function(ChessMove move)? onLocalMove;
+
+  /// [ChessMode.online]'da odanın canlı akışına yapılan abonelik. Sahibi
+  /// `ChessOnlineSetupScreen`'dir; ömrü bu ekranın `State`'ine değil, bu
+  /// controller'a bağlanır (ekran hamleler başlarken kapanıp
+  /// `ChessGameScreen`'e geçilse de akış dinlemeye devam etmeli) —
+  /// [dispose]'da kapatılır. `StreamSubscription<dynamic>` bilerek: bu
+  /// dosya `data/`'daki Supabase türlerini bilmez.
+  StreamSubscription<dynamic>? networkSubscription;
+
   /// Bilgisayarın düşünme süresine uygulanan çarpan. Testler 0 yapıp
   /// gecikmeyi kapatır (sanal zamanda 5 saniye beklemek yerine); üretimde
   /// hep 1'dir.
@@ -165,6 +179,11 @@ class ChessController extends ChangeNotifier {
   bool get _isHumanTurn =>
       mode == ChessMode.twoPlayer || board.sideToMove == humanColor;
 
+  /// [ChessMode.online]'da rakibin ağdan gelen hamlesini uygular
+  /// (`selectSquare`'in aksine sıra kontrolü yapmaz — hamle zaten karşı
+  /// tarafta oynandı, burada sadece yansıtılıyor).
+  void applyRemoteMove(ChessMove move) => _commitMove(move, fromRemote: true);
+
   /// [timeControl] varsayılanı bilerek [ChessTimeControl.unlimited]: süreli
   /// bir oyun periyodik bir `Timer` kurar, bu da `pumpAndSettle()` kullanan
   /// mevcut widget testlerini asla "settle" edemez hâle getirirdi. Kurulum
@@ -177,12 +196,19 @@ class ChessController extends ChangeNotifier {
     ChessDifficulty difficulty = chessDefaultDifficulty,
     ChessTimeControl timeControl = ChessTimeControl.unlimited,
   }) {
+    if (mode != ChessMode.online) {
+      // Önceki bir online oyundan kalmış olabilecek bağlantıyı, yeni yerel/
+      // bilgisayara karşı oyuna hamle sızdırmasın diye kapat.
+      networkSubscription?.cancel();
+      networkSubscription = null;
+      onLocalMove = null;
+    }
     _generation++;
     board = ChessBoard.initial();
     this.mode = mode;
     this.whiteName = whiteName;
     this.blackName = blackName;
-    this.humanColor = mode == ChessMode.vsAi ? humanColor : null;
+    this.humanColor = mode == ChessMode.twoPlayer ? null : humanColor;
     this.difficulty = difficulty;
     this.timeControl = timeControl;
     final initialTime = timeControl.initialTime ?? Duration.zero;
@@ -298,7 +324,7 @@ class ChessController extends ChangeNotifier {
     evaluationCentipawns = _ai.evaluateForWhite(board);
   }
 
-  void _commitMove(ChessMove move) {
+  void _commitMove(ChessMove move, {bool fromRemote = false}) {
     _applyAndRecord(move);
     selectedSquare = null;
     selectedSquareLegalMoves = [];
@@ -310,6 +336,9 @@ class ChessController extends ChangeNotifier {
         mode == ChessMode.vsAi &&
         board.sideToMove != humanColor) {
       unawaited(_makeAiMove());
+    }
+    if (!fromRemote && mode == ChessMode.online) {
+      onLocalMove?.call(move);
     }
   }
 
@@ -416,6 +445,7 @@ class ChessController extends ChangeNotifier {
   @override
   void dispose() {
     _stopClock();
+    networkSubscription?.cancel();
     _moveSounds?.dispose();
     super.dispose();
   }

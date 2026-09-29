@@ -21,7 +21,7 @@ migrate_working_dir/
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -53,3 +53,6 @@ app.*.map.json
 # Blender kaynak dosyaları yalnızca yerelde tutulur (ikili; depoyu şişirmesin)
 *.blend
 *.blend1
+
+# Bilim İnsanları için kaynak poster (3/A); yalnızca yerelde tutulur
+/bilim-insanlari.jpg

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -67,6 +68,8 @@ import 'package:bombali_sayilar/controllers/simon_controller.dart';
 import 'package:bombali_sayilar/controllers/stroop_controller.dart';
 import 'package:bombali_sayilar/controllers/sudoku_controller.dart';
 import 'package:bombali_sayilar/controllers/theme_controller.dart';
+import 'package:bombali_sayilar/data/chess_room_service.dart';
+import 'package:bombali_sayilar/data/in_memory_chess_room_service.dart';
 import 'package:bombali_sayilar/main.dart';
 import 'package:bombali_sayilar/models/chess_board.dart';
 import 'package:bombali_sayilar/models/chess_difficulty.dart';
@@ -3092,6 +3095,84 @@ void main() {
       lessThan(ChessDifficulty.cokZor.timeBudgetMs * 2),
     );
   });
+
+  test(
+    'Chess online: host bir hamle oynayınca guest\'in controller\'ına '
+    'ağ üzerinden yansır',
+    () async {
+      // İki cihazı taklit eden iki ayrı ChessController, aynı bellek içi
+      // "sunucu" (InMemoryChessRoomService) üzerinden eşleşiyor —
+      // ChessOnlineSetupScreen'in `_beginGame`/`_applyRemoteMoves`
+      // kablolamasının bire bir aynısı, widget'sız olarak.
+      final service = InMemoryChessRoomService();
+      final host = ChessController();
+      final guest = ChessController();
+      addTearDown(host.dispose);
+      addTearDown(guest.dispose);
+
+      void wire(ChessController controller, String code) {
+        controller.onLocalMove = (move) {
+          final payload = [
+            for (final m in controller.board.moveHistory)
+              ChessRoomMove(
+                from: m.from,
+                to: m.to,
+                promotionType: m.promotionType,
+              ),
+          ];
+          unawaited(service.pushMove(code, payload));
+        };
+        controller.networkSubscription = service.watchRoom(code).listen((
+          update,
+        ) {
+          final localCount = controller.board.moveHistory.length;
+          for (var i = localCount; i < update.moves.length; i++) {
+            final entry = update.moves[i];
+            final legal = controller.board.legalMovesFrom(entry.from);
+            final move = legal.firstWhere(
+              (m) =>
+                  m.to == entry.to && m.promotionType == entry.promotionType,
+            );
+            controller.applyRemoteMove(move);
+          }
+        });
+      }
+
+      final room = await service.createRoom(
+        hostName: 'Ev Sahibi',
+        timeControl: ChessTimeControl.unlimited,
+      );
+      wire(host, room.code);
+      host.startGame(
+        mode: ChessMode.online,
+        whiteName: 'Ev Sahibi',
+        blackName: 'Konuk',
+        humanColor: PieceColor.white,
+      );
+
+      await service.joinRoom(code: room.code, guestName: 'Konuk');
+      wire(guest, room.code);
+      guest.startGame(
+        mode: ChessMode.online,
+        whiteName: 'Ev Sahibi',
+        blackName: 'Konuk',
+        humanColor: PieceColor.black,
+      );
+
+      final from = squareIndex(4, 1); // e2
+      final to = squareIndex(4, 3); // e4
+      host.selectSquare(from);
+      host.selectSquare(to);
+      // Bellek içi servis Stream tabanlı olduğu için teslimat en az bir
+      // mikrotask sonra gerçekleşir; bekleyen tüm mikrotaskları boşalt.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(host.board.squares[to]?.type, PieceType.pawn);
+      expect(guest.board.squares[to]?.type, PieceType.pawn);
+      expect(guest.board.squares[from], isNull);
+      expect(guest.currentColor, PieceColor.black);
+    },
+  );
 
   testWidgets(
     'Çarpım Bahçesi: oyun ilk turda ızgarayı ve 4 seçeneği gösterir',
