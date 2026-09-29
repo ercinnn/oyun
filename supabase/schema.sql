@@ -43,19 +43,23 @@ create table if not exists public.chess_rooms (
 
 alter table public.chess_rooms enable row level security;
 
+-- `to anon, authenticated`: uygulamada AuthGate herkesi Google ile giriş
+-- yaptırdığı için Supabase istekleri fiilen hep `authenticated` rolüyle
+-- gidiyor (yalnızca `anon`'a izin vermek RLS'in isteği sessizce reddetmesine
+-- yol açar — oda kurulamaz).
 create policy "Anyone can create a chess room"
   on public.chess_rooms for insert
-  to anon
+  to anon, authenticated
   with check (true);
 
 create policy "Anyone can read chess rooms"
   on public.chess_rooms for select
-  to anon
+  to anon, authenticated
   using (true);
 
 create policy "Anyone can update a chess room"
   on public.chess_rooms for update
-  to anon
+  to anon, authenticated
   using (true)
   with check (true);
 
